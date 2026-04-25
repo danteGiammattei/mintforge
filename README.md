@@ -116,21 +116,36 @@ If your D1 was created before locked coins / friends were added, run:
 npx wrangler d1 execute mintforge --file=./migrations/001_locked_friends.sql --remote
 ```
 
-This adds the `locked` column to `coins` and creates the `friends` table.
-Idempotent for the friends table; the `ALTER TABLE` will error if already applied — safe to ignore.
+If your D1 was created before tarot cards / pickaxe durability / marks currency, run:
 
-## API surface (updated)
+```bash
+npx wrangler d1 execute mintforge --file=./migrations/002_marks_durability_tarot.sql --remote
+```
+
+Both migrations are idempotent for the `CREATE TABLE IF NOT EXISTS` statements.
+The `ALTER TABLE … ADD COLUMN` statements will error with "duplicate column name" if already applied — safe to ignore.
+
+## API surface (current)
 
 | Method | Path                       | Auth | Purpose                                         |
 |--------|----------------------------|------|-------------------------------------------------|
 | POST   | `/api/auth/register`       | —    | Create account + session                        |
 | POST   | `/api/auth/login`          | —    | Authenticate + session                          |
 | POST   | `/api/auth/logout`         | ✓    | Revoke session                                  |
-| GET    | `/api/vault`               | ✓    | Full player state + coin list                   |
-| POST   | `/api/vault`               | ✓    | Transactional `{remove?, add?, lock?, state?}`  |
+| GET    | `/api/vault`               | ✓    | Full player state + coin list + tarots          |
+| POST   | `/api/vault`               | ✓    | Transactional `{remove?, add?, lock?, tarotBuy?, tarotSell?, state?}` |
 | GET    | `/api/users/search?q=`     | ✓    | Username prefix search (max 10)                 |
 | GET    | `/api/users/:username`     | ✓    | Public profile + showcase coins                 |
 | GET    | `/api/friends`             | ✓    | List your friends                               |
 | POST   | `/api/friends`             | ✓    | `{username}` — add friend                       |
 | DELETE | `/api/friends`             | ✓    | `{username}` — remove friend                    |
+
+## Game systems
+
+- **Coins** — the collectables. Found via Hunt, identity derived from a 32-bit seed (so DB rows stay tiny — `{id, seed, metalIdx, shiny, locked}`). All visual properties are reconstructed client-side via `mkCoin(seed)`.
+- **Marks (◈)** — the spendable currency. Earned at ~30% of a coin's value on discovery, or by selling coins from the inspect modal. Spent on tarot cards and pickaxe repairs.
+- **Pickaxe durability** — each dig costs 1 durability (Hierophant tarot halves it). Broken pickaxes refuse to dig until repaired in the Tavern. Repair cost scales with shovel level.
+- **Tarot cards** — purchased once each from the Tavern shop, equip up to 5 simultaneously for stacking buffs (shiny chance, XP multiplier, marks multiplier, tier-up rolls, durability reduction, pin slots, lucky-dig chance, forge refund).
+- **Brush** — capped at 15% shiny chance at max level (was 35%) to leave room for tarot stacking. Tarot bonuses apply on top of the brush rate.
+
 

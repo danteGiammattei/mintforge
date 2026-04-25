@@ -1,18 +1,31 @@
 import { json, bad, getAuth } from "../_utils.js";
 
-/*  GET  /api/vault
-    Returns the full hydrated player state.
-*/
+/* Valid tarot card IDs — kept in lockstep with the client TAROT_CARDS catalog.
+   Anything not in this set is rejected for both purchase persistence and equip. */
+const VALID_TAROT_IDS = new Set([
+  "magician","high_priestess","empress","emperor","hierophant","lovers",
+  "chariot","strength","hermit","wheel_of_fortune","justice","hanged_man",
+]);
+
+/*  GET  /api/vault — full hydrated player state. */
 export async function onRequestGet({ request, env }) {
   const auth = await getAuth(request, env);
   if (!auth) return bad("Unauthorized", 401);
   const pid = auth.player.id;
 
-  const [state, coins] = await Promise.all([
-    env.DB.prepare(`SELECT xp, shovel_level, brush_level, frame, bio, selected_title, pinned_ids
-                      FROM player_state WHERE player_id = ?1`).bind(pid).first(),
-    env.DB.prepare(`SELECT id, seed, metal_idx, shiny, locked, acquired_at FROM coins
-                      WHERE player_id = ?1 ORDER BY acquired_at DESC`).bind(pid).all(),
+  const [state, coins, tarots] = await Promise.all([
+    env.DB.prepare(
+      `SELECT xp, shovel_level, brush_level, frame, bio, selected_title,
+              pinned_ids, marks, shovel_dur, equipped_tarots
+         FROM player_state WHERE player_id = ?1`
+    ).bind(pid).first(),
+    env.DB.prepare(
+      `SELECT id, seed, metal_idx, shiny, locked, acquired_at FROM coins
+        WHERE player_id = ?1 ORDER BY acquired_at DESC`
+    ).bind(pid).all(),
+    env.DB.prepare(
+      `SELECT card_id FROM tarot_cards WHERE player_id = ?1 ORDER BY acquired_at`
+    ).bind(pid).all(),
   ]);
 
   if (!state) return bad("State missing — contact support", 500);
@@ -26,6 +39,10 @@ export async function onRequestGet({ request, env }) {
     bio: state.bio || "",
     selectedTitle: state.selected_title,
     pinnedIds: state.pinned_ids ? JSON.parse(state.pinned_ids) : null,
+    marks: state.marks || 0,
+    shovelDur: state.shovel_dur != null ? state.shovel_dur : 40,
+    ownedTarots: (tarots.results || []).map(r => r.card_id),
+    equippedTarots: state.equipped_tarots ? JSON.parse(state.equipped_tarots) : [],
     coins: (coins.results || []).map(r => ({
       id: r.id,
       seed: r.seed >>> 0,
@@ -36,14 +53,17 @@ export async function onRequestGet({ request, env }) {
   });
 }
 
-/*  POST /api/vault/tx   (also accepts POST /api/vault)
-    Transactional update.  Body shape:
+/*  POST /api/vault — transactional update.
+    Body shape:
       {
-        add?:    [ { id, seed, metalIdx, shiny } ],
-        remove?: [ id, id, ... ],
-        state?:  { xp?, shovelLevel?, brushLevel?, frame?, bio?, selectedTitle?, pinnedIds? }
+        add?:    [ { id, seed, metalIdx, shiny, locked? } ],
+        remove?: [ id, ... ],
+        lock?:   [ { id, locked } ],
+        tarotBuy?:    [ cardId, ... ],
+        tarotSell?:   [ cardId, ... ],
+        state?:  { xp?, shovelLevel?, brushLevel?, frame?, bio?, selectedTitle?, pinnedIds?,
+                   marks?, shovelDur?, equippedTarots? }
       }
-    All three are optional; whatever is present is applied atomically.
 */
 export async function onRequestPost({ request, env }) {
   const auth = await getAuth(request, env);
@@ -56,9 +76,8 @@ export async function onRequestPost({ request, env }) {
   const stmts = [];
   const now = Date.now();
 
-  // ── coin removals ─────────────────────────────────────────────
+  // ── coin removals ────────────────────────────────────────────
   if (Array.isArray(body.remove) && body.remove.length) {
-    // cap to 200 per request to prevent abuse
     const ids = body.remove.slice(0, 200).filter(x => typeof x === "string" && x.length <= 80);
     const placeholders = ids.map((_, i) => `?${i + 2}`).join(",");
     if (ids.length) {
@@ -68,7 +87,7 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  // ── coin additions ────────────────────────────────────────────
+  // ── coin additions ───────────────────────────────────────────
   if (Array.isArray(body.add) && body.add.length) {
     for (const c of body.add.slice(0, 50)) {
       if (typeof c?.id !== "string" || c.id.length > 80) continue;
@@ -81,8 +100,7 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  // ── lock toggle ───────────────────────────────────────────────
-  // body.lock = [{ id, locked }, ...]   sets the locked flag for owned coins
+  // ── lock toggle ──────────────────────────────────────────────
   if (Array.isArray(body.lock) && body.lock.length) {
     for (const op of body.lock.slice(0, 50)) {
       if (typeof op?.id !== "string" || op.id.length > 80) continue;
@@ -92,7 +110,27 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  // ── scalar state patch ────────────────────────────────────────
+  // ── tarot purchases ──────────────────────────────────────────
+  // Just stores ownership — actual marks deduction is a state.marks update sent in the same request
+  if (Array.isArray(body.tarotBuy) && body.tarotBuy.length) {
+    for (const cid of body.tarotBuy.slice(0, 12)) {
+      if (typeof cid !== "string" || !VALID_TAROT_IDS.has(cid)) continue;
+      stmts.push(env.DB.prepare(
+        `INSERT OR IGNORE INTO tarot_cards (player_id, card_id, acquired_at) VALUES (?1, ?2, ?3)`
+      ).bind(pid, cid, now));
+    }
+  }
+
+  if (Array.isArray(body.tarotSell) && body.tarotSell.length) {
+    for (const cid of body.tarotSell.slice(0, 12)) {
+      if (typeof cid !== "string") continue;
+      stmts.push(env.DB.prepare(
+        `DELETE FROM tarot_cards WHERE player_id = ?1 AND card_id = ?2`
+      ).bind(pid, cid));
+    }
+  }
+
+  // ── scalar state patch ───────────────────────────────────────
   if (body.state && typeof body.state === "object") {
     const s = body.state;
     const fields = [];
@@ -107,7 +145,14 @@ export async function onRequestPost({ request, env }) {
     if (typeof s.selectedTitle === "string") add("selected_title", String(s.selectedTitle).slice(0, 40));
     if ("pinnedIds" in s) {
       if (s.pinnedIds === null) add("pinned_ids", null);
-      else if (Array.isArray(s.pinnedIds)) add("pinned_ids", JSON.stringify(s.pinnedIds.slice(0, 6)));
+      // accept up to 8 pinned (default 6 + Lovers tarot adds 2)
+      else if (Array.isArray(s.pinnedIds)) add("pinned_ids", JSON.stringify(s.pinnedIds.slice(0, 8)));
+    }
+    if (Number.isFinite(s.marks))        add("marks", Math.max(0, s.marks | 0));
+    if (Number.isFinite(s.shovelDur))    add("shovel_dur", Math.max(0, Math.min(500, s.shovelDur | 0)));
+    if (Array.isArray(s.equippedTarots)) {
+      const filtered = s.equippedTarots.filter(c => typeof c === "string" && VALID_TAROT_IDS.has(c)).slice(0, 5);
+      add("equipped_tarots", JSON.stringify(filtered));
     }
 
     if (fields.length) {

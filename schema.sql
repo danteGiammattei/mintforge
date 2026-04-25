@@ -1,6 +1,6 @@
--- MintForge D1 schema
+-- MintForge D1 schema (canonical — fresh deploys)
 -- Apply with:  npx wrangler d1 execute mintforge --file=./schema.sql --remote
--- For existing databases, run migrations from ./migrations/ instead.
+-- For existing databases, run the relevant files in ./migrations/ instead.
 
 CREATE TABLE IF NOT EXISTS players (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS player_state (
   bio             TEXT    NOT NULL DEFAULT '',
   selected_title  TEXT    NOT NULL DEFAULT 'Novice Digger',
   pinned_ids      TEXT,
+  marks           INTEGER NOT NULL DEFAULT 0,
+  shovel_dur      INTEGER NOT NULL DEFAULT 40,
+  equipped_tarots TEXT,
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 
@@ -54,3 +57,12 @@ CREATE TABLE IF NOT EXISTS friends (
 );
 CREATE INDEX IF NOT EXISTS friends_player_idx ON friends(player_id);
 CREATE INDEX IF NOT EXISTS friends_friend_idx ON friends(friend_id);
+
+CREATE TABLE IF NOT EXISTS tarot_cards (
+  player_id   INTEGER NOT NULL,
+  card_id     TEXT    NOT NULL,
+  acquired_at INTEGER NOT NULL,
+  PRIMARY KEY (player_id, card_id),
+  FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS tarot_cards_player_idx ON tarot_cards(player_id);
