@@ -105,7 +105,7 @@ export async function onRequestPost({ request, env }) {
     for (const c of body.add.slice(0, 50)) {
       if (typeof c?.id !== "string" || c.id.length > 80) continue;
       if (typeof c.seed !== "number") continue;
-      if (typeof c.metalIdx !== "number" || c.metalIdx < 0 || c.metalIdx > 6) continue;
+      if (typeof c.metalIdx !== "number" || c.metalIdx < 0 || c.metalIdx > 8) continue;
       stmts.push(env.DB.prepare(
         `INSERT OR REPLACE INTO coins (id, player_id, seed, metal_idx, shiny, locked, acquired_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
