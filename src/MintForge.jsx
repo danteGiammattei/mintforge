@@ -63,6 +63,8 @@ button{-webkit-tap-highlight-color:transparent;}
 @keyframes particleFly{0%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(.4)}}
 @keyframes luckySlam{0%{opacity:0;transform:translateY(-44px) scale(.55)}50%{transform:translateY(5px) scale(1.1)}70%{transform:translateY(-3px) scale(.96)}100%{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes flicker{0%,100%{opacity:1}45%{opacity:.84}55%{opacity:1}}
+@keyframes pickSwing{0%{transform:translate(-50%,-90%) rotate(-55deg) scale(.9);opacity:.95}45%{transform:translate(-50%,-90%) rotate(20deg) scale(1.18);opacity:1}100%{transform:translate(-50%,-90%) rotate(0deg) scale(.7);opacity:0}}
+@keyframes pickSwingCell{0%{transform:rotate(-50deg) scale(.8);opacity:.9}45%{transform:rotate(15deg) scale(1.25);opacity:1}100%{transform:rotate(0) scale(.6);opacity:0}}
 .shiny-card{animation:shinyPulse 2.4s linear infinite!important}
 .noise-overlay{position:absolute;inset:0;pointer-events:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/></svg>");mix-blend-mode:overlay}
 .tab-active-indicator{position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:2px;border-radius:0 0 2px 2px;background:currentColor;box-shadow:0 0 8px currentColor}
@@ -279,11 +281,16 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,t,isDark}){
   },[coin.seed,shovelLevel]);
 
   const[dug,setDug]=useState({});const[shake,setShake]=useState(null);const[found,setFound]=useState(null);
+  const[touchPick,setTouchPick]=useState(null);  // {x,y} screen coords for touch follower
+  const[swingCell,setSwingCell]=useState(null);  // cell idx currently animating swing
   const cntRef=useRef(0);
-  useEffect(()=>{setDug({});setShake(null);setFound(null);cntRef.current=0;},[coin.seed]);
+  // Reset when coin changes (per-hunt freshness)
+  useEffect(()=>{setDug({});setShake(null);setFound(null);cntRef.current=0;setTouchPick(null);setSwingCell(null);},[coin.seed]);
 
-  const dig=(idx)=>{
+  const dig=(idx,e)=>{
     if(dug[idx]||found!==null)return;
+    // Trigger swing animation in the clicked cell (visual feedback for both PC + mobile)
+    setSwingCell(idx);setTimeout(()=>setSwingCell(c=>c===idx?null:c),380);
     if(idx===coinCell&&depths[idx]>shovelLevel){
       setShake(idx);setTimeout(()=>setShake(null),500);
       onTooDeep(depths[idx]);return;
@@ -292,19 +299,28 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,t,isDark}){
     setDug(p=>({...p,[idx]:true}));
     if(idx===coinCell){setFound(idx);setTimeout(()=>onFound(cnt,GRID*GRID),600);}
   };
+  // Track finger position over the pit (touch only — mouse uses native cursor + hover)
+  const trackPointer=(e)=>{
+    if(e.pointerType==="mouse"){setTouchPick(null);return;}
+    setTouchPick({x:e.clientX,y:e.clientY});
+  };
   const cellSize=64;
   return(
-    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
-      <div style={{padding:12,paddingTop:18,background:isDark?"linear-gradient(to bottom,#231408,#170c04)":"linear-gradient(to bottom,#6a4218,#3a240c)",border:`3px solid ${isDark?"#5a3c18":"#8a5828"}`,borderRadius:16,boxShadow:`inset 0 6px 24px rgba(0,0,0,.7),0 8px 24px rgba(0,0,0,.4)`,position:"relative"}}>
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,position:"relative"}}>
+      {/* Touch-only floating pickaxe so the player can see where they're about to tap */}
+      {touchPick&&<div style={{position:"fixed",left:touchPick.x,top:touchPick.y,pointerEvents:"none",zIndex:60,fontSize:34,transform:"translate(-50%,-90%) rotate(-25deg)",filter:"drop-shadow(0 2px 4px rgba(0,0,0,.7))"}}>⛏</div>}
+      <div style={{padding:12,paddingTop:18,background:isDark?"linear-gradient(to bottom,#231408,#170c04)":"linear-gradient(to bottom,#6a4218,#3a240c)",border:`3px solid ${isDark?"#5a3c18":"#8a5828"}`,borderRadius:16,boxShadow:`inset 0 6px 24px rgba(0,0,0,.7),0 8px 24px rgba(0,0,0,.4)`,position:"relative"}}
+        onPointerMove={trackPointer} onPointerDown={trackPointer} onPointerLeave={()=>setTouchPick(null)}>
         <div style={{position:"absolute",top:0,left:0,right:0,height:14,background:"linear-gradient(to bottom,#8a5a28,#4a2c10)",borderRadius:"13px 13px 0 0",borderBottom:"1px solid #2a1808"}}/>
         <div style={{display:"grid",gridTemplateColumns:`repeat(${GRID},1fr)`,gap:7}}>
           {Array.from({length:GRID*GRID},(_,idx)=>{
             const isDug=!!dug[idx],isFound=found===idx,isShaking=shake===idx;
             const tooDeep=isDug&&idx===coinCell&&depths[idx]>shovelLevel;
+            const isSwinging=swingCell===idx;
             const cr=new RNG(coin.seed^idx^0xba5e);
             const sc=["#c8a460","#c09858","#bfa066","#c8aa70","#d0b070"][cr.int(0,4)];
             return(
-              <div key={idx} onClick={()=>dig(idx)} style={{width:cellSize,height:cellSize,borderRadius:9,position:"relative",overflow:"hidden",border:`1.5px solid ${isDug?"#3a2410":"#6a4220"}`,cursor:isDug?"default":"pointer",animation:isShaking?"shake .4s ease-out":isFound?"cellReveal .5s ease-out":"none",background:isDug?(isFound?"#1a2810":tooDeep?"#2a1408":"#3a2210"):"transparent",transition:"background .15s,border-color .15s"}}
+              <div key={idx} onPointerDown={(e)=>dig(idx,e)} style={{width:cellSize,height:cellSize,borderRadius:9,position:"relative",overflow:"hidden",border:`1.5px solid ${isDug?"#3a2410":"#6a4220"}`,cursor:isDug?"default":"pointer",animation:isShaking?"shake .4s ease-out":isFound?"cellReveal .5s ease-out":"none",background:isDug?(isFound?"#1a2810":tooDeep?"#2a1408":"#3a2210"):"transparent",transition:"background .15s,border-color .15s",touchAction:"manipulation"}}
                 onMouseEnter={e=>{if(!isDug){e.currentTarget.style.borderColor="#d4a017";const h=e.currentTarget.querySelector(".hl");if(h)h.style.opacity="1";}}}
                 onMouseLeave={e=>{if(!isDug){e.currentTarget.style.borderColor="#6a4220";const h=e.currentTarget.querySelector(".hl");if(h)h.style.opacity="0";}}}>
                 {!isDug&&<>
@@ -317,6 +333,8 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,t,isDark}){
                 {isDug&&!isFound&&!tooDeep&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:"78%",height:"78%",borderRadius:5,background:"#1e1008",boxShadow:"inset 0 2px 8px rgba(0,0,0,.85)"}}/></div>}
                 {tooDeep&&<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",fontFamily:"VT323,monospace",fontSize:14,color:"#e04020",lineHeight:1,letterSpacing:1,textShadow:"0 0 8px #c0301088"}}><span>TOO</span><span>DEEP</span></div>}
                 {isFound&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,animation:"digPop .35s ease-out"}}>✦</div>}
+                {/* Per-cell swing animation on tap — works on both PC and mobile */}
+                {isSwinging&&<div key={`swing-${idx}-${cntRef.current}`} style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,pointerEvents:"none",animation:"pickSwingCell .38s ease-out forwards",filter:"drop-shadow(0 2px 4px rgba(0,0,0,.8))",zIndex:5}}>⛏</div>}
               </div>
             );
           })}
@@ -775,6 +793,18 @@ export default function MintForge(){
   },[phase]);
 
   const onDig=()=>{if(!canDig||phase!=="hunt")return;setFoundCoin(huntCoin);setTooDeepMsg(null);setPhase("dig");};
+
+  // Enter / Space to dig — desktop convenience so you don't need to click off the field
+  useEffect(()=>{
+    if(tab!=="hunt"||phase!=="hunt"||!canDig)return;
+    const h=(e)=>{
+      // Skip if typing in a form field
+      if(e.target?.tagName==="INPUT"||e.target?.tagName==="TEXTAREA"||e.target?.tagName==="SELECT")return;
+      if(e.key==="Enter"||e.key===" "){e.preventDefault();onDig();}
+    };
+    window.addEventListener("keydown",h);
+    return()=>window.removeEventListener("keydown",h);
+  },[tab,phase,canDig]); // eslint-disable-line
   const onDigFound=(cnt,total)=>{
     if(cnt<=2){setFoundCoin(p=>p?{...p,metalIdx:Math.min(MAX_TIER,p.metalIdx+1),digBonus:"lucky"}:p);setShowLucky(true);}
     else if(cnt>=total){setFoundCoin(p=>p?{...p,metalIdx:Math.max(0,p.metalIdx-1),digBonus:"damaged"}:p);}
@@ -899,30 +929,33 @@ export default function MintForge(){
         {/* ─── PROFILE ─── */}
         {tab==="profile"&&(
           <div style={{animation:"fadein .35s ease"}}>
-            <div style={{height:170,borderRadius:"0 0 20px 20px",background:BANNERS[frame],position:"relative",overflow:"hidden",marginTop:-18,marginLeft:-14,marginRight:-14,border:`1px solid ${t.border}`,borderTop:"none"}}>
+            <div style={{height:130,borderRadius:"0 0 20px 20px",background:BANNERS[frame],position:"relative",overflow:"hidden",marginTop:-18,marginLeft:-14,marginRight:-14,border:`1px solid ${t.border}`,borderTop:"none"}}>
               <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 30% 60%,rgba(255,255,255,.06),transparent 65%)"}}/>
               <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 70% 30%,rgba(212,160,23,.08),transparent 60%)"}}/>
               <div className="noise-overlay" style={{opacity:.06}}/>
-              <div style={{position:"absolute",bottom:10,left:14,...microLabel,color:fr.accent}}>{fr.lbl} Banner</div>
               <div style={{position:"absolute",top:12,right:14}}>
                 <select value={frame} onChange={e=>setFrame(e.target.value)} style={{background:"rgba(0,0,0,.6)",border:`1px solid rgba(255,255,255,.16)`,color:"#c8b89a",borderRadius:6,padding:"4px 10px",...F,fontSize:11,cursor:"pointer",fontWeight:600,letterSpacing:.5}}>
                   {Object.entries(FRAMES).map(([k,f])=><option key={k} value={k} disabled={level<f.minLvl}>{f.lbl}{level<f.minLvl?` · Lv${f.minLvl}`:""}</option>)}
                 </select>
               </div>
+              <div style={{position:"absolute",bottom:8,left:16,...microLabel,fontSize:9,color:fr.accent,opacity:.7}}>{fr.lbl}</div>
             </div>
 
-            <div style={{marginTop:-44,marginBottom:14,display:"flex",justifyContent:"space-between",alignItems:"flex-end",flexWrap:"wrap",gap:8,padding:"0 4px"}}>
+            {/* Avatar lifts halfway out of the banner */}
+            <div style={{marginTop:-44,marginBottom:12,padding:"0 4px"}}>
               <div style={{width:88,height:88,borderRadius:"50%",border:`4px solid ${t.bg}`,background:t.surface,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 8px 24px rgba(0,0,0,.25),0 0 0 1px ${fr.accent}66`}}>
                 {showcaseCoins[0]?<CoinCanvas coin={showcaseCoins[0]} size={80}/>:<span style={{fontSize:30,opacity:.3}}>⚒</span>}
               </div>
-              <div style={{display:"flex",gap:8,paddingBottom:6}}>
-                {[["Coins",coins.length],["Score",rarityScore(coins).toLocaleString()],["✦",coins.filter(c=>c.shiny).length]].map(([k,v])=>(
-                  <div key={k} style={{padding:"9px 13px",...card,textAlign:"center",minWidth:60}}>
-                    <div style={{...FR,fontWeight:800,fontSize:18,color:t.text,letterSpacing:-.5,fontVariantNumeric:"tabular-nums"}}>{v}</div>
-                    <div style={{...microLabel,fontSize:9,marginTop:1}}>{k}</div>
-                  </div>
-                ))}
-              </div>
+            </div>
+
+            {/* Stats row — sits cleanly BELOW banner, full width */}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:14,padding:"0 4px"}}>
+              {[["Coins",coins.length],["Score",rarityScore(coins).toLocaleString()],["✦ Shiny",coins.filter(c=>c.shiny).length]].map(([k,v])=>(
+                <div key={k} style={{padding:"10px 8px",...card,textAlign:"center"}}>
+                  <div style={{...FR,fontWeight:800,fontSize:20,color:t.text,letterSpacing:-.5,fontVariantNumeric:"tabular-nums",lineHeight:1}}>{v}</div>
+                  <div style={{...microLabel,fontSize:9,marginTop:4}}>{k}</div>
+                </div>
+              ))}
             </div>
 
             {!editingProfile?(
@@ -1014,15 +1047,31 @@ export default function MintForge(){
                 <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14,alignItems:"center"}}>
                   {[[-1,"All",coins.length],...METALS.map((m,i)=>[i,m.name,coins.filter(c=>c.metalIdx===i).length]).filter(x=>x[2]>0)].map(([idx,lbl,cnt])=>{const active=filter===idx;const mt=idx>=0?METALS[idx]:null;return(<button key={idx} onClick={()=>setFilter(idx)} style={{padding:"6px 13px",borderRadius:20,border:`1px solid ${active?(mt?.eng||t.accent):t.border}`,background:active?(mt?`${mt.dark}55`:t.surfaceHi):"transparent",color:active?(mt?.hl||t.accent):t.muted,...F,fontSize:11,fontWeight:600,cursor:"pointer",transition:"all .15s",letterSpacing:.5}}>{lbl}<span style={{marginLeft:5,opacity:.65,fontWeight:500,fontVariantNumeric:"tabular-nums"}}>{cnt}</span></button>);})}
                 </div>
-                <div style={{...mu,fontSize:11,marginBottom:10,fontStyle:"italic"}}>Tap to inspect · long-press to pin</div>
+                <div style={{...mu,fontSize:11,marginBottom:10,fontStyle:"italic"}}>Tap to inspect · double-tap to pin</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:9}}>
                   {visCoins.map(coin=>{const m=METALS[coin.metalIdx];const pinned=pinnedIds?pinnedIds.includes(coin.id):autoTop.some(c=>c.id===coin.id);return(
                     <div key={coin.id} className={coin.shiny?"shiny-card":""} style={{...card,padding:"13px 8px 10px",textAlign:"center",cursor:"pointer",border:`1px solid ${pinned?m.eng+"66":t.border}`,background:pinned?(isDark?`linear-gradient(160deg,${m.dark}30,${t.surface})`:t.surface):t.surface,transition:"all .18s",position:"relative"}}
                       onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=m.eng;}}
-                      onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.borderColor=pinned?m.eng+"66":t.border;clearTimeout(e.currentTarget._lp);e.currentTarget._didLong=false;}}
-                      onPointerDown={e=>{e.currentTarget._didLong=false;e.currentTarget._lp=setTimeout(()=>{e.currentTarget._didLong=true;togglePin(coin.id);},500);}}
-                      onPointerUp={e=>{clearTimeout(e.currentTarget._lp);if(!e.currentTarget._didLong)setSelectedCoin(coin);e.currentTarget._didLong=false;}}
-                      onPointerLeave={e=>{clearTimeout(e.currentTarget._lp);e.currentTarget._didLong=false;}}>
+                      onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.borderColor=pinned?m.eng+"66":t.border;}}
+                      onClick={e=>{
+                        // Double-tap detector: if a tap was registered <350ms ago, treat as double
+                        const now=Date.now();
+                        const last=e.currentTarget._lastTap||0;
+                        if(now-last<350){
+                          // double-tap: pin/unpin, cancel pending single-tap
+                          clearTimeout(e.currentTarget._tapT);
+                          e.currentTarget._lastTap=0;
+                          togglePin(coin.id);
+                        }else{
+                          // first tap: schedule single-tap action
+                          e.currentTarget._lastTap=now;
+                          const target=e.currentTarget;
+                          e.currentTarget._tapT=setTimeout(()=>{
+                            target._lastTap=0;
+                            setSelectedCoin(coin);
+                          },280);
+                        }
+                      }}>
                       {pinned&&<div style={{position:"absolute",top:7,right:7,width:6,height:6,borderRadius:"50%",background:m.hl,boxShadow:`0 0 6px ${m.hl}`}}/>}
                       {coin.shiny&&<div style={{position:"absolute",top:6,left:7,fontSize:10,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
                       <div style={{display:"flex",justifyContent:"center",marginBottom:7}}><CoinCanvas coin={coin} size={64}/></div>
@@ -1053,7 +1102,10 @@ export default function MintForge(){
                   </div>
                   <div style={{height:6,background:t.faint,borderRadius:3,overflow:"hidden",border:`1px solid ${t.border}`}}><div style={{width:`${signal*100}%`,height:"100%",borderRadius:3,background:`linear-gradient(to right,#2a3850,${signalColor})`,transition:"width .08s",boxShadow:`0 0 8px ${signalColor}55`}}/></div>
                 </div>
-                {canDig&&<button onClick={onDig} style={{padding:"11px 26px",borderRadius:11,border:`1px solid ${t.success}`,cursor:"pointer",background:isDark?"linear-gradient(135deg,#0e2810,#1e4820)":"linear-gradient(135deg,#e8f8ee,#bce8ca)",...F,fontWeight:800,fontSize:14,color:t.success,flexShrink:0,letterSpacing:2,textTransform:"uppercase",boxShadow:`0 4px 12px ${t.success}33`,animation:"flicker 1.4s linear infinite"}}>⛏ Dig</button>}
+                {canDig&&<button onClick={onDig} style={{padding:"11px 26px",borderRadius:11,border:`1px solid ${t.success}`,cursor:"pointer",background:isDark?"linear-gradient(135deg,#0e2810,#1e4820)":"linear-gradient(135deg,#e8f8ee,#bce8ca)",...F,fontWeight:800,fontSize:14,color:t.success,flexShrink:0,letterSpacing:2,textTransform:"uppercase",boxShadow:`0 4px 12px ${t.success}33`,animation:"flicker 1.4s linear infinite",display:"flex",alignItems:"center",gap:8}}>
+                  <span>⛏ Dig</span>
+                  <kbd style={{...F,fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"rgba(0,0,0,.25)",color:t.success,letterSpacing:.5,opacity:.85,border:`1px solid ${t.success}55`}}>↵</kbd>
+                </button>}
               </div>
               <div ref={fieldRef} onMouseMove={onFieldInteract} onTouchMove={onFieldInteract} onClick={onFieldInteract}
                 style={{position:"relative",height:280,borderRadius:16,overflow:"hidden",cursor:"crosshair",userSelect:"none",background:isDark?"radial-gradient(ellipse at center,#0e1018 0%,#06070c 100%)":"radial-gradient(ellipse at center,#e8e4d8,#c8c4b8)",border:`1px solid ${t.border}`,backgroundImage:`radial-gradient(circle,${isDark?"rgba(212,160,23,.06)":"rgba(0,0,0,.05)"} 1px,transparent 1px)`,backgroundSize:"24px 24px",touchAction:"none",boxShadow:`inset 0 0 60px rgba(0,0,0,.4)`}}>
