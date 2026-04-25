@@ -1,70 +1,82 @@
 import { json, bad, getAuth } from "../_utils.js";
 
-/* Valid tarot card IDs — kept in lockstep with the client TAROT_CARDS catalog.
-   Anything not in this set is rejected for both purchase persistence and equip. */
+/* Valid tarot card IDs — kept in lockstep with the client TAROT_CARDS catalog. */
 const VALID_TAROT_IDS = new Set([
   "magician","high_priestess","empress","emperor","hierophant","lovers",
   "chariot","strength","hermit","wheel_of_fortune","justice","hanged_man",
 ]);
 
-/*  GET  /api/vault — full hydrated player state. */
+/* Helper — try a query, return null on any failure (typically schema mismatch). */
+async function tryQuery(env, sql, ...binds) {
+  try {
+    const stmt = env.DB.prepare(sql).bind(...binds);
+    return await stmt.first();
+  } catch { return null; }
+}
+async function tryQueryAll(env, sql, ...binds) {
+  try {
+    const stmt = env.DB.prepare(sql).bind(...binds);
+    const r = await stmt.all();
+    return r.results || [];
+  } catch { return []; }
+}
+
+/*  GET  /api/vault — full hydrated player state.
+    Resilient to missing migrations: queries new columns separately and falls
+    back to defaults if they don't exist yet. */
 export async function onRequestGet({ request, env }) {
   const auth = await getAuth(request, env);
   if (!auth) return bad("Unauthorized", 401);
   const pid = auth.player.id;
 
-  const [state, coins, tarots] = await Promise.all([
-    env.DB.prepare(
-      `SELECT xp, shovel_level, brush_level, frame, bio, selected_title,
-              pinned_ids, marks, shovel_dur, equipped_tarots
-         FROM player_state WHERE player_id = ?1`
-    ).bind(pid).first(),
-    env.DB.prepare(
-      `SELECT id, seed, metal_idx, shiny, locked, acquired_at FROM coins
-        WHERE player_id = ?1 ORDER BY acquired_at DESC`
-    ).bind(pid).all(),
-    env.DB.prepare(
-      `SELECT card_id FROM tarot_cards WHERE player_id = ?1 ORDER BY acquired_at`
-    ).bind(pid).all(),
-  ]);
+  // Base query — must succeed. These columns exist since v1.
+  const baseState = await tryQuery(env,
+    `SELECT xp, shovel_level, brush_level, frame, bio, selected_title, pinned_ids
+       FROM player_state WHERE player_id = ?1`, pid);
 
-  if (!state) return bad("State missing — contact support", 500);
+  if (!baseState) return bad("State missing — your account may need recreating", 500);
+
+  // v2+ columns. Query independently so a missing migration doesn't 500 the whole endpoint.
+  const v2Extras = await tryQuery(env,
+    `SELECT marks, shovel_dur, equipped_tarots
+       FROM player_state WHERE player_id = ?1`, pid);
+
+  const coins = await tryQueryAll(env,
+    `SELECT id, seed, metal_idx, shiny, locked, acquired_at FROM coins
+      WHERE player_id = ?1 ORDER BY acquired_at DESC`, pid);
+
+  // tarot_cards table may not exist yet — empty array is the right default.
+  const tarots = await tryQueryAll(env,
+    `SELECT card_id FROM tarot_cards WHERE player_id = ?1 ORDER BY acquired_at`, pid);
 
   return json({
     username: auth.player.username,
-    xp: state.xp,
-    shovelLevel: state.shovel_level,
-    brushLevel: state.brush_level,
-    frame: state.frame,
-    bio: state.bio || "",
-    selectedTitle: state.selected_title,
-    pinnedIds: state.pinned_ids ? JSON.parse(state.pinned_ids) : null,
-    marks: state.marks || 0,
-    shovelDur: state.shovel_dur != null ? state.shovel_dur : 40,
-    ownedTarots: (tarots.results || []).map(r => r.card_id),
-    equippedTarots: state.equipped_tarots ? JSON.parse(state.equipped_tarots) : [],
-    coins: (coins.results || []).map(r => ({
+    xp: baseState.xp,
+    shovelLevel: baseState.shovel_level,
+    brushLevel: baseState.brush_level,
+    frame: baseState.frame,
+    bio: baseState.bio || "",
+    selectedTitle: baseState.selected_title,
+    pinnedIds: baseState.pinned_ids ? JSON.parse(baseState.pinned_ids) : null,
+    marks: v2Extras?.marks || 0,
+    shovelDur: v2Extras?.shovel_dur != null ? v2Extras.shovel_dur : 40,
+    ownedTarots: tarots.map(r => r.card_id),
+    equippedTarots: v2Extras?.equipped_tarots ? JSON.parse(v2Extras.equipped_tarots) : [],
+    coins: coins.map(r => ({
       id: r.id,
       seed: r.seed >>> 0,
       metalIdx: r.metal_idx,
       shiny: !!r.shiny,
       locked: !!r.locked,
     })),
+    // Flag the client can use to warn about pending migrations.
+    schemaWarning: v2Extras ? null : "Server is missing v3 migration — currency, durability, and tarot features will not persist.",
   });
 }
 
 /*  POST /api/vault — transactional update.
-    Body shape:
-      {
-        add?:    [ { id, seed, metalIdx, shiny, locked? } ],
-        remove?: [ id, ... ],
-        lock?:   [ { id, locked } ],
-        tarotBuy?:    [ cardId, ... ],
-        tarotSell?:   [ cardId, ... ],
-        state?:  { xp?, shovelLevel?, brushLevel?, frame?, bio?, selectedTitle?, pinnedIds?,
-                   marks?, shovelDur?, equippedTarots? }
-      }
-*/
+    Resilient: skips updates that target missing columns/tables rather than
+    failing the whole batch. */
 export async function onRequestPost({ request, env }) {
   const auth = await getAuth(request, env);
   if (!auth) return bad("Unauthorized", 401);
@@ -73,10 +85,11 @@ export async function onRequestPost({ request, env }) {
   let body;
   try { body = await request.json(); } catch { return bad("Invalid JSON"); }
 
-  const stmts = [];
+  const stmts = [];          // base statements that should always work
+  const optionalStmts = [];  // v2+ statements that may fail on un-migrated DBs
   const now = Date.now();
 
-  // ── coin removals ────────────────────────────────────────────
+  // ── coin removals ──────────────────────────────────────────
   if (Array.isArray(body.remove) && body.remove.length) {
     const ids = body.remove.slice(0, 200).filter(x => typeof x === "string" && x.length <= 80);
     const placeholders = ids.map((_, i) => `?${i + 2}`).join(",");
@@ -87,7 +100,7 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  // ── coin additions ───────────────────────────────────────────
+  // ── coin additions ─────────────────────────────────────────
   if (Array.isArray(body.add) && body.add.length) {
     for (const c of body.add.slice(0, 50)) {
       if (typeof c?.id !== "string" || c.id.length > 80) continue;
@@ -100,7 +113,7 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  // ── lock toggle ──────────────────────────────────────────────
+  // ── lock toggle ────────────────────────────────────────────
   if (Array.isArray(body.lock) && body.lock.length) {
     for (const op of body.lock.slice(0, 50)) {
       if (typeof op?.id !== "string" || op.id.length > 80) continue;
@@ -110,64 +123,80 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  // ── tarot purchases ──────────────────────────────────────────
-  // Just stores ownership — actual marks deduction is a state.marks update sent in the same request
+  // ── tarot purchases (v3+) — optional, may fail on un-migrated DBs
   if (Array.isArray(body.tarotBuy) && body.tarotBuy.length) {
     for (const cid of body.tarotBuy.slice(0, 12)) {
       if (typeof cid !== "string" || !VALID_TAROT_IDS.has(cid)) continue;
-      stmts.push(env.DB.prepare(
+      optionalStmts.push(env.DB.prepare(
         `INSERT OR IGNORE INTO tarot_cards (player_id, card_id, acquired_at) VALUES (?1, ?2, ?3)`
       ).bind(pid, cid, now));
     }
   }
-
   if (Array.isArray(body.tarotSell) && body.tarotSell.length) {
     for (const cid of body.tarotSell.slice(0, 12)) {
       if (typeof cid !== "string") continue;
-      stmts.push(env.DB.prepare(
+      optionalStmts.push(env.DB.prepare(
         `DELETE FROM tarot_cards WHERE player_id = ?1 AND card_id = ?2`
       ).bind(pid, cid));
     }
   }
 
-  // ── scalar state patch ───────────────────────────────────────
+  // ── scalar state patch ─────────────────────────────────────
+  // Split base columns from v3+ columns so the latter can be dropped if the migration
+  // hasn't run yet, without losing the base updates (xp, levels, etc.).
   if (body.state && typeof body.state === "object") {
     const s = body.state;
-    const fields = [];
-    const binds = [pid];
-    const add = (col, value) => { binds.push(value); fields.push(`${col} = ?${binds.length}`); };
+    const baseFields = []; const baseBinds = [pid];
+    const v2Fields = []; const v2Binds = [pid];
+    const addBase = (col, value) => { baseBinds.push(value); baseFields.push(`${col} = ?${baseBinds.length}`); };
+    const addV2 = (col, value) => { v2Binds.push(value); v2Fields.push(`${col} = ?${v2Binds.length}`); };
 
-    if (Number.isFinite(s.xp))           add("xp", Math.max(0, s.xp | 0));
-    if (Number.isFinite(s.shovelLevel))  add("shovel_level", Math.max(1, Math.min(7, s.shovelLevel | 0)));
-    if (Number.isFinite(s.brushLevel))   add("brush_level", Math.max(0, Math.min(4, s.brushLevel | 0)));
-    if (typeof s.frame === "string")     add("frame", String(s.frame).slice(0, 20));
-    if (typeof s.bio === "string")       add("bio", String(s.bio).slice(0, 120));
-    if (typeof s.selectedTitle === "string") add("selected_title", String(s.selectedTitle).slice(0, 40));
+    if (Number.isFinite(s.xp))           addBase("xp", Math.max(0, s.xp | 0));
+    if (Number.isFinite(s.shovelLevel))  addBase("shovel_level", Math.max(1, Math.min(7, s.shovelLevel | 0)));
+    if (Number.isFinite(s.brushLevel))   addBase("brush_level", Math.max(0, Math.min(4, s.brushLevel | 0)));
+    if (typeof s.frame === "string")     addBase("frame", String(s.frame).slice(0, 20));
+    if (typeof s.bio === "string")       addBase("bio", String(s.bio).slice(0, 120));
+    if (typeof s.selectedTitle === "string") addBase("selected_title", String(s.selectedTitle).slice(0, 40));
     if ("pinnedIds" in s) {
-      if (s.pinnedIds === null) add("pinned_ids", null);
-      // accept up to 8 pinned (default 6 + Lovers tarot adds 2)
-      else if (Array.isArray(s.pinnedIds)) add("pinned_ids", JSON.stringify(s.pinnedIds.slice(0, 8)));
+      if (s.pinnedIds === null) addBase("pinned_ids", null);
+      else if (Array.isArray(s.pinnedIds)) addBase("pinned_ids", JSON.stringify(s.pinnedIds.slice(0, 8)));
     }
-    if (Number.isFinite(s.marks))        add("marks", Math.max(0, s.marks | 0));
-    if (Number.isFinite(s.shovelDur))    add("shovel_dur", Math.max(0, Math.min(500, s.shovelDur | 0)));
+    // v3+ columns
+    if (Number.isFinite(s.marks))     addV2("marks", Math.max(0, s.marks | 0));
+    if (Number.isFinite(s.shovelDur)) addV2("shovel_dur", Math.max(0, Math.min(500, s.shovelDur | 0)));
     if (Array.isArray(s.equippedTarots)) {
       const filtered = s.equippedTarots.filter(c => typeof c === "string" && VALID_TAROT_IDS.has(c)).slice(0, 5);
-      add("equipped_tarots", JSON.stringify(filtered));
+      addV2("equipped_tarots", JSON.stringify(filtered));
     }
 
-    if (fields.length) {
+    if (baseFields.length) {
       stmts.push(env.DB.prepare(
-        `UPDATE player_state SET ${fields.join(", ")} WHERE player_id = ?1`
-      ).bind(...binds));
+        `UPDATE player_state SET ${baseFields.join(", ")} WHERE player_id = ?1`
+      ).bind(...baseBinds));
+    }
+    if (v2Fields.length) {
+      optionalStmts.push(env.DB.prepare(
+        `UPDATE player_state SET ${v2Fields.join(", ")} WHERE player_id = ?1`
+      ).bind(...v2Binds));
     }
   }
 
-  if (!stmts.length) return json({ ok: true, noop: true });
+  if (!stmts.length && !optionalStmts.length) return json({ ok: true, noop: true });
 
+  // Run base statements as a strict batch — these MUST succeed.
   try {
-    await env.DB.batch(stmts);
-    return json({ ok: true });
+    if (stmts.length) await env.DB.batch(stmts);
   } catch (e) {
     return bad("Transaction failed: " + (e.message || "unknown"), 500);
   }
+
+  // Run v2+ statements one by one, swallowing per-statement errors so a missing
+  // migration on, say, the tarot_cards table doesn't poison the rest.
+  let optionalSkipped = 0;
+  for (const s of optionalStmts) {
+    try { await s.run(); }
+    catch { optionalSkipped++; }
+  }
+
+  return json({ ok: true, optionalSkipped });
 }
