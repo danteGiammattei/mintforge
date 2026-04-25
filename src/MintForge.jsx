@@ -65,8 +65,9 @@ button{-webkit-tap-highlight-color:transparent;}
 @keyframes flicker{0%,100%{opacity:1}45%{opacity:.84}55%{opacity:1}}
 @keyframes pickSwing{0%{transform:translate(-50%,-90%) rotate(-55deg) scale(.9);opacity:.95}45%{transform:translate(-50%,-90%) rotate(20deg) scale(1.18);opacity:1}100%{transform:translate(-50%,-90%) rotate(0deg) scale(.7);opacity:0}}
 @keyframes pickSwingCell{0%{transform:rotate(-50deg) scale(.8);opacity:.9}45%{transform:rotate(15deg) scale(1.25);opacity:1}100%{transform:rotate(0) scale(.6);opacity:0}}
-.shiny-card{position:relative;isolation:isolate;}
-.shiny-card::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:-1;animation:shinyAuraGlow 2.4s linear infinite;}
+.shiny-card{position:relative;}
+.shiny-aura{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;animation:shinyAuraGlow 2.4s linear infinite;}
+.shiny-card>*:not(.shiny-aura){position:relative;z-index:1;}
 .noise-overlay{position:absolute;inset:0;pointer-events:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/></svg>");mix-blend-mode:overlay}
 .tab-active-indicator{position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:2px;border-radius:0 0 2px 2px;background:currentColor;box-shadow:0 0 8px currentColor}
 `;
@@ -96,12 +97,28 @@ const METALS=[
   {name:"Platinum",base:"#c0d8e8",mid:"#8ab0c8",dark:"#304860",hl:"#e8f4ff",eng:"#283848",accent:"#90c0e0",flash:"rgba(160,200,230,.22)",rarity:"Legendary"},
   {name:"Obsidian",base:"#5a1890",mid:"#380a60",dark:"#0e0020",hl:"#c060ff",eng:"#e090ff",accent:"#7a28b0",flash:"rgba(120,20,220,.2)",rarity:"Mythic"},
   {name:"Void",    base:"#0e1040",mid:"#090920",dark:"#020208",hl:"#7070f8",eng:"#a0a0ff",accent:"#3030c0",flash:"rgba(50,50,220,.22)",rarity:"Transcendent"},
+  {name:"Eldritch",base:"#2a5a3a",mid:"#0e3a1a",dark:"#021a08",hl:"#80ffb0",eng:"#5af090",accent:"#1aa050",flash:"rgba(80,255,160,.24)",rarity:"Eldritch"},
+  {name:"Astral",  base:"#f0e8d0",mid:"#a89060",dark:"#605030",hl:"#fff8a0",eng:"#806010",accent:"#f0c840",flash:"rgba(255,240,160,.28)",rarity:"Celestial"},
 ];
-const MAX_TIER=6;
-const SHOVEL_TIER_CAP=[1,2,3,4,5,6,6];
+const MAX_TIER=8;
+// SHOVEL_TIER_CAP[shovelLevel-1] = highest metal index reachable at that level.
+// Updated for 9 metals — top tiers locked behind max shovel.
+const SHOVEL_TIER_CAP=[1,2,3,4,5,6,8];
 function pickMetal(rng,pLvl=1,tierCap=MAX_TIER){
   const b=Math.min(pLvl-1,50);
-  const w=[Math.max(14,38-b*.48),Math.max(10,22-b*.18),18+b*.08,12+b*.12,6+b*.14,3+b*.08,Math.min(15,1+b*.08)];
+  // 9 tiers: copper, bronze, silver, gold, platinum, obsidian, void, eldritch, astral
+  // Weights skew heavily toward common at low levels, slowly opening up rare tiers as pLvl rises.
+  const w=[
+    Math.max(14,38-b*.48),    // copper
+    Math.max(10,22-b*.18),    // bronze
+    18+b*.08,                  // silver
+    12+b*.12,                  // gold
+    6+b*.14,                   // platinum
+    3+b*.08,                   // obsidian
+    Math.min(15,1+b*.08),      // void
+    Math.max(.2,b*.02),        // eldritch — very rare even at high levels
+    Math.max(.05,b*.008),      // astral — vanishingly rare
+  ];
   const tot=w.reduce((a,v)=>a+v,0);
   let r=rng.next()*tot,c=0;
   for(let i=0;i<w.length;i++){c+=w[i];if(r<=c)return Math.min(i,tierCap);}return 0;
@@ -273,10 +290,14 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,t,isDark}){
     const ds=Array.from({length:GRID*GRID},(_,i)=>{
       const d=new RNG(coin.seed^i^0xd16);
       if(i===cc){
-        if(shovelLevel>=7)return d.int(1,7);                           // max shovel always reaches
-        return d.bool(0.82)?d.int(1,shovelLevel):shovelLevel+1;        // 18% of coins are just out of reach
+        // At max shovel level (6 with current SHOVEL_UPS), all coins must be reachable.
+        // SHOVEL_UPS has 7 entries (index 0 = base, 1-6 = upgrades), so MAX_SH=6.
+        // Previously checked >=7 which was unreachable, leaving 18% of coins permanently
+        // stuck at depth 7 with no upgrade path.
+        if(shovelLevel>=6)return d.int(1,shovelLevel);                   // max shovel: never too-deep
+        return d.bool(0.82)?d.int(1,shovelLevel):shovelLevel+1;          // 18% are one level too deep
       }
-      return d.int(1,Math.min(7,shovelLevel+1));                       // non-coin cells: visual flavour only
+      return d.int(1,Math.min(7,shovelLevel+1));                         // non-coin cells: visual flavour only
     });
     return{coinCell:cc,depths:ds};
   },[coin.seed,shovelLevel]);
@@ -425,6 +446,7 @@ function RevealBanner({coin,onDone}){
       {isShiny&&<div style={{position:"absolute",width:300,height:300,borderRadius:"50%",background:"conic-gradient(#ff8080,#ffcc40,#80ff90,#80d0ff,#a080ff,#ff80ff,#ff8080)",animation:"shinyRotate 2.2s linear infinite",opacity:.42,pointerEvents:"none",filter:"blur(4px)"}}/>}
       <div style={{textAlign:"center",animation:"flashIn .5s cubic-bezier(.2,.8,.3,1) forwards",padding:"0 24px",position:"relative",zIndex:1,maxWidth:420}}>
         {isShiny&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:13,fontWeight:800,letterSpacing:5,marginBottom:14,animation:"shinyText 1s linear infinite"}}>✦ SHINY DISCOVERED ✦</div>}
+        {coin.digBonus==="first"&&!isShiny&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:11,fontWeight:800,color:"#ffd060",letterSpacing:5,marginBottom:10,textTransform:"uppercase",textShadow:"0 0 12px rgba(255,208,96,.6)"}}>★ First-try strike — +2 tiers ★</div>}
         {coin.digBonus==="lucky"&&!isShiny&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:11,fontWeight:700,color:"#7ad888",letterSpacing:4,marginBottom:10,textTransform:"uppercase"}}>⚡ Lucky find — rarity upgraded</div>}
         {coin.digBonus==="damaged"&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:11,fontWeight:700,color:"#e07050",letterSpacing:4,marginBottom:10,textTransform:"uppercase"}}>✕ Over-excavated — rarity reduced</div>}
         <div style={{display:"flex",justifyContent:"center",marginBottom:18,position:"relative"}}>
@@ -540,15 +562,14 @@ function lvl(xp){return Math.floor(Math.sqrt(xp/220))+1;}
 function lvlMin(l){return(l-1)**2*220;}
 function lvlMax(l){return l**2*220;}
 function unlockedTitles(l){return TITLES.filter((_,i)=>l>=TITLE_LEVELS[i]);}
-function rarityScore(coins){return coins.reduce((s,c)=>s+([1,3,8,20,45,120,300][c.metalIdx]||1)*(c.shiny?3:1),0);}
+function rarityScore(coins){return coins.reduce((s,c)=>s+([1,3,8,20,45,120,300,800,2000][c.metalIdx]||1)*(c.shiny?3:1),0);}
 
 // Value of a single coin in "marks" (the in-game currency).
 // Tiered by metal, shinies are 4×, condition modulates ±15%.
 // Pristine adds 15%, Corroded subtracts 15%, others scale linearly between.
 function coinValue(c){
-  const base=[3,8,20,55,140,360,900][c.metalIdx]||3;
+  const base=[3,8,20,55,140,360,900,2400,6000][c.metalIdx]||3;
   const condIdx=Math.max(0,CONDS.indexOf(c.cond));
-  // CONDS: Pristine=0 (+15%), Mint=1 (+10%), Fine=2 (+5%), Good=3 (0%), Fair=4 (-5%), Worn=5 (-10%), Corroded=6 (-15%)
   const condMul=1+(0.15-condIdx*0.05);
   const shinyMul=c.shiny?4:1;
   return Math.max(1,Math.round(base*condMul*shinyMul));
@@ -573,7 +594,7 @@ const FRAMES={
 };
 
 const SHOVEL_UPS=[null,{label:"Iron Shovel",depth:2,cost:[{m:0,n:3}],desc:"Reaches depth 2"},{label:"Bronze Pick",depth:3,cost:[{m:0,n:2},{m:1,n:2}],desc:"Reaches depth 3"},{label:"Steel Pick",depth:4,cost:[{m:2,n:2},{m:1,n:1}],desc:"Reaches depth 4"},{label:"Gilded Pick",depth:5,cost:[{m:3,n:1},{m:2,n:2}],desc:"Reaches depth 5"},{label:"Platinum Pick",depth:6,cost:[{m:4,n:1},{m:3,n:1}],desc:"Reaches depth 6"},{label:"Void Excavator",depth:7,cost:[{m:5,n:1},{m:4,n:1}],desc:"Reaches depth 7 — Maxed"}];
-const BRUSH_UPS=[{label:"Rough Brush",alpha:BA,shinyChance:.01,cost:null,desc:"1% shiny chance"},{label:"Boar Bristle",alpha:.55,shinyChance:.03,cost:[{m:0,n:2}],desc:"3% shiny chance"},{label:"Silver Brush",alpha:.9,shinyChance:.06,cost:[{m:0,n:1},{m:2,n:2}],desc:"6% shiny chance"},{label:"Gold Brush",alpha:1.0,shinyChance:.10,cost:[{m:3,n:1},{m:2,n:1}],desc:"10% shiny chance"},{label:"Void Brush",alpha:1.0,shinyChance:.15,cost:[{m:5,n:1}],desc:"15% shiny chance — tarot buffs stack on top"}];
+const BRUSH_UPS=[{label:"Rough Brush",alpha:BA,shinyChance:.005,cost:null,desc:"0.5% shiny chance"},{label:"Boar Bristle",alpha:.55,shinyChance:.015,cost:[{m:0,n:2}],desc:"1.5% shiny chance"},{label:"Silver Brush",alpha:.9,shinyChance:.03,cost:[{m:0,n:1},{m:2,n:2}],desc:"3% shiny chance"},{label:"Gold Brush",alpha:1.0,shinyChance:.05,cost:[{m:3,n:1},{m:2,n:1}],desc:"5% shiny chance"},{label:"Void Brush",alpha:1.0,shinyChance:.08,cost:[{m:5,n:1}],desc:"8% shiny chance — tarot buffs stack on top"}];
 const MAX_SH=SHOVEL_UPS.length-1,MAX_BR=BRUSH_UPS.length-1;
 
 /* ─── TAROT ───────────────────────────────────────────────────────────
@@ -581,14 +602,14 @@ const MAX_SH=SHOVEL_UPS.length-1,MAX_BR=BRUSH_UPS.length-1;
    description, gameplay-affecting fields the engine reads, and a marks
    price in the shop. Cards stack additively up to 5 equipped slots. */
 const TAROT_CARDS=[
-  {id:"magician",         title:"The Magician",       roman:"I",    rarity:"common",   price:300,   shinyBonus:0.03, desc:"+3% shiny chance"},
+  {id:"magician",         title:"The Magician",       roman:"I",    rarity:"common",   price:300,   shinyBonus:0.015, desc:"+1.5% shiny chance"},
   {id:"high_priestess",   title:"The High Priestess", roman:"II",   rarity:"common",   price:300,   xpMul:0.10,      desc:"+10% XP from digs"},
   {id:"empress",          title:"The Empress",        roman:"III",  rarity:"common",   price:400,   marksMul:0.15,   desc:"+15% marks earned"},
   {id:"emperor",          title:"The Emperor",        roman:"IV",   rarity:"uncommon", price:650,   tierUp:0.05,     desc:"+5% chance any dig is one tier higher"},
   {id:"hierophant",       title:"The Hierophant",     roman:"V",    rarity:"uncommon", price:600,   durMul:0.50,     desc:"Pickaxe wear halved"},
   {id:"lovers",           title:"The Lovers",         roman:"VI",   rarity:"uncommon", price:700,   pinSlots:2,      desc:"+2 display cabinet slots"},
   {id:"chariot",          title:"The Chariot",        roman:"VII",  rarity:"rare",     price:1200,  digSpeed:0.20,   desc:"+20% lucky-dig chance (≤2 digs to find)"},
-  {id:"strength",         title:"Strength",           roman:"VIII", rarity:"rare",     price:1500,  shinyBonus:0.08, desc:"+8% shiny chance"},
+  {id:"strength",         title:"Strength",           roman:"VIII", rarity:"rare",     price:1500,  shinyBonus:0.04, desc:"+4% shiny chance"},
   {id:"hermit",           title:"The Hermit",         roman:"rare", rarity:"rare",     price:1300,  artefactRate:0.10, desc:"+10% chance to find artefacts (coming soon)"},
   {id:"wheel_of_fortune", title:"Wheel of Fortune",   roman:"X",    rarity:"epic",     price:2400,  marksMul:0.40,   desc:"+40% marks earned"},
   {id:"justice",          title:"Justice",            roman:"XI",   rarity:"epic",     price:2200,  forgeRefund:0.25, desc:"25% chance to recover forge materials"},
@@ -640,7 +661,7 @@ function TarotCard({card,owned=true,equipped=false,onClick,size="md",t}){
   const dims=size==="sm"?{w:88,fs:9}:size==="lg"?{w:170,fs:14}:{w:120,fs:11};
   const rarColor=RARITY_COLOR[card.rarity]||"#888";
   return(
-    <div onClick={onClick} className={equipped?"shiny-card":""} style={{
+    <div onClick={onClick} style={{
       width:dims.w,
       cursor:onClick?"pointer":"default",
       borderRadius:9,
@@ -810,6 +831,7 @@ export default function MintForge(){
   const [shovelDur,setShovelDur]=useState(40);
   const [ownedTarots,setOwnedTarots]=useState([]);   // array of card IDs
   const [equippedTarots,setEquippedTarots]=useState([]); // up to 5
+  const [schemaWarning,setSchemaWarning]=useState(null);
   const buff=useMemo(()=>tarotBuffs(equippedTarots),[equippedTarots]);
   const maxPins=6+(buff.pinSlots||0);
   const maxDur=shovelMaxDur(shovelLevel);
@@ -874,6 +896,7 @@ export default function MintForge(){
       setShovelDur(v.shovelDur!=null?v.shovelDur:shovelMaxDur(v.shovelLevel||1));
       setOwnedTarots(v.ownedTarots||[]);
       setEquippedTarots(v.equippedTarots||[]);
+      setSchemaWarning(v.schemaWarning||null);
       // reconstruct coins from stored {seed, metalIdx, shiny, locked, id}
       setCoins((v.coins||[]).map(row=>{
         const base=mkCoin(row.seed,1,row.metalIdx);
@@ -993,23 +1016,35 @@ export default function MintForge(){
   },[tab,phase,canDig,shovelDur]); // eslint-disable-line
 
   const onDigFound=(cnt,total)=>{
-    // Tarot Chariot widens the lucky-dig window (≤2 by default; +20% to a 3-cell window roll)
-    const luckyThreshold=2;
-    const isLucky=cnt<=luckyThreshold||(cnt===3&&Math.random()<buff.digSpeed);
-    // Emperor: +5% chance the resulting coin is one tier higher than rolled
-    const tierUpRoll=Math.random()<buff.tierUp;
-    if(isLucky){
-      setFoundCoin(p=>p?{...p,metalIdx:Math.min(MAX_TIER,p.metalIdx+1+(tierUpRoll?1:0)),digBonus:"lucky"}:p);
-      setShowLucky(true);
-    }else if(tierUpRoll){
-      setFoundCoin(p=>p?{...p,metalIdx:Math.min(MAX_TIER,p.metalIdx+1),digBonus:"lucky"}:p);
+    // Rarity model:
+    //   cnt 1 (first try):           +2 tiers (LEGENDARY find)
+    //   cnt 2:                       +1 tier  (lucky)
+    //   cnt 3 (with Chariot tarot):  +1 tier  (lucky stretch)
+    //   cnt 4-12:                    no modifier
+    //   cnt 13-15:                   no modifier
+    //   cnt 16 (all cells):          -1 tier  (over-excavated)
+    // Emperor tarot adds +1 chance independent of cnt.
+    let bonus=0,reason=null;
+    if(cnt===1){bonus=2;reason="first";}
+    else if(cnt===2){bonus=1;reason="lucky";}
+    else if(cnt===3&&Math.random()<buff.digSpeed){bonus=1;reason="lucky";}
+    else if(cnt>=total){bonus=-1;reason="damaged";}
+    if(Math.random()<buff.tierUp){bonus+=1;if(!reason)reason="lucky";}
+    if(bonus>=2)reason="first";  // upgrade label to first-try if Emperor pushed bonus to 2
+
+    if(bonus!==0||reason){
+      const showFanfare=bonus>=2;
+      setFoundCoin(p=>p?{...p,metalIdx:Math.max(0,Math.min(MAX_TIER,p.metalIdx+bonus)),digBonus:reason,digCnt:cnt}:p);
+      if(showFanfare)setShowLucky(true);
+    }else{
+      setFoundCoin(p=>p?{...p,digCnt:cnt}:p);
     }
-    else if(cnt>=total){setFoundCoin(p=>p?{...p,metalIdx:Math.max(0,p.metalIdx-1),digBonus:"damaged"}:p);}
     // Pickaxe wear — Hierophant halves it (multiplicative)
     const wear=Math.max(1,Math.round(1*buff.durMul));
     setShovelDur(d=>Math.max(0,d-wear));
-    // XP — High Priestess +10%
-    setXP(p=>p+Math.round(80*(1+buff.xpMul)));
+    // XP — High Priestess +10%, plus modest bonus per skill
+    const xpGain=Math.round((80+(cnt===1?40:cnt<=3?15:0))*(1+buff.xpMul));
+    setXP(p=>p+xpGain);
     setPhase("brush");
   };
   const onTooDeep=(d)=>setTooDeepMsg(`Coin lies at depth ${d} — upgrade your shovel.`);
@@ -1198,6 +1233,18 @@ export default function MintForge(){
     <div style={{...F,minHeight:"100vh",background:t.bg,color:t.text,paddingBottom:"calc(78px + env(safe-area-inset-bottom,0px))",position:"relative"}}>
       <div className="noise-overlay" style={{position:"fixed",zIndex:1,opacity:t.noiseOpacity}}/>
 
+      {/* Schema warning banner — surfaced when the server tells us a migration is missing */}
+      {schemaWarning&&(
+        <div style={{padding:"10px 14px",background:"#3a1a08",borderBottom:`1px solid ${t.danger}55`,...F,fontSize:12,color:"#ffb060",display:"flex",alignItems:"center",gap:10,position:"sticky",top:0,zIndex:85}}>
+          <span style={{fontSize:16,flexShrink:0}}>⚠</span>
+          <div style={{flex:1,lineHeight:1.4}}>
+            <div style={{fontWeight:700,marginBottom:2}}>Database migration pending</div>
+            <div style={{fontSize:11,color:"#d8a070",lineHeight:1.4}}>{schemaWarning}</div>
+          </div>
+          <button onClick={()=>setSchemaWarning(null)} style={{border:"none",background:"transparent",color:"#ffb060",cursor:"pointer",fontSize:18,padding:4,lineHeight:1}}>×</button>
+        </div>
+      )}
+
       {/* ═══ TOP BAR ═══ */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px 14px",borderBottom:`1px solid ${t.border}`,background:t.nav,backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",position:"sticky",top:0,zIndex:80}}>
         <div style={{display:"flex",alignItems:"center",gap:11}}>
@@ -1327,6 +1374,7 @@ export default function MintForge(){
                 if(!coin)return<div key={i} style={{minHeight:144,border:`1px dashed ${t.border}`,borderRadius:13,display:"flex",alignItems:"center",justifyContent:"center",background:`${t.surface}66`}}><span style={{...mu,fontSize:24,opacity:.3}}>+</span></div>;
                 const m=METALS[coin.metalIdx];
                 return(<div key={coin.id} className={coin.shiny?"shiny-card":""} style={{background:isDark?`linear-gradient(160deg,${m.dark}40,${t.surface})`:t.surface,border:`1px solid ${m.eng}30`,borderTop:`2px solid ${fr.accent}`,borderRadius:13,padding:"13px 8px 10px",textAlign:"center",position:"relative",transition:"transform .2s",cursor:"pointer"}} onClick={()=>setSelectedCoin(coin)} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";}} onMouseLeave={e=>{e.currentTarget.style.transform="";}}>
+                  {coin.shiny&&<div className="shiny-aura"/>}
                   {coin.shiny&&<div style={{position:"absolute",top:6,right:7,fontSize:11,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
                   <div style={{display:"flex",justifyContent:"center",marginBottom:7}}><CoinCanvas coin={coin} size={64}/></div>
                   <div style={{...VT,fontSize:15,color:m.hl,letterSpacing:3,lineHeight:1}}>{coin.runes}</div>
@@ -1492,6 +1540,7 @@ export default function MintForge(){
                           const dispCoin=(()=>{const b=mkCoin(cs.seed,1,cs.metalIdx);b.id=cs.id;b.shiny=cs.shiny;return b;})();
                           return(
                             <div key={i} className={cs.shiny?"shiny-card":""} style={{background:isDark?`linear-gradient(160deg,${m.dark}40,${t.surface})`:t.surface,border:`1px solid ${m.eng}30`,borderTop:`2px solid ${pfr.accent}`,borderRadius:13,padding:"13px 8px 10px",textAlign:"center",position:"relative"}}>
+                              {cs.shiny&&<div className="shiny-aura"/>}
                               {cs.shiny&&<div style={{position:"absolute",top:6,right:7,fontSize:11,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
                               <div style={{display:"flex",justifyContent:"center",marginBottom:7}}><CoinCanvas coin={dispCoin} size={64}/></div>
                               <div style={{...VT,fontSize:14,color:m.hl,letterSpacing:2,lineHeight:1.1}}>{dispCoin.runes}</div>
@@ -1530,7 +1579,7 @@ export default function MintForge(){
                 <div style={{...mu,fontSize:11,marginBottom:10,fontStyle:"italic"}}>Tap to inspect · double-tap to pin</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:9}}>
                   {visCoins.map(coin=>{const m=METALS[coin.metalIdx];const pinned=pinnedIds?pinnedIds.includes(coin.id):autoTop.some(c=>c.id===coin.id);return(
-                    <div key={coin.id} className={coin.shiny?"shiny-card":""} style={{...card,padding:"13px 8px 10px",textAlign:"center",cursor:"pointer",border:`1px solid ${pinned?m.eng+"66":t.border}`,background:pinned?(isDark?`linear-gradient(160deg,${m.dark}30,${t.surface})`:t.surface):t.surface,transition:"all .18s",position:"relative"}}
+                    <div key={coin.id} className={coin.shiny?"shiny-card":""} style={{...card,padding:"13px 8px 10px",textAlign:"center",cursor:"pointer",border:`1px solid ${pinned?m.eng+"66":t.border}`,background:pinned?(isDark?`linear-gradient(160deg,${m.dark}30,${t.surface})`:t.surface):t.surface,transition:"transform .18s, border-color .18s",position:"relative"}}
                       onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=m.eng;}}
                       onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.borderColor=pinned?m.eng+"66":t.border;}}
                       onClick={e=>{
@@ -1552,6 +1601,7 @@ export default function MintForge(){
                           },280);
                         }
                       }}>
+                      {coin.shiny&&<div className="shiny-aura"/>}
                       {pinned&&<div style={{position:"absolute",top:7,right:7,width:6,height:6,borderRadius:"50%",background:m.hl,boxShadow:`0 0 6px ${m.hl}`}}/>}
                       {coin.shiny&&<div style={{position:"absolute",top:6,left:7,fontSize:10,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
                       {coin.locked&&<div style={{position:"absolute",bottom:6,right:7,fontSize:10,opacity:.85,filter:"drop-shadow(0 0 4px rgba(0,0,0,.6))"}}>🔒</div>}
