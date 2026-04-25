@@ -792,6 +792,7 @@ export default function MintForge(){
   const[player,setPlayer]=useState(null);
   const[authReady,setAuthReady]=useState(false);
   const[loadErr,setLoadErr]=useState(null);
+  const[retryCounter,setRetryCounter]=useState(0); // bump to retry vault fetch
   const api=useMemo(()=>apiClient(token),[token]);
   const[loadedFromServer,setLoadedFromServer]=useState(false);
   const [isDark,setIsDark]=useState(true);
@@ -884,14 +885,23 @@ export default function MintForge(){
       setLoadedFromServer(true);
       setAuthReady(true);
     }).catch(err=>{
-      // Bad/expired token — clear and show login
-      if(!cancel){
+      if(cancel)return;
+      const msg=String(err.message||"");
+      // ONLY treat actual auth failures (401) as a logout trigger.
+      // Anything else (500, network, schema mismatch) keeps the token
+      // and shows a retry screen — silently logging out destroys the session
+      // for transient issues like a missing migration.
+      if(/401|unauthor/i.test(msg)){
         try{localStorage.removeItem(TOKEN_KEY);}catch{}
-        setToken(null);setAuthReady(true);setLoadErr(err.message);
+        setToken(null);setAuthReady(true);setLoadErr(null);
+      }else{
+        // Keep token, show retry — likely a server-side issue
+        setAuthReady(true);
+        setLoadErr(msg||"Could not reach the vault");
       }
     });
     return()=>{cancel=true;};
-  },[token]); // eslint-disable-line
+  },[token,retryCounter]); // eslint-disable-line
 
   const handleAuthed=useCallback((tok,pl)=>{setToken(tok);setPlayer(pl);setUsername(pl.username);setLoadedFromServer(false);},[]);
 
@@ -1161,6 +1171,26 @@ export default function MintForge(){
     return(<div style={{...F,minHeight:"100vh",background:DARK.bg,color:DARK.muted,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Outfit,sans-serif",fontSize:13,letterSpacing:2,textTransform:"uppercase"}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}><span style={{fontFamily:"'Fraunces',serif",fontSize:22,color:DARK.accent}}>⚒</span> Opening the vault…</div>
     </div>);
+  }
+  // If we have a token but vault load failed (non-auth error like a server bug),
+  // show a retry screen instead of bouncing back to login. Logging the user out
+  // for a transient server issue is far more frustrating than this explicit retry.
+  if(token&&loadErr&&!loadedFromServer){
+    return(
+      <div style={{...F,minHeight:"100vh",background:DARK.bg,color:DARK.text,display:"flex",alignItems:"center",justifyContent:"center",padding:"24px 20px",position:"relative"}}>
+        <div className="noise-overlay" style={{position:"fixed",zIndex:1,opacity:.04}}/>
+        <div style={{position:"relative",zIndex:2,maxWidth:380,textAlign:"center"}}>
+          <div style={{fontSize:48,opacity:.5,marginBottom:16}}>⚒</div>
+          <div style={{fontFamily:"'Fraunces',serif",fontWeight:800,fontSize:22,letterSpacing:-.4,marginBottom:10}}>The vault won't open</div>
+          <div style={{fontSize:13,color:DARK.textDim,lineHeight:1.55,marginBottom:6}}>The server returned an error while loading your account. This is most likely a backend issue — your account is safe.</div>
+          <div style={{fontFamily:"VT323,monospace",fontSize:13,color:DARK.danger,padding:"10px 14px",background:"rgba(210,74,40,.08)",border:`1px solid ${DARK.danger}33`,borderRadius:8,margin:"16px 0",letterSpacing:.5,wordBreak:"break-word"}}>{loadErr}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:9,marginTop:18}}>
+            <button onClick={()=>{setLoadErr(null);setRetryCounter(c=>c+1);}} style={{padding:"12px 0",borderRadius:11,border:`1px solid ${DARK.accent}`,background:`linear-gradient(135deg,${DARK.accentHi},${DARK.accent})`,cursor:"pointer",fontWeight:800,fontSize:13,color:DARK.accentInk,letterSpacing:2.5,textTransform:"uppercase",fontFamily:"Outfit,sans-serif"}}>Retry</button>
+            <button onClick={()=>{try{localStorage.removeItem(TOKEN_KEY);}catch{}setToken(null);setLoadErr(null);}} style={{padding:"10px 0",borderRadius:11,border:`1px solid ${DARK.border}`,background:"transparent",cursor:"pointer",fontWeight:600,fontSize:11,color:DARK.muted,letterSpacing:2,textTransform:"uppercase",fontFamily:"Outfit,sans-serif"}}>Sign out</button>
+          </div>
+        </div>
+      </div>
+    );
   }
   if(!token){return<AuthScreen onAuthed={handleAuthed}/>;}
 
