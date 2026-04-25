@@ -447,7 +447,7 @@ function RevealBanner({coin,onDone}){
 }
 
 /* ─── 3D COIN MODAL ───────────────────────────────────────────────────── */
-function CoinModal({coin,onClose,t,isDark}){
+function CoinModal({coin,onClose,onToggleLock,t,isDark}){
   const cvRef=useRef();
   const rotRef=useRef({x:12,y:0});
   const velRef=useRef({x:0,y:0});
@@ -516,7 +516,14 @@ function CoinModal({coin,onClose,t,isDark}){
           </div>
           <div style={{padding:"10px 18px 14px",borderTop:"1px solid rgba(245,230,200,.05)",...FR,fontStyle:"italic",fontSize:11,color:"rgba(245,230,200,.4)",lineHeight:1.5}}>{coin.era}</div>
         </div>
-        <button onClick={onClose} style={{padding:"11px 36px",borderRadius:11,border:"1px solid rgba(245,230,200,.16)",background:"rgba(245,230,200,.06)",cursor:"pointer",...F,fontWeight:700,fontSize:13,color:"rgba(245,230,200,.7)",letterSpacing:2,textTransform:"uppercase"}}>Close</button>
+        <div style={{display:"flex",gap:8,width:"100%"}}>
+          {onToggleLock&&<button onClick={()=>onToggleLock(coin.id)} style={{flex:1,padding:"11px 0",borderRadius:11,border:`1px solid ${coin.locked?"rgba(212,160,23,.55)":"rgba(245,230,200,.16)"}`,background:coin.locked?"rgba(212,160,23,.16)":"rgba(245,230,200,.06)",cursor:"pointer",...F,fontWeight:700,fontSize:13,color:coin.locked?"#f0c850":"rgba(245,230,200,.7)",letterSpacing:1.5,textTransform:"uppercase",transition:"all .15s",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <span style={{fontSize:14}}>{coin.locked?"🔒":"🔓"}</span>
+            {coin.locked?"Locked":"Lock coin"}
+          </button>}
+          <button onClick={onClose} style={{flex:onToggleLock?1:undefined,padding:"11px 36px",borderRadius:11,border:"1px solid rgba(245,230,200,.16)",background:"rgba(245,230,200,.06)",cursor:"pointer",...F,fontWeight:700,fontSize:13,color:"rgba(245,230,200,.7)",letterSpacing:2,textTransform:"uppercase"}}>Close</button>
+        </div>
+        {onToggleLock&&<div style={{...FR,fontStyle:"italic",fontSize:11,color:"rgba(245,230,200,.4)",textAlign:"center",lineHeight:1.5,marginTop:-4,maxWidth:300}}>{coin.locked?"This coin is protected from forging and wagers.":"Locked coins are never consumed in upgrades or bets."}</div>}
       </div>
     </div>
   );
@@ -561,19 +568,19 @@ const GAMBLES=[
 
 /* ─── BOTTOM NAV ──────────────────────────────────────────────────────── */
 function BottomNav({tab,setTab,huntActive,t}){
-  const items=[["profile","☉","Profile"],["vault","◈","Vault"],["hunt","⛏","Hunt"],["forge","⚒","Forge"],["tavern","♢","Tavern"]];
+  const items=[["profile","☉","Profile"],["social","♟","Social"],["vault","◈","Vault"],["hunt","⛏","Hunt"],["forge","⚒","Forge"],["tavern","♢","Tavern"]];
   return(
-    <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:90,background:t.nav,borderTop:`1px solid ${t.border}`,backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",display:"flex",justifyContent:"space-around",padding:"4px 6px 8px",paddingBottom:`calc(8px + env(safe-area-inset-bottom,0px))`}}>
+    <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:90,background:t.nav,borderTop:`1px solid ${t.border}`,backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",display:"flex",justifyContent:"space-around",padding:"4px 2px 8px",paddingBottom:`calc(8px + env(safe-area-inset-bottom,0px))`}}>
       {items.map(([id,icon,lbl])=>{
         const active=tab===id;
         return(
-          <button key={id} onClick={()=>setTab(id)} style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 14px 6px",border:"none",cursor:"pointer",background:"transparent",minWidth:60,transition:"all .18s",color:active?t.accent:t.muted}}>
+          <button key={id} onClick={()=>setTab(id)} style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 6px 6px",border:"none",cursor:"pointer",background:"transparent",minWidth:48,flex:1,maxWidth:80,transition:"all .18s",color:active?t.accent:t.muted}}>
             {active&&<div className="tab-active-indicator"/>}
-            <span style={{fontSize:20,lineHeight:1,fontFamily:"'Fraunces',serif",fontWeight:active?900:600,transition:"transform .18s",transform:active?"scale(1.05)":"scale(1)",position:"relative"}}>
+            <span style={{fontSize:19,lineHeight:1,fontFamily:"'Fraunces',serif",fontWeight:active?900:600,transition:"transform .18s",transform:active?"scale(1.05)":"scale(1)",position:"relative"}}>
               {icon}
               {id==="hunt"&&huntActive&&<span style={{position:"absolute",top:-2,right:-6,width:6,height:6,borderRadius:"50%",background:t.success,boxShadow:`0 0 8px ${t.success}`,animation:"flicker 1.4s linear infinite"}}/>}
             </span>
-            <span style={{fontFamily:"Outfit,sans-serif",fontSize:9,fontWeight:active?800:600,letterSpacing:1.5,textTransform:"uppercase"}}>{lbl}</span>
+            <span style={{fontFamily:"Outfit,sans-serif",fontSize:8.5,fontWeight:active?800:600,letterSpacing:1.2,textTransform:"uppercase"}}>{lbl}</span>
           </button>
         );
       })}
@@ -601,6 +608,11 @@ function apiClient(token){
     logout:()=>call("/api/auth/logout","POST").catch(()=>{}),
     getVault:()=>call("/api/vault","GET"),
     tx:(payload)=>call("/api/vault","POST",payload),
+    searchUsers:(q)=>call(`/api/users/search?q=${encodeURIComponent(q)}`,"GET"),
+    getUser:(username)=>call(`/api/users/${encodeURIComponent(username)}`,"GET"),
+    listFriends:()=>call("/api/friends","GET"),
+    addFriend:(username)=>call("/api/friends","POST",{username}),
+    removeFriend:(username)=>call("/api/friends","DELETE",{username}),
   };
 }
 
@@ -722,6 +734,16 @@ export default function MintForge(){
   const [roulResult,setRoulResult]=useState(null);
   const [roulDone,setRoulDone]=useState(false);
 
+  /* ── social state ───────────────────────────────────────────── */
+  const [searchQ,setSearchQ]=useState("");
+  const [searchResults,setSearchResults]=useState([]);
+  const [searching,setSearching]=useState(false);
+  const [friendsList,setFriendsList]=useState([]);
+  const [viewingProfile,setViewingProfile]=useState(null); // username string or null
+  const [profileData,setProfileData]=useState(null);
+  const [profileLoading,setProfileLoading]=useState(false);
+  const [profileErr,setProfileErr]=useState(null);
+
   const xpIn=xp-lvlMin(level);const xpRange=lvlMax(level)-lvlMin(level);
 
   /* ── auth bootstrap: on mount, if we have a token, fetch the vault ─ */
@@ -739,11 +761,12 @@ export default function MintForge(){
       setFrame(v.frame||"stone");
       setSelectedTitle(v.selectedTitle||TITLES[0]);
       setPinnedIds(v.pinnedIds||null);
-      // reconstruct coins from stored {seed, metalIdx, shiny, id}
+      // reconstruct coins from stored {seed, metalIdx, shiny, locked, id}
       setCoins((v.coins||[]).map(row=>{
         const base=mkCoin(row.seed,1,row.metalIdx);
         base.id=row.id;
         base.shiny=!!row.shiny;
+        base.locked=!!row.locked;
         return base;
       }));
       setLoadedFromServer(true);
@@ -774,6 +797,42 @@ export default function MintForge(){
     if(!loadedFromServer)return;
     api.tx({state:{xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds}}).catch(()=>{});
   },[xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,loadedFromServer],800);
+
+  /* ── load friends list on auth + when entering social tab ──── */
+  useEffect(()=>{
+    if(!token||!loadedFromServer)return;
+    if(tab!=="social")return;
+    api.listFriends().then(r=>setFriendsList(r.friends||[])).catch(()=>{});
+  },[tab,token,loadedFromServer]); // eslint-disable-line
+
+  /* ── debounced user search ──────────────────────────────────── */
+  useDebouncedEffect(()=>{
+    if(searchQ.trim().length<2){setSearchResults([]);setSearching(false);return;}
+    setSearching(true);
+    api.searchUsers(searchQ.trim()).then(r=>{setSearchResults(r.users||[]);setSearching(false);}).catch(()=>setSearching(false));
+  },[searchQ],250);
+
+  /* ── load specific profile ──────────────────────────────────── */
+  useEffect(()=>{
+    if(!viewingProfile)return;
+    setProfileLoading(true);setProfileErr(null);setProfileData(null);
+    api.getUser(viewingProfile).then(d=>{setProfileData(d);setProfileLoading(false);}).catch(e=>{setProfileErr(e.message);setProfileLoading(false);});
+  },[viewingProfile]); // eslint-disable-line
+
+  const handleAddFriend=useCallback(async(uname)=>{
+    try{await api.addFriend(uname);
+      // refresh both friend list and active profile
+      api.listFriends().then(r=>setFriendsList(r.friends||[])).catch(()=>{});
+      if(viewingProfile===uname)setProfileData(p=>p?{...p,isFriend:true}:p);
+    }catch{}
+  },[api,viewingProfile]);
+
+  const handleRemoveFriend=useCallback(async(uname)=>{
+    try{await api.removeFriend(uname);
+      api.listFriends().then(r=>setFriendsList(r.friends||[])).catch(()=>{});
+      if(viewingProfile===uname)setProfileData(p=>p?{...p,isFriend:false}:p);
+    }catch{}
+  },[api,viewingProfile]);
 
   const xpPct=Math.min(100,Math.round(xpIn/xpRange*100));
   const fr=FRAMES[frame];
@@ -836,12 +895,28 @@ export default function MintForge(){
 
   const togglePin=(id)=>setPinnedIds(prev=>{const base=prev??autoTop.map(c=>c.id);return base.includes(id)?base.filter(x=>x!==id):base.length<6?[...base,id]:base;});
 
-  const canAfford=(cost)=>!cost||cost.every(({m,n})=>coins.filter(c=>c.metalIdx===m).length>=n);
+  // Lock toggle — prevents a coin being used in upgrades/wagers
+  const toggleLock=useCallback((id)=>{
+    setCoins(prev=>{
+      const next=prev.map(c=>c.id===id?{...c,locked:!c.locked}:c);
+      const target=next.find(c=>c.id===id);
+      if(target)api.tx({lock:[{id,locked:target.locked}]}).catch(()=>{});
+      return next;
+    });
+  },[api]);
+
+  // Available coins for sacrificing/betting = unlocked only
+  const sacrificialCoins=useMemo(()=>coins.filter(c=>!c.locked),[coins]);
+  const canAfford=(cost)=>!cost||cost.every(({m,n})=>sacrificialCoins.filter(c=>c.metalIdx===m).length>=n);
   const forgeUp=(type)=>{
     const isS=type==="shovel";const nl=isS?shovelLevel+1:brushLevel+1;
     const u=(isS?SHOVEL_UPS:BRUSH_UPS)[nl];if(!u||!canAfford(u.cost))return;
     const removedIds=[];
-    let rem=[...coins];if(u.cost)for(const{m,n}of u.cost){let r=0;rem=rem.filter(c=>{if(c.metalIdx===m&&r<n){r++;removedIds.push(c.id);return false;}return true;});}
+    let rem=[...coins];if(u.cost)for(const{m,n}of u.cost){let r=0;rem=rem.filter(c=>{
+      // Skip locked coins when picking material — only consume unlocked of the right metal
+      if(!c.locked&&c.metalIdx===m&&r<n){r++;removedIds.push(c.id);return false;}
+      return true;
+    });}
     setCoins(rem);isS?setShovelLevel(nl):setBrushLevel(nl);setXP(p=>p+200);
     if(removedIds.length)api.tx({remove:removedIds}).catch(()=>{});
   };
@@ -853,7 +928,9 @@ export default function MintForge(){
     api.tx({remove:res.remove,add:res.add.map(c=>({id:c.id,seed:c.seed,metalIdx:c.metalIdx,shiny:!!c.shiny}))}).catch(()=>{});
   },1600);};
   const resetGamble=()=>{setBetIds([]);setGambResult(null);setGambPhase("select");};
-  const toggleBet=(id)=>{if(gambPhase!=="select")return;setBetIds(prev=>{if(prev.includes(id))return prev.filter(x=>x!==id);if(prev.length>=gamble.count)return[...prev.slice(1),id];return[...prev,id];});};
+  const toggleBet=(id)=>{if(gambPhase!=="select")return;
+    const c=coins.find(x=>x.id===id);if(c?.locked)return;  // ignore taps on locked coins
+    setBetIds(prev=>{if(prev.includes(id))return prev.filter(x=>x!==id);if(prev.length>=gamble.count)return[...prev.slice(1),id];return[...prev,id];});};
   const roulBetCoin=coins.find(c=>c.id===roulBetId)||null;
   const onRoulResult=(sector)=>{
     if(!roulBetCoin)return;const tier=roulBetCoin.metalIdx;let remove=[roulBetCoin.id],add=[],msg="",won=false;
@@ -941,9 +1018,9 @@ export default function MintForge(){
               <div style={{position:"absolute",bottom:8,left:16,...microLabel,fontSize:9,color:fr.accent,opacity:.7}}>{fr.lbl}</div>
             </div>
 
-            {/* Avatar lifts halfway out of the banner */}
-            <div style={{marginTop:-44,marginBottom:12,padding:"0 4px"}}>
-              <div style={{width:88,height:88,borderRadius:"50%",border:`4px solid ${t.bg}`,background:t.surface,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 8px 24px rgba(0,0,0,.25),0 0 0 1px ${fr.accent}66`}}>
+            {/* Avatar sits fully below banner now (no overlap) */}
+            <div style={{marginTop:14,marginBottom:12,padding:"0 4px",display:"flex",justifyContent:"flex-start"}}>
+              <div style={{width:88,height:88,borderRadius:"50%",border:`3px solid ${fr.accent}`,background:t.surface,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 6px 18px rgba(0,0,0,.35),inset 0 0 0 2px ${t.surface}`}}>
                 {showcaseCoins[0]?<CoinCanvas coin={showcaseCoins[0]} size={80}/>:<span style={{fontSize:30,opacity:.3}}>⚒</span>}
               </div>
             </div>
@@ -1028,6 +1105,137 @@ export default function MintForge(){
           </div>
         )}
 
+        {/* ─── SOCIAL ─── */}
+        {tab==="social"&&(
+          <div style={{animation:"fadein .35s ease"}}>
+            {!viewingProfile?(<>
+              <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14,padding:"0 2px"}}>
+                <div style={sectionTitle}>Social</div>
+                <div style={{...microLabel}}>{friendsList.length} friend{friendsList.length===1?"":"s"}</div>
+              </div>
+
+              {/* Search bar */}
+              <div style={{position:"relative",marginBottom:14}}>
+                <input value={searchQ} onChange={e=>setSearchQ(e.target.value.replace(/[^A-Za-z0-9_]/g,"").slice(0,20))} placeholder="Search by username…" style={{width:"100%",padding:"12px 14px 12px 38px",borderRadius:11,border:`1px solid ${t.inputBorder}`,background:t.input,color:t.text,...F,fontSize:14,outline:"none",transition:"border-color .15s"}} onFocus={e=>e.target.style.borderColor=t.inputFocus} onBlur={e=>e.target.style.borderColor=t.inputBorder}/>
+                <span style={{position:"absolute",left:13,top:"50%",transform:"translateY(-50%)",fontSize:16,opacity:.5,pointerEvents:"none"}}>🔍</span>
+                {searchQ&&<button onClick={()=>setSearchQ("")} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",border:"none",background:"transparent",cursor:"pointer",color:t.muted,fontSize:18,padding:4}}>×</button>}
+              </div>
+
+              {/* Search results */}
+              {searchQ.trim().length>=2&&(
+                <div style={{marginBottom:18}}>
+                  <div style={{...microLabel,marginBottom:8,padding:"0 2px"}}>{searching?"Searching…":`Results (${searchResults.length})`}</div>
+                  {searchResults.length===0&&!searching?<div style={{...mu,fontSize:13,padding:"16px 4px",fontStyle:"italic"}}>No collectors found by that name.</div>:(
+                    <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                      {searchResults.map(u=>{
+                        const ulvl=lvl(u.xp);
+                        const isFriend=friendsList.some(f=>f.username.toLowerCase()===u.username.toLowerCase());
+                        return(
+                          <div key={u.id} onClick={()=>setViewingProfile(u.username)} style={{...card,padding:"11px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=t.borderHi;e.currentTarget.style.transform="translateX(2px)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.transform="";}}>
+                            <div style={{width:40,height:40,borderRadius:"50%",background:t.surfaceHi,border:`1px solid ${t.borderHi}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,...FR,fontWeight:900,fontSize:16,color:t.accent}}>{u.username.slice(0,2).toUpperCase()}</div>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{...FR,fontWeight:700,fontSize:15,color:t.text,letterSpacing:-.2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.username}{isFriend&&<span style={{...F,fontSize:9,fontWeight:700,color:t.success,marginLeft:8,letterSpacing:1.5,textTransform:"uppercase"}}>· Friend</span>}</div>
+                              <div style={{...mu,fontSize:11,color:t.textDim,marginTop:1}}>Lv.{ulvl} · {u.title}</div>
+                            </div>
+                            <span style={{fontSize:18,opacity:.4,color:t.muted}}>›</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Friends list */}
+              <div style={{...microLabel,marginBottom:8,padding:"0 2px"}}>Your Circle</div>
+              {friendsList.length===0?(
+                <div style={{textAlign:"center",padding:"40px 20px",...card}}>
+                  <div style={{fontSize:42,marginBottom:12,opacity:.4}}>♟</div>
+                  <div style={{...FR,fontWeight:700,fontSize:16,marginBottom:6,letterSpacing:-.3}}>No friends yet</div>
+                  <div style={{...mu,fontSize:12,maxWidth:240,margin:"0 auto",lineHeight:1.55}}>Search above to find other collectors and add them to your circle.</div>
+                </div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                  {friendsList.map(f=>{
+                    const flvl=lvl(f.xp);
+                    return(
+                      <div key={f.id} onClick={()=>setViewingProfile(f.username)} style={{...card,padding:"11px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:12,transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=t.borderHi;e.currentTarget.style.transform="translateX(2px)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.transform="";}}>
+                        <div style={{width:40,height:40,borderRadius:"50%",background:BANNERS[f.frame]||BANNERS.stone,border:`1px solid ${(FRAMES[f.frame]||FRAMES.stone).accent}66`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,...FR,fontWeight:900,fontSize:16,color:"#fff",textShadow:"0 1px 2px rgba(0,0,0,.5)"}}>{f.username.slice(0,2).toUpperCase()}</div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{...FR,fontWeight:700,fontSize:15,color:t.text,letterSpacing:-.2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{f.username}</div>
+                          <div style={{...mu,fontSize:11,color:t.textDim,marginTop:1}}>Lv.{flvl} · {f.title}</div>
+                        </div>
+                        <span style={{fontSize:18,opacity:.4,color:t.muted}}>›</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>):(
+              /* ── Profile detail view ── */
+              <div style={{animation:"fadein .25s ease"}}>
+                <button onClick={()=>{setViewingProfile(null);setProfileData(null);setProfileErr(null);}} style={{...F,fontSize:12,fontWeight:700,color:t.muted,background:"transparent",border:"none",padding:"4px 0",marginBottom:14,cursor:"pointer",letterSpacing:1.5,textTransform:"uppercase"}}>← Back</button>
+                {profileLoading&&<div style={{...mu,textAlign:"center",padding:"60px 0",fontStyle:"italic"}}>Opening their vault…</div>}
+                {profileErr&&<div style={{...card,padding:"24px 16px",textAlign:"center",borderColor:t.danger}}><div style={{...F,color:t.danger,fontWeight:600}}>⚠ {profileErr}</div></div>}
+                {profileData&&(()=>{
+                  const pd=profileData;const plvl=lvl(pd.xp);const pfr=FRAMES[pd.frame]||FRAMES.stone;
+                  return(<>
+                    <div style={{height:130,borderRadius:16,background:BANNERS[pd.frame]||BANNERS.stone,position:"relative",overflow:"hidden",marginLeft:-14,marginRight:-14,border:`1px solid ${t.border}`}}>
+                      <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 30% 60%,rgba(255,255,255,.06),transparent 65%)"}}/>
+                      <div className="noise-overlay" style={{opacity:.06}}/>
+                      <div style={{position:"absolute",bottom:8,left:16,...microLabel,fontSize:9,color:pfr.accent,opacity:.7}}>{pfr.lbl}</div>
+                    </div>
+                    <div style={{marginTop:14,marginBottom:12,padding:"0 4px",display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
+                      <div style={{width:88,height:88,borderRadius:"50%",border:`3px solid ${pfr.accent}`,background:t.surface,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:`0 6px 18px rgba(0,0,0,.35),inset 0 0 0 2px ${t.surface}`}}>
+                        {pd.showcase[0]?<CoinCanvas coin={(()=>{const b=mkCoin(pd.showcase[0].seed,1,pd.showcase[0].metalIdx);b.shiny=pd.showcase[0].shiny;return b;})()} size={80}/>:<span style={{fontSize:30,opacity:.3}}>⚒</span>}
+                      </div>
+                      {!pd.isSelf&&(
+                        pd.isFriend?
+                          <button onClick={()=>handleRemoveFriend(pd.username)} style={{padding:"9px 16px",borderRadius:10,border:`1px solid ${t.border}`,background:t.surfaceHi,cursor:"pointer",...F,fontSize:11,fontWeight:700,color:t.muted,letterSpacing:1.5,textTransform:"uppercase",transition:"all .15s"}}>✓ Friends</button>
+                        :<button onClick={()=>handleAddFriend(pd.username)} style={{padding:"9px 16px",borderRadius:10,border:"none",background:`linear-gradient(135deg,${t.accentHi},${t.accent})`,cursor:"pointer",...F,fontSize:11,fontWeight:800,color:t.accentInk,letterSpacing:1.5,textTransform:"uppercase",boxShadow:`0 4px 10px ${t.accent}33`}}>+ Add Friend</button>
+                      )}
+                    </div>
+                    <div style={{padding:"0 4px",marginBottom:14}}>
+                      <div style={{...FR,fontWeight:800,fontSize:24,letterSpacing:-.5,color:t.text,lineHeight:1.1}}>{pd.username}</div>
+                      <div style={{...VT,fontSize:18,color:t.muted,letterSpacing:3,marginTop:3}}>{rune(pd.username.toUpperCase().replace(/[^A-Z]/g,""))}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8,flexWrap:"wrap"}}>
+                        <span style={{background:`linear-gradient(135deg,${t.accentHi},${t.accent})`,color:t.accentInk,fontWeight:900,fontSize:11,padding:"3px 10px",borderRadius:5,letterSpacing:1}}>LV {plvl}</span>
+                        <span style={{...F,fontSize:12,color:t.textDim,fontWeight:600}}>{pd.title}</span>
+                      </div>
+                      {pd.bio&&<div style={{...mu,fontSize:13,color:t.textDim,marginTop:10,lineHeight:1.55,maxWidth:380}}>{pd.bio}</div>}
+                    </div>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:18,padding:"0 4px"}}>
+                      {[["Coins",pd.coinCount],["Score",pd.rarityScore.toLocaleString()],["✦ Shiny",pd.shinyCount]].map(([k,v])=>(
+                        <div key={k} style={{padding:"10px 8px",...card,textAlign:"center"}}>
+                          <div style={{...FR,fontWeight:800,fontSize:20,color:t.text,letterSpacing:-.5,fontVariantNumeric:"tabular-nums",lineHeight:1}}>{v}</div>
+                          <div style={{...microLabel,fontSize:9,marginTop:4}}>{k}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {pd.showcase.length>0&&<div style={{padding:"0 2px"}}>
+                      <div style={{...microLabel,marginBottom:9}}>Display Cabinet</div>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:9}}>
+                        {pd.showcase.map((cs,i)=>{
+                          const m=METALS[cs.metalIdx];
+                          const dispCoin=(()=>{const b=mkCoin(cs.seed,1,cs.metalIdx);b.id=cs.id;b.shiny=cs.shiny;return b;})();
+                          return(
+                            <div key={i} className={cs.shiny?"shiny-card":""} style={{background:isDark?`linear-gradient(160deg,${m.dark}40,${t.surface})`:t.surface,border:`1px solid ${m.eng}30`,borderTop:`2px solid ${pfr.accent}`,borderRadius:13,padding:"13px 8px 10px",textAlign:"center",position:"relative"}}>
+                              {cs.shiny&&<div style={{position:"absolute",top:6,right:7,fontSize:11,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
+                              <div style={{display:"flex",justifyContent:"center",marginBottom:7}}><CoinCanvas coin={dispCoin} size={64}/></div>
+                              <div style={{...VT,fontSize:14,color:m.hl,letterSpacing:2,lineHeight:1.1}}>{dispCoin.runes}</div>
+                              <div style={{...microLabel,fontSize:8,marginTop:3,color:m.hl,opacity:.55}}>{m.name}{cs.shiny?" ✦":""}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>}
+                  </>);
+                })()}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ─── VAULT ─── */}
         {tab==="vault"&&(
           <div style={{animation:"fadein .35s ease"}}>
@@ -1074,6 +1282,7 @@ export default function MintForge(){
                       }}>
                       {pinned&&<div style={{position:"absolute",top:7,right:7,width:6,height:6,borderRadius:"50%",background:m.hl,boxShadow:`0 0 6px ${m.hl}`}}/>}
                       {coin.shiny&&<div style={{position:"absolute",top:6,left:7,fontSize:10,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
+                      {coin.locked&&<div style={{position:"absolute",bottom:6,right:7,fontSize:10,opacity:.85,filter:"drop-shadow(0 0 4px rgba(0,0,0,.6))"}}>🔒</div>}
                       <div style={{display:"flex",justifyContent:"center",marginBottom:7}}><CoinCanvas coin={coin} size={64}/></div>
                       <div style={{...VT,fontSize:14,color:m.hl,letterSpacing:3,lineHeight:1.1}}>{coin.runes}</div>
                       <div style={{...microLabel,fontSize:8,marginTop:3,color:m.hl,opacity:.55}}>{m.name}{coin.shiny?" ✦":""}</div>
@@ -1159,8 +1368,8 @@ export default function MintForge(){
               </div>
             </div>
             {coins.length>0&&<div style={{...card,padding:"11px 14px",marginBottom:14,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
-              <span style={{...microLabel,fontSize:10}}>Materials</span>
-              {METALS.map((m,i)=>{const have=coins.filter(c=>c.metalIdx===i).length;return have>0&&(<div key={i} style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:8,height:8,borderRadius:2,background:m.hl,boxShadow:`0 0 4px ${m.hl}66`}}/><span style={{...F,fontSize:11,color:m.hl,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{have}<span style={{color:t.muted,fontWeight:500,marginLeft:2}}>×</span></span></div>);})}
+              <span style={{...microLabel,fontSize:10}}>Available</span>
+              {METALS.map((m,i)=>{const have=sacrificialCoins.filter(c=>c.metalIdx===i).length;const lockedCnt=coins.filter(c=>c.metalIdx===i&&c.locked).length;return(have>0||lockedCnt>0)&&(<div key={i} style={{display:"flex",alignItems:"center",gap:5}}><div style={{width:8,height:8,borderRadius:2,background:m.hl,boxShadow:`0 0 4px ${m.hl}66`}}/><span style={{...F,fontSize:11,color:m.hl,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{have}{lockedCnt>0&&<span style={{color:t.muted,fontWeight:500,fontSize:10}}> +{lockedCnt}🔒</span>}<span style={{color:t.muted,fontWeight:500,marginLeft:2}}>×</span></span></div>);})}
             </div>}
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
               {[
@@ -1192,7 +1401,7 @@ export default function MintForge(){
                         nu?<>
                           <div style={{...F,fontSize:12,marginBottom:10,color:t.textDim,fontWeight:500}}><span style={{color:t.muted}}>→</span> {nu.label}<span style={{color:t.muted,fontWeight:400,marginLeft:6,fontStyle:"italic"}}>· {nu.desc}</span></div>
                           <div style={{display:"flex",gap:6,marginBottom:11,flexWrap:"wrap"}}>
-                            {(nu.cost||[]).map(({m:mi,n},ci)=>{const mt=METALS[mi];const have=coins.filter(c=>c.metalIdx===mi).length;const ok=have>=n;return(<div key={ci} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 11px",borderRadius:7,background:ok?`${mt.dark}44`:t.surfaceHi,border:`1px solid ${ok?mt.eng+"66":t.border}`}}><div style={{width:7,height:7,borderRadius:2,background:ok?mt.hl:t.muted,boxShadow:ok?`0 0 4px ${mt.hl}88`:"none"}}/><span style={{...F,fontSize:12,color:ok?mt.hl:t.muted,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{n}× {mt.name}</span><span style={{...F,fontSize:10,color:ok?t.success:t.muted,fontWeight:600,opacity:.8}}>({have})</span></div>);})}
+                            {(nu.cost||[]).map(({m:mi,n},ci)=>{const mt=METALS[mi];const have=sacrificialCoins.filter(c=>c.metalIdx===mi).length;const ok=have>=n;return(<div key={ci} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 11px",borderRadius:7,background:ok?`${mt.dark}44`:t.surfaceHi,border:`1px solid ${ok?mt.eng+"66":t.border}`}}><div style={{width:7,height:7,borderRadius:2,background:ok?mt.hl:t.muted,boxShadow:ok?`0 0 4px ${mt.hl}88`:"none"}}/><span style={{...F,fontSize:12,color:ok?mt.hl:t.muted,fontWeight:700,fontVariantNumeric:"tabular-nums"}}>{n}× {mt.name}</span><span style={{...F,fontSize:10,color:ok?t.success:t.muted,fontWeight:600,opacity:.8}}>({have})</span></div>);})}
                           </div>
                           <button onClick={()=>forgeUp(type)} disabled={!afford} style={{width:"100%",padding:"11px 0",borderRadius:10,border:`1px solid ${afford?t.accentDim:t.border}`,cursor:afford?"pointer":"not-allowed",background:afford?(isDark?"linear-gradient(135deg,#2a1e08,#604a14)":"linear-gradient(135deg,#ede0b0,#d4a830)"):t.surfaceHi,...F,fontWeight:800,fontSize:13,color:afford?(isDark?t.accent:t.accentInk):t.muted,transition:"all .15s",letterSpacing:2,textTransform:"uppercase",boxShadow:afford?`0 4px 12px ${t.accent}22`:"none"}}>{afford?"⚒ Forge · +200 XP":"Missing materials"}</button>
                         </>:<div style={{...mu,fontSize:12,padding:"8px 0",textAlign:"center",fontStyle:"italic"}}>Forge to unlock upgrades</div>
@@ -1256,10 +1465,11 @@ export default function MintForge(){
                   <div style={{...mu,fontSize:12,marginBottom:11,fontStyle:"italic"}}>Select {gDef.count} coin{gDef.count>1?"s":""}{gDef.same?" (same tier)":""} · <span style={{color:t.text,fontWeight:600,fontStyle:"normal"}}>{betIds.length} / {gDef.count}</span></div>
                   {coins.length===0?<div style={{...card,padding:"32px 20px",textAlign:"center"}}><div style={{fontSize:40,marginBottom:10,opacity:.4}}>🪙</div><div style={{...mu}}>No coins to bet — visit the Hunt first.</div></div>:(
                     <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,marginBottom:14}}>
-                      {coins.map(coin=>{const m=METALS[coin.metalIdx];const sel=betIds.includes(coin.id);return(
-                        <div key={coin.id} onClick={()=>toggleBet(coin.id)} style={{...card,padding:"9px 6px 7px",textAlign:"center",cursor:"pointer",border:`1.5px solid ${sel?m.hl:t.border}`,background:sel?`${m.dark}40`:t.surface,transition:"all .12s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=m.eng} onMouseLeave={e=>e.currentTarget.style.borderColor=sel?m.hl:t.border}>
+                      {coins.map(coin=>{const m=METALS[coin.metalIdx];const sel=betIds.includes(coin.id);const lk=coin.locked;return(
+                        <div key={coin.id} onClick={()=>!lk&&toggleBet(coin.id)} style={{...card,padding:"9px 6px 7px",textAlign:"center",cursor:lk?"not-allowed":"pointer",border:`1.5px solid ${sel?m.hl:t.border}`,background:sel?`${m.dark}40`:t.surface,transition:"all .12s",opacity:lk?.4:1,position:"relative"}} onMouseEnter={e=>{if(!lk)e.currentTarget.style.borderColor=m.eng;}} onMouseLeave={e=>e.currentTarget.style.borderColor=sel?m.hl:t.border}>
                           <div style={{display:"flex",justifyContent:"center",marginBottom:5}}><CoinCanvas coin={coin} size={52}/></div>
                           <div style={{...VT,fontSize:12,color:m.hl,letterSpacing:1.5}}>{coin.runes.slice(0,4)}</div>
+                          {lk&&<div style={{position:"absolute",top:4,right:5,fontSize:10}}>🔒</div>}
                         </div>
                       );})}
                     </div>
@@ -1292,9 +1502,10 @@ export default function MintForge(){
                 <div style={{width:"100%"}}>
                   <div style={{...mu,fontSize:12,marginBottom:9,fontStyle:"italic"}}>Select 1 coin to bet:</div>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-                    {coins.slice(0,20).map(coin=>{const m=METALS[coin.metalIdx];const sel=roulBetId===coin.id;return(
-                      <div key={coin.id} onClick={()=>setRoulBetId(sel?null:coin.id)} style={{padding:"5px",borderRadius:7,border:`1.5px solid ${sel?m.hl:t.border}`,background:sel?`${m.dark}40`:t.surface,cursor:"pointer",transition:"all .12s"}}>
+                    {coins.slice(0,20).map(coin=>{const m=METALS[coin.metalIdx];const sel=roulBetId===coin.id;const lk=coin.locked;return(
+                      <div key={coin.id} onClick={()=>{if(lk)return;setRoulBetId(sel?null:coin.id);}} style={{padding:"5px",borderRadius:7,border:`1.5px solid ${sel?m.hl:t.border}`,background:sel?`${m.dark}40`:t.surface,cursor:lk?"not-allowed":"pointer",transition:"all .12s",opacity:lk?.4:1,position:"relative"}}>
                         <CoinCanvas coin={coin} size={44}/>
+                        {lk&&<div style={{position:"absolute",top:1,right:2,fontSize:9}}>🔒</div>}
                       </div>
                     );})}
                     {coins.length===0&&<div style={{...mu,fontSize:12,fontStyle:"italic"}}>No coins — go hunt first!</div>}
@@ -1311,7 +1522,7 @@ export default function MintForge(){
 
       <LuckyFanfare show={showLucky} onDone={()=>setShowLucky(false)}/>
       {phase==="banner"&&foundCoin&&<RevealBanner coin={foundCoin} onDone={onBannerDone}/>}
-      {selectedCoin&&<CoinModal coin={selectedCoin} onClose={()=>setSelectedCoin(null)} t={t} isDark={isDark}/>}
+      {selectedCoin&&<CoinModal coin={coins.find(c=>c.id===selectedCoin.id)||selectedCoin} onClose={()=>setSelectedCoin(null)} onToggleLock={toggleLock} t={t} isDark={isDark}/>}
     </div>
   );
 }

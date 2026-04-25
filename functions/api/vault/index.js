@@ -11,7 +11,7 @@ export async function onRequestGet({ request, env }) {
   const [state, coins] = await Promise.all([
     env.DB.prepare(`SELECT xp, shovel_level, brush_level, frame, bio, selected_title, pinned_ids
                       FROM player_state WHERE player_id = ?1`).bind(pid).first(),
-    env.DB.prepare(`SELECT id, seed, metal_idx, shiny, acquired_at FROM coins
+    env.DB.prepare(`SELECT id, seed, metal_idx, shiny, locked, acquired_at FROM coins
                       WHERE player_id = ?1 ORDER BY acquired_at DESC`).bind(pid).all(),
   ]);
 
@@ -31,6 +31,7 @@ export async function onRequestGet({ request, env }) {
       seed: r.seed >>> 0,
       metalIdx: r.metal_idx,
       shiny: !!r.shiny,
+      locked: !!r.locked,
     })),
   });
 }
@@ -74,9 +75,20 @@ export async function onRequestPost({ request, env }) {
       if (typeof c.seed !== "number") continue;
       if (typeof c.metalIdx !== "number" || c.metalIdx < 0 || c.metalIdx > 6) continue;
       stmts.push(env.DB.prepare(
-        `INSERT OR REPLACE INTO coins (id, player_id, seed, metal_idx, shiny, acquired_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)`
-      ).bind(c.id, pid, (c.seed >>> 0), c.metalIdx | 0, c.shiny ? 1 : 0, now));
+        `INSERT OR REPLACE INTO coins (id, player_id, seed, metal_idx, shiny, locked, acquired_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
+      ).bind(c.id, pid, (c.seed >>> 0), c.metalIdx | 0, c.shiny ? 1 : 0, c.locked ? 1 : 0, now));
+    }
+  }
+
+  // ── lock toggle ───────────────────────────────────────────────
+  // body.lock = [{ id, locked }, ...]   sets the locked flag for owned coins
+  if (Array.isArray(body.lock) && body.lock.length) {
+    for (const op of body.lock.slice(0, 50)) {
+      if (typeof op?.id !== "string" || op.id.length > 80) continue;
+      stmts.push(env.DB.prepare(
+        `UPDATE coins SET locked = ?3 WHERE player_id = ?1 AND id = ?2`
+      ).bind(pid, op.id, op.locked ? 1 : 0));
     }
   }
 

@@ -108,8 +108,29 @@ See `schema.sql`. Four tables:
 
 All coin mutations flow through the single transactional endpoint — forges and gambles stay atomic.
 
-## Sync model
+## Migrations (existing deployments)
 
-- **Coin add/remove**: explicit API call inline with each mutation (immediate)
-- **Scalar state** (xp, levels, bio, title, frame, pinnedIds): debounced `useEffect`, 800ms after last change
-- **Failures are swallowed** — game stays playable offline; next load may be stale until reconnected
+If your D1 was created before locked coins / friends were added, run:
+
+```bash
+npx wrangler d1 execute mintforge --file=./migrations/001_locked_friends.sql --remote
+```
+
+This adds the `locked` column to `coins` and creates the `friends` table.
+Idempotent for the friends table; the `ALTER TABLE` will error if already applied — safe to ignore.
+
+## API surface (updated)
+
+| Method | Path                       | Auth | Purpose                                         |
+|--------|----------------------------|------|-------------------------------------------------|
+| POST   | `/api/auth/register`       | —    | Create account + session                        |
+| POST   | `/api/auth/login`          | —    | Authenticate + session                          |
+| POST   | `/api/auth/logout`         | ✓    | Revoke session                                  |
+| GET    | `/api/vault`               | ✓    | Full player state + coin list                   |
+| POST   | `/api/vault`               | ✓    | Transactional `{remove?, add?, lock?, state?}`  |
+| GET    | `/api/users/search?q=`     | ✓    | Username prefix search (max 10)                 |
+| GET    | `/api/users/:username`     | ✓    | Public profile + showcase coins                 |
+| GET    | `/api/friends`             | ✓    | List your friends                               |
+| POST   | `/api/friends`             | ✓    | `{username}` — add friend                       |
+| DELETE | `/api/friends`             | ✓    | `{username}` — remove friend                    |
+
