@@ -8,4 +8,4 @@ database_name = "mintforge"
 # database_id will be filled in by wrangler when you run:
 #   npx wrangler d1 create mintforge
 # OR set it in the Cloudflare dashboard after creating the D1 database.
-database_id = ""
+database_id = "fb56dbbd-68e1-4ec1-83c4-eb475918f718"
