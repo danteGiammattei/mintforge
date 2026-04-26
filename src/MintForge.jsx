@@ -58,6 +58,9 @@ button{-webkit-tap-highlight-color:transparent;}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}60%{transform:translateX(6px)}}
 @keyframes winPop{0%{transform:scale(0) rotate(-15deg)}65%{transform:scale(1.18) rotate(4deg)}100%{transform:scale(1) rotate(0)}}
 @keyframes shinyAuraGlow{0%,100%{box-shadow:0 0 0 1.5px #ff6080,0 0 18px 2px rgba(255,96,128,.55),inset 0 0 12px rgba(255,200,80,.18)}33%{box-shadow:0 0 0 1.5px #60ff90,0 0 18px 2px rgba(96,255,144,.55),inset 0 0 12px rgba(120,255,180,.18)}66%{box-shadow:0 0 0 1.5px #9060ff,0 0 18px 2px rgba(144,96,255,.55),inset 0 0 12px rgba(180,120,255,.18)}}
+@keyframes scrapFly{0%{transform:translate(0,0) scale(0.4) rotate(0deg);opacity:0}10%{transform:translate(0,-22px) scale(1.5) rotate(40deg);opacity:1}45%{transform:translate(calc(var(--dx)*.4),calc(var(--dy)*.3 - 30px)) scale(1.15) rotate(180deg);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(0.6) rotate(720deg);opacity:0}}
+@keyframes scrapText{0%{opacity:0;transform:translate(-50%,0) scale(.7)}15%{opacity:1;transform:translate(-50%,-12px) scale(1.1)}65%{opacity:1;transform:translate(-50%,-30px) scale(1)}100%{opacity:0;transform:translate(-50%,-50px) scale(.85)}}
+@keyframes marksPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18);text-shadow:0 0 12px currentColor}}
 @keyframes shinyText{0%,100%{color:#ff8080}16%{color:#ffcc40}33%{color:#80ffa0}50%{color:#80d0ff}66%{color:#a080ff}83%{color:#ff80ff}}
 @keyframes shinyRotate{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @keyframes particleFly{0%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(.4)}}
@@ -127,12 +130,45 @@ function pickMetal(rng,pLvl=1,tierCap=MAX_TIER){
 const SHAPES=["round","round","round","round","octagonal","octagonal","hexagonal","hexagonal","holed","shield","diamond","oval"];
 const SHAPE_NAMES={round:"Round",octagonal:"Octagonal",hexagonal:"Hexagonal",holed:"Pierced",shield:"Shield",diamond:"Diamond",oval:"Oval"};
 function genFace(seed){
-  const rng=new RNG(seed^0xf4ce1a);const SZ=9,half=5;
-  let L=Array.from({length:SZ},(_,y)=>Array.from({length:half},(_,x)=>{const d=Math.hypot(x-4,y-4)/4.2;return rng.next()>(0.38+d*.28)?1:0;}));
-  for(let it=0;it<2;it++){L=L.map((row,y)=>row.map((cell,x)=>{let n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dy&&!dx)continue;const ny=y+dy,nx=x+dx;n+=(ny>=0&&ny<SZ&&nx>=0&&nx<half)?L[ny][nx]:0;}return n>=4?1:n<=2?0:cell;}));}
-  const g=Array.from({length:SZ},(_,y)=>{const row=new Array(SZ).fill(0);for(let x=0;x<half;x++){row[x]=L[y][x];row[SZ-1-x]=L[y][x];}return row;});
-  const pool=[];for(let y=2;y<7;y++)for(let x=2;x<7;x++)if(g[y][x]===1&&Math.hypot(x-4,y-4)<2.8)pool.push([y,x]);
-  for(let h=0;h<rng.int(1,2);h++){if(!pool.length)break;const idx=rng.int(0,pool.length-1);const[hy,hx]=pool.splice(idx,1)[0];g[hy][hx]=2;}
+  // 13×13 face grid (was 9×9). Higher density allows more complex random patterns
+  // while preserving the "ancient minted" aesthetic. half=7 cells per side, mirrored.
+  const rng=new RNG(seed^0xf4ce1a);const SZ=13,half=7,center=(SZ-1)/2;
+  let L=Array.from({length:SZ},(_,y)=>Array.from({length:half},(_,x)=>{
+    const d=Math.hypot(x-center,y-center)/(center*0.95);
+    // Higher base density (0.42 vs 0.38) compensates for finer grid; falloff toward edges
+    return rng.next()>(0.42+d*.3)?1:0;
+  }));
+  // Three smoothing passes (was 2) to clean up the larger grid
+  for(let it=0;it<3;it++){
+    L=L.map((row,y)=>row.map((cell,x)=>{
+      let n=0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        if(!dy&&!dx)continue;
+        const ny=y+dy,nx=x+dx;
+        n+=(ny>=0&&ny<SZ&&nx>=0&&nx<half)?L[ny][nx]:0;
+      }
+      return n>=4?1:n<=2?0:cell;
+    }));
+  }
+  // Mirror left half across to make symmetric face
+  const g=Array.from({length:SZ},(_,y)=>{
+    const row=new Array(SZ).fill(0);
+    for(let x=0;x<half;x++){row[x]=L[y][x];row[SZ-1-x]=L[y][x];}
+    return row;
+  });
+  // Choose 2-4 highlight cells (engraving accent — was 1-2). More cells, more visual richness.
+  const pool=[];
+  for(let y=3;y<SZ-3;y++)for(let x=3;x<SZ-3;x++){
+    if(g[y][x]===1&&Math.hypot(x-center,y-center)<center*0.7)pool.push([y,x]);
+  }
+  for(let h=0;h<rng.int(2,4);h++){
+    if(!pool.length)break;
+    const idx=rng.int(0,pool.length-1);
+    const[hy,hx]=pool.splice(idx,1)[0];
+    g[hy][hx]=2;
+    // Mirror the highlight too — keeps the symmetry
+    if(SZ-1-hx!==hx)g[hy][SZ-1-hx]=2;
+  }
   return g;
 }
 
@@ -154,7 +190,10 @@ const newSeed=()=>(Date.now()^(Math.random()*0xffffffff|0))>>>0;
 
 /* ─── DRAW COIN ───────────────────────────────────────────────────────── */
 function drawCoin(canvas,coin,px){
-  const S=48,off=document.createElement("canvas");off.width=S;off.height=S;
+  // Bumped from 48 to 64 for higher pixel density. The face moves from 9×9 (5px each)
+  // to 13×13 (3.5px each), giving ~2.6× the pixel detail per face. The blit at the end
+  // is still nearest-neighbor scaled to whatever target px is requested.
+  const S=64,off=document.createElement("canvas");off.width=S;off.height=S;
   const c=off.getContext("2d"),m=METALS[coin.metalIdx],noise=new RNG(coin.seed^0xcafeba),cx=S/2,cy=S/2,r=S/2-1;
   const clip=()=>{c.beginPath();const sh=coin.shape;
     if(sh==="round"||sh==="holed")c.arc(cx,cy,r,0,Math.PI*2);
@@ -167,8 +206,24 @@ function drawCoin(canvas,coin,px){
   };
   clip();c.save();c.clip();
   const grd=c.createRadialGradient(cx-r*.3,cy-r*.3,0,cx,cy,r);grd.addColorStop(0,m.base);grd.addColorStop(.55,m.mid);grd.addColorStop(1,m.dark);c.fillStyle=grd;c.fillRect(0,0,S,S);
-  for(let i=0;i<240;i++){const a=noise.next()*Math.PI*2,d=noise.next()*r*.95,x=cx+Math.cos(a)*d,y=cy+Math.sin(a)*d,b=noise.next();c.fillStyle=`rgba(${b>.5?255:0},${b>.5?255:0},${b>.5?255:0},${.04+noise.next()*.06})`;c.fillRect(x|0,y|0,1,1);}
-  const face=genFace(coin.seed);for(let y=0;y<9;y++)for(let x=0;x<9;x++){const v=face[y][x];if(!v)continue;const px2=4+x*4.5,py=4+y*4.5;c.fillStyle=v===2?m.eng:m.hl;c.fillRect(px2|0,py|0,5,5);if(v===1){c.fillStyle="rgba(255,255,255,.18)";c.fillRect(px2|0,py|0,5,1);c.fillStyle="rgba(0,0,0,.22)";c.fillRect(px2|0,(py+4)|0,5,1);}}
+  // More noise particles to fill the larger canvas (240 → 420)
+  for(let i=0;i<420;i++){const a=noise.next()*Math.PI*2,d=noise.next()*r*.95,x=cx+Math.cos(a)*d,y=cy+Math.sin(a)*d,b=noise.next();c.fillStyle=`rgba(${b>.5?255:0},${b>.5?255:0},${b>.5?255:0},${.04+noise.next()*.06})`;c.fillRect(x|0,y|0,1,1);}
+  // Face: 13×13 grid centered on canvas, ~3.5px per cell. Offset = (S - 13*cellSize)/2.
+  const face=genFace(coin.seed);
+  const cellSize=3.5,faceOffset=(S-13*cellSize)/2;
+  for(let y=0;y<13;y++)for(let x=0;x<13;x++){
+    const v=face[y][x];if(!v)continue;
+    const px2=faceOffset+x*cellSize,py=faceOffset+y*cellSize;
+    c.fillStyle=v===2?m.eng:m.hl;
+    // Rendering at non-integer pixel positions: draw with ceil to avoid gaps
+    c.fillRect(Math.floor(px2),Math.floor(py),Math.ceil(cellSize),Math.ceil(cellSize));
+    if(v===1){
+      c.fillStyle="rgba(255,255,255,.22)";
+      c.fillRect(Math.floor(px2),Math.floor(py),Math.ceil(cellSize),1);
+      c.fillStyle="rgba(0,0,0,.26)";
+      c.fillRect(Math.floor(px2),Math.floor(py)+Math.ceil(cellSize)-1,Math.ceil(cellSize),1);
+    }
+  }
   c.fillStyle="rgba(255,255,255,.14)";c.beginPath();c.arc(cx-r*.4,cy-r*.4,r*.55,0,Math.PI*2);c.fill();
   if(coin.shape==="holed"){c.save();c.globalCompositeOperation="destination-out";c.beginPath();c.arc(cx,cy,r*.18,0,Math.PI*2);c.fill();c.restore();}
   c.restore();
@@ -277,7 +332,7 @@ function BrushReveal({coin,brushAlpha=BA,shinyChance=.01,onRevealed,t}){
 
 /* ─── DIG PIT  (core bug fixed) ───────────────────────────────────────── */
 const GRID=4;
-function DigPit({coin,shovelLevel,onFound,onTooDeep,t,isDark}){
+function DigPit({coin,shovelLevel,onFound,onTooDeep,onCellScrap,t,isDark}){
   // ── BUG FIX ──
   // Previously the coin-cell depth was `int(1, shovelLevel)` — always reachable,
   // so the "TOO DEEP" gate could never fire. Now the coin cell has an 18% chance
@@ -315,7 +370,18 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,t,isDark}){
     }
     cntRef.current++;const cnt=cntRef.current;
     setDug(p=>({...p,[idx]:true}));
-    if(idx===coinCell){setFound(idx);setTimeout(()=>onFound(cnt,GRID*GRID),600);}
+    if(idx===coinCell){
+      setFound(idx);setTimeout(()=>onFound(cnt,GRID*GRID),600);
+    }else if(onCellScrap){
+      // Non-coin dig: fire scrap reward animation. Capture cell rect on next frame
+      // (after the cell paints) so the flyer originates at the visible position.
+      const target=e?.currentTarget;
+      requestAnimationFrame(()=>{
+        if(target?.getBoundingClientRect){
+          onCellScrap(target.getBoundingClientRect());
+        }
+      });
+    }
   };
   // Track finger position over the pit (touch only — mouse uses native cursor + hover)
   const trackPointer=(e)=>{
@@ -462,7 +528,7 @@ function RevealBanner({coin,onDone}){
         {coin.scrapEarned>0&&(
           <div style={{marginTop:14,padding:"7px 14px",display:"inline-flex",alignItems:"center",gap:8,background:"rgba(212,160,23,.08)",border:"1px solid rgba(212,160,23,.22)",borderRadius:6,fontFamily:"Outfit,sans-serif",fontSize:11,fontWeight:700,color:"#d4a017",letterSpacing:1.5,animation:"flashIn .5s ease-out .3s backwards"}}>
             <span style={{fontSize:13}}>⚙</span>
-            +{coin.scrapCount} scrap · ◈ {coin.scrapEarned}
+            Bonus scrap · ◈ {coin.scrapEarned}
           </div>
         )}
         <div style={{fontFamily:"Outfit,sans-serif",fontSize:10,color:"#3a3024",marginTop:18,letterSpacing:3,textTransform:"uppercase"}}>tap to continue</div>
@@ -612,7 +678,7 @@ const TAROT_CARDS=[
   {id:"lovers",           title:"The Lovers",         roman:"VI",   rarity:"uncommon", price:700,   pinSlots:2,      desc:"+2 display cabinet slots"},
   {id:"chariot",          title:"The Chariot",        roman:"VII",  rarity:"rare",     price:1200,  digSpeed:0.20,   desc:"+20% lucky-dig chance (≤2 digs to find)"},
   {id:"strength",         title:"Strength",           roman:"VIII", rarity:"rare",     price:1500,  shinyBonus:0.04, desc:"+4% shiny chance"},
-  {id:"hermit",           title:"The Hermit",         roman:"rare", rarity:"rare",     price:1300,  artefactRate:0.10, desc:"+10% chance to find artefacts (coming soon)"},
+  {id:"hermit",           title:"The Hermit",         roman:"rare", rarity:"rare",     price:1300,  artefactRate:0.10, desc:"+10% artefact find chance · coming soon"},
   {id:"wheel_of_fortune", title:"Wheel of Fortune",   roman:"X",    rarity:"epic",     price:2400,  marksMul:0.40,   desc:"+40% marks earned"},
   {id:"justice",          title:"Justice",            roman:"XI",   rarity:"epic",     price:2200,  forgeRefund:0.25, desc:"25% chance to recover forge materials"},
   {id:"hanged_man",       title:"The Hanged Man",     roman:"XII",  rarity:"epic",     price:2800,  rerollDig:1,     desc:"Once per hunt, retry a too-deep coin"},
@@ -829,6 +895,8 @@ export default function MintForge(){
   const [brushLevel,setBrushLevel]=useState(0);
   const [marks,setMarks]=useState(0);
   const [shovelDur,setShovelDur]=useState(40);
+  const [hangedManUsed,setHangedManUsed]=useState(false); // resets on each successful coin found
+  const marksCounterRef=useRef(null);  // for scrap flyer targeting
   const [ownedTarots,setOwnedTarots]=useState([]);   // array of card IDs
   const [equippedTarots,setEquippedTarots]=useState([]); // up to 5
   const [schemaWarning,setSchemaWarning]=useState(null);
@@ -1032,32 +1100,49 @@ export default function MintForge(){
     if(Math.random()<buff.tierUp){bonus+=1;if(!reason)reason="lucky";}
     if(bonus>=2)reason="first";
 
-    // Scrap drops — every dig produces 1-3 scrap (more with luck and Empress tarot).
-    // Scrap converts directly to marks at award time. Soft-lock prevention: even a
-    // -1 tier "damaged" dig still nets you the dig's scrap so you're never empty-handed.
-    const scrapBase=cnt<=2?3:cnt<=8?2:1;            // first/lucky digs yield more scrap
-    const scrapBonus=Math.random()<buff.marksMul?1:0; // Empress/Wheel of Fortune: chance for +1 scrap
-    const scrapCount=scrapBase+scrapBonus;
-    // Each scrap is worth 4-7 marks scaled by shovel level (top shovel = 7 each)
+    // Bonus scrap for finding the coin — first-try gets a big chunk, normal a small one.
+    const finalScrap=cnt===1?5:cnt<=3?3:1;
     const scrapPerPiece=Math.max(4,Math.round(4+shovelLevel*0.5));
-    const scrapEarned=Math.round(scrapCount*scrapPerPiece*(1+buff.marksMul));
-    setMarks(m=>m+scrapEarned);
+    const scrapEarned=Math.round(finalScrap*scrapPerPiece*(1+buff.marksMul));
 
     if(bonus!==0||reason){
       const showFanfare=bonus>=2;
-      setFoundCoin(p=>p?{...p,metalIdx:Math.max(0,Math.min(MAX_TIER,p.metalIdx+bonus)),digBonus:reason,digCnt:cnt,scrapCount,scrapEarned}:p);
+      setFoundCoin(p=>p?{...p,metalIdx:Math.max(0,Math.min(MAX_TIER,p.metalIdx+bonus)),digBonus:reason,digCnt:cnt,scrapCount:finalScrap,scrapEarned}:p);
       if(showFanfare)setShowLucky(true);
     }else{
-      setFoundCoin(p=>p?{...p,digCnt:cnt,scrapCount,scrapEarned}:p);
+      setFoundCoin(p=>p?{...p,digCnt:cnt,scrapCount:finalScrap,scrapEarned}:p);
     }
-    // Pickaxe wear — Hierophant halves it (multiplicative)
-    const wear=Math.max(1,Math.round(1*buff.durMul));
-    setShovelDur(d=>Math.max(0,d-wear));
+    setMarks(m=>m+scrapEarned);
+    // Pickaxe wear — Hierophant tarot's durMul is multiplicative (0.5 per Hierophant).
+    // Old logic used Math.round which floored 0.5 to 1, so Hierophant did literally nothing.
+    // New approach: probabilistic wear. With durMul=0.5, each dig has 50% chance of wear.
+    const wear=Math.random()<buff.durMul?1:0;
+    if(wear)setShovelDur(d=>Math.max(0,d-1));
     // XP — High Priestess +10%, plus modest bonus per skill
     const xpGain=Math.round((80+(cnt===1?40:cnt<=3?15:0))*(1+buff.xpMul));
     setXP(p=>p+xpGain);
     setPhase("brush");
   };
+  // Per-cell scrap callback fired by DigPit when a non-coin cell is excavated.
+  // Spawns a flying scrap animation toward the marks counter and adds to marks.
+  // Rect is the bounding rect of the cell that was dug (for animation origin).
+  const [scrapFlyers,setScrapFlyers]=useState([]); // active flyer animations
+  const onCellScrap=useCallback((rect)=>{
+    const scrapPerPiece=Math.max(3,Math.round(3+shovelLevel*0.4));
+    const amount=Math.round(scrapPerPiece*(1+buff.marksMul));
+    const id=Math.random().toString(36).slice(2);
+    // Determine where the marks counter is right now so the scrap can fly to it.
+    const targetRect=marksCounterRef.current?.getBoundingClientRect();
+    const startX=rect.left+rect.width/2;
+    const startY=rect.top+rect.height/2;
+    const dx=targetRect?(targetRect.left+targetRect.width/2-startX):0;
+    const dy=targetRect?(targetRect.top+targetRect.height/2-startY):-300;
+    setScrapFlyers(f=>[...f,{id,startX,startY,dx,dy,amount}]);
+    // Marks tick up just before the flyer reaches the counter (~75% through anim)
+    setTimeout(()=>setMarks(m=>m+amount),700);
+    // Remove flyer after animation completes
+    setTimeout(()=>setScrapFlyers(f=>f.filter(x=>x.id!==id)),1000);
+  },[shovelLevel,buff.marksMul]);
   const onTooDeep=(d)=>setTooDeepMsg(`Coin lies at depth ${d} — upgrade your shovel.`);
   // Abandon the current dig — prevents soft-lock when a too-deep coin is
   // unreachable AND the player can't afford to forge. Generates a new hunt
@@ -1067,6 +1152,16 @@ export default function MintForge(){
     // 1 scrap × shovel-level marks each, scaled by Empress/Wheel of Fortune.
     const consolation=Math.max(1,Math.round((4+shovelLevel*0.5)*(1+buff.marksMul)));
     setMarks(m=>m+consolation);
+    const tc=SHOVEL_TIER_CAP[Math.min(shovelLevel-1,SHOVEL_TIER_CAP.length-1)];
+    const next=mkCoin(newSeed(),level,null,tc);
+    setHuntCoin(next);setCoinFrac({x:.1+Math.random()*.8,y:.1+Math.random()*.8});
+    setDetFrac({x:.5,y:.5});setFoundCoin(null);setTooDeepMsg(null);setPhase("hunt");
+  };
+  // Hanged Man tarot: once per hunt, reroll a too-deep coin without penalty.
+  // Uses one reroll charge that resets when you successfully find a coin.
+  const onReroll=()=>{
+    if(hangedManUsed||buff.rerollDig<=0)return;
+    setHangedManUsed(true);
     const tc=SHOVEL_TIER_CAP[Math.min(shovelLevel-1,SHOVEL_TIER_CAP.length-1)];
     const next=mkCoin(newSeed(),level,null,tc);
     setHuntCoin(next);setCoinFrac({x:.1+Math.random()*.8,y:.1+Math.random()*.8});
@@ -1087,6 +1182,7 @@ export default function MintForge(){
     const next=mkCoin(newSeed(),level,null,tc);
     setHuntCoin(next);setCoinFrac({x:.1+Math.random()*.8,y:.1+Math.random()*.8});
     setDetFrac({x:.5,y:.5});setFoundCoin(null);setPhase("hunt");
+    setHangedManUsed(false); // fresh reroll budget for next hunt
   };
 
   // Pin toggle — when going from auto-mode (pinnedIds === null) to manual,
@@ -1274,7 +1370,7 @@ export default function MintForge(){
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{textAlign:"right"}}>
             <div style={{display:"flex",alignItems:"center",gap:7,justifyContent:"flex-end",marginBottom:4}}>
-              <span style={{...F,fontSize:11,fontWeight:800,color:t.accent,letterSpacing:.5,fontVariantNumeric:"tabular-nums",display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:11,opacity:.85}}>◈</span>{marks.toLocaleString()}</span>
+              <span ref={marksCounterRef} style={{...F,fontSize:11,fontWeight:800,color:t.accent,letterSpacing:.5,fontVariantNumeric:"tabular-nums",display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:11,opacity:.85}}>◈</span>{marks.toLocaleString()}</span>
               <span style={{...F,fontSize:10,color:t.textDim,fontWeight:600,letterSpacing:1,textTransform:"uppercase",opacity:.55}}>·</span>
               <span style={{background:`linear-gradient(135deg,${t.accentHi},${t.accent})`,color:t.accentInk,fontWeight:900,fontSize:10,padding:"2px 8px",borderRadius:4,letterSpacing:1,boxShadow:"0 1px 2px rgba(0,0,0,.2)"}}>LV {level}</span>
             </div>
@@ -1682,10 +1778,17 @@ export default function MintForge(){
                   <div style={{...microLabel,fontSize:10,padding:"5px 11px",background:isDark?"#1a0e08":"#faf0ea",border:`1px solid ${isDark?"#3a1e10":"#e0b090"}`,borderRadius:6,color:"#c47040"}}>☠ All cells · rarity down</div>
                 </div>
                 {tooDeepMsg&&<div style={{background:isDark?"#1a0c08":"#fff5f0",border:`1px solid ${t.danger}`,borderRadius:9,padding:"11px 18px",...F,fontSize:13,color:t.danger,textAlign:"center",fontWeight:600,maxWidth:320,letterSpacing:.3}}>⛏ {tooDeepMsg}</div>}
-                <DigPit coin={foundCoin} shovelLevel={shovelLevel} onFound={onDigFound} onTooDeep={onTooDeep} t={t} isDark={isDark}/>
-                <button onClick={onAbandon} style={{marginTop:4,padding:"8px 18px",borderRadius:8,border:`1px solid ${t.border}`,background:"transparent",cursor:"pointer",...F,fontSize:11,fontWeight:600,color:t.muted,letterSpacing:2,textTransform:"uppercase",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.color=t.textDim;e.currentTarget.style.borderColor=t.borderHi;}} onMouseLeave={e=>{e.currentTarget.style.color=t.muted;e.currentTarget.style.borderColor=t.border;}}>
-                  ← Leave buried
-                </button>
+                <DigPit coin={foundCoin} shovelLevel={shovelLevel} onFound={onDigFound} onTooDeep={onTooDeep} onCellScrap={onCellScrap} t={t} isDark={isDark}/>
+                <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",justifyContent:"center"}}>
+                  <button onClick={onAbandon} style={{padding:"8px 18px",borderRadius:8,border:`1px solid ${t.border}`,background:"transparent",cursor:"pointer",...F,fontSize:11,fontWeight:600,color:t.muted,letterSpacing:2,textTransform:"uppercase",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.color=t.textDim;e.currentTarget.style.borderColor=t.borderHi;}} onMouseLeave={e=>{e.currentTarget.style.color=t.muted;e.currentTarget.style.borderColor=t.border;}}>
+                    ← Leave buried
+                  </button>
+                  {buff.rerollDig>0&&!hangedManUsed&&tooDeepMsg&&(
+                    <button onClick={onReroll} style={{padding:"8px 18px",borderRadius:8,border:`1px solid ${RARITY_COLOR.epic}`,background:`linear-gradient(135deg,${RARITY_COLOR.epic}22,${RARITY_COLOR.epic}11)`,cursor:"pointer",...F,fontSize:11,fontWeight:700,color:RARITY_COLOR.epic,letterSpacing:2,textTransform:"uppercase",transition:"all .15s",boxShadow:`0 0 12px ${RARITY_COLOR.epic}22`}}>
+                      ✦ Reroll · Hanged Man
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             {phase==="brush"&&foundCoin&&(
@@ -1961,6 +2064,22 @@ export default function MintForge(){
       <BottomNav tab={tab} setTab={setTab} huntActive={phase==="dig"||phase==="brush"} t={t}/>
 
       <LuckyFanfare show={showLucky} onDone={()=>setShowLucky(false)}/>
+      {/* Flying scrap animation — fixed-position overlay, one element per dug cell.
+          Each flyer arcs from cell origin toward the marks counter, with floating
+          "+◈ N scrap" text near the origin. Timing is tuned so marks ticker fires
+          ~75% through the flight (700ms) and the element vanishes at 1000ms. */}
+      {scrapFlyers.length>0&&(
+        <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:170}}>
+          {scrapFlyers.map(f=>(
+            <div key={f.id}>
+              <div style={{position:"fixed",left:f.startX,top:f.startY,fontSize:22,filter:"drop-shadow(0 2px 6px rgba(0,0,0,.7))",animation:"scrapFly 1s cubic-bezier(.45,.05,.55,.95) forwards",pointerEvents:"none",willChange:"transform",["--dx"]:`${f.dx}px`,["--dy"]:`${f.dy}px`}}>⚙</div>
+              <div style={{position:"fixed",left:f.startX,top:f.startY-8,...F,fontSize:13,fontWeight:800,color:"#f0c850",letterSpacing:.5,textShadow:"0 1px 4px rgba(0,0,0,.85),0 0 10px rgba(212,160,23,.6)",pointerEvents:"none",animation:"scrapText .85s ease-out forwards",whiteSpace:"nowrap"}}>
+                Scrap +◈{f.amount}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {phase==="banner"&&foundCoin&&<RevealBanner coin={foundCoin} onDone={onBannerDone}/>}
       {selectedCoin&&<CoinModal coin={coins.find(c=>c.id===selectedCoin.id)||selectedCoin} onClose={()=>setSelectedCoin(null)} onToggleLock={toggleLock} onSell={sellCoin} t={t} isDark={isDark}/>}
     </div>
