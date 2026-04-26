@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS player_state (
   marks           INTEGER NOT NULL DEFAULT 0,
   shovel_dur      INTEGER NOT NULL DEFAULT 40,
   equipped_tarots TEXT,
+  owned_frames    TEXT,
+  owned_titles    TEXT,
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 
