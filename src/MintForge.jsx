@@ -58,6 +58,22 @@ button{-webkit-tap-highlight-color:transparent;}
 @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}60%{transform:translateX(6px)}}
 @keyframes winPop{0%{transform:scale(0) rotate(-15deg)}65%{transform:scale(1.18) rotate(4deg)}100%{transform:scale(1) rotate(0)}}
 @keyframes shinyAuraGlow{0%,100%{box-shadow:0 0 0 1.5px #ff6080,0 0 18px 2px rgba(255,96,128,.55),inset 0 0 12px rgba(255,200,80,.18)}33%{box-shadow:0 0 0 1.5px #60ff90,0 0 18px 2px rgba(96,255,144,.55),inset 0 0 12px rgba(120,255,180,.18)}66%{box-shadow:0 0 0 1.5px #9060ff,0 0 18px 2px rgba(144,96,255,.55),inset 0 0 12px rgba(180,120,255,.18)}}
+@keyframes ambientFloat1{0%,100%{transform:translate(0,0);opacity:.0}25%{opacity:.9}50%{transform:translate(10px,-12px);opacity:.5}75%{opacity:.9}}
+@keyframes ambientFloat2{0%,100%{transform:translate(0,0);opacity:.0}30%{opacity:.7}50%{transform:translate(-8px,-10px);opacity:.4}70%{opacity:.7}}
+@keyframes ambientFloat3{0%,100%{transform:translate(0,0);opacity:.0}35%{opacity:.85}50%{transform:translate(6px,-14px);opacity:.45}65%{opacity:.85}}
+.ambient-particles{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:2;}
+.ambient-particles>span{position:absolute;width:3px;height:3px;border-radius:50%;display:block;}
+.ambient-particles.eldritch>span{background:#80ffb0;box-shadow:0 0 6px #80ffb0,0 0 10px #5af090aa;}
+.ambient-particles.astral>span{background:#fff8a0;box-shadow:0 0 6px #fff8a0,0 0 12px #ffd060aa;width:2.5px;height:2.5px;}
+.ambient-particles>span:nth-child(1){left:18%;top:75%;animation:ambientFloat1 4s ease-in-out infinite;}
+.ambient-particles>span:nth-child(2){left:78%;top:65%;animation:ambientFloat2 5s ease-in-out infinite .8s;}
+.ambient-particles>span:nth-child(3){left:50%;top:82%;animation:ambientFloat3 4.5s ease-in-out infinite 1.6s;}
+@keyframes titleShimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+@keyframes titleVoidPulse{0%,100%{text-shadow:0 0 6px rgba(160,80,232,.6),0 0 12px rgba(160,80,232,.3)}50%{text-shadow:0 0 10px rgba(200,120,255,.9),0 0 20px rgba(160,80,232,.6),0 0 28px rgba(120,40,200,.4)}}
+@keyframes titleAstralGlow{0%,100%{filter:hue-rotate(0deg) brightness(1)}33%{filter:hue-rotate(15deg) brightness(1.15)}66%{filter:hue-rotate(-10deg) brightness(1.05)}}
+.title-shimmer{background:linear-gradient(90deg,#d4a017 0%,#fff8a0 50%,#d4a017 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:titleShimmer 3s ease-in-out infinite;font-weight:800;}
+.title-void{color:#c890ff;animation:titleVoidPulse 2.4s ease-in-out infinite;font-weight:800;}
+.title-astral{background:linear-gradient(90deg,#fff8a0,#ffd060,#a8d8ff,#c890ff,#fff8a0);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:titleShimmer 4s linear infinite, titleAstralGlow 5s ease-in-out infinite;font-weight:800;}
 @keyframes scrapFly{0%{transform:translate(0,0) scale(0.4) rotate(0deg);opacity:0}10%{transform:translate(0,-22px) scale(1.5) rotate(40deg);opacity:1}45%{transform:translate(calc(var(--dx)*.4),calc(var(--dy)*.3 - 30px)) scale(1.15) rotate(180deg);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(0.6) rotate(720deg);opacity:0}}
 @keyframes scrapText{0%{opacity:0;transform:translate(-50%,0) scale(.7)}15%{opacity:1;transform:translate(-50%,-12px) scale(1.1)}65%{opacity:1;transform:translate(-50%,-30px) scale(1)}100%{opacity:0;transform:translate(-50%,-50px) scale(.85)}}
 @keyframes marksPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18);text-shadow:0 0 12px currentColor}}
@@ -373,12 +389,12 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,onCellScrap,t,isDark}){
     if(idx===coinCell){
       setFound(idx);setTimeout(()=>onFound(cnt,GRID*GRID),600);
     }else if(onCellScrap){
-      // Non-coin dig: fire scrap reward animation. Capture cell rect on next frame
-      // (after the cell paints) so the flyer originates at the visible position.
+      // Non-coin dig: forward cell idx + bounding rect so parent can decide whether
+      // this cell is in the pre-budgeted scrap set, and animate accordingly.
       const target=e?.currentTarget;
       requestAnimationFrame(()=>{
         if(target?.getBoundingClientRect){
-          onCellScrap(target.getBoundingClientRect());
+          onCellScrap(idx,target.getBoundingClientRect());
         }
       });
     }
@@ -651,6 +667,9 @@ const BANNERS={
   gilded:"linear-gradient(135deg,#3a2400 0%,#604000 50%,#241400 100%)",
   obsidian:"linear-gradient(135deg,#1a0040 0%,#400870 50%,#0a0020 100%)",
   void:"linear-gradient(135deg,#04041a 0%,#101030 50%,#020210 100%)",
+  // Image-backed banners — referenced by frame id, rendered as background-image with overlay
+  stargazer:"url('/banners/stargazer.webp') center/cover",
+  wanderer:"url('/banners/wanderer.webp') center/cover",
 };
 const FRAMES={
   stone:{lbl:"Stone",minLvl:1,accent:"#8a7560"},
@@ -659,7 +678,19 @@ const FRAMES={
   gilded:{lbl:"Gilded",minLvl:20,accent:"#d4a017"},
   obsidian:{lbl:"Obsidian",minLvl:30,accent:"#a050e8"},
   void:{lbl:"Void",minLvl:50,accent:"#5050e8"},
+  // Premium frames — gated by both XP and a marks purchase. Keys must match BANNERS.
+  stargazer:{lbl:"Stargazer",minLvl:15,accent:"#c8b878",premium:true,price:1800,desc:"A lone scholar at the edge of the world"},
+  wanderer:{lbl:"The Wanderer",minLvl:25,accent:"#a89060",premium:true,price:2400,desc:"Crowned spires beyond the wandering staff"},
 };
+// Premium titles — purchasable, with animated text effects.
+// Free titles are still managed by the existing TITLES list (XP-gated by index).
+const PREMIUM_TITLES=[
+  {id:"goldspun",   label:"Goldspun",         minLvl:10, price:600,  effect:"shimmer"},
+  {id:"voidtouched",label:"Void-Touched",     minLvl:20, price:1500, effect:"void"},
+  {id:"astral",     label:"Of the Astral Hour",minLvl:35,price:3500, effect:"astral"},
+];
+const PREMIUM_TITLE_BY_ID=Object.fromEntries(PREMIUM_TITLES.map(t=>[t.id,t]));
+const PREMIUM_TITLE_LABELS=new Set(PREMIUM_TITLES.map(t=>t.label));
 
 const SHOVEL_UPS=[null,{label:"Iron Shovel",depth:2,cost:[{m:0,n:3}],desc:"Reaches depth 2"},{label:"Bronze Pick",depth:3,cost:[{m:0,n:2},{m:1,n:2}],desc:"Reaches depth 3"},{label:"Steel Pick",depth:4,cost:[{m:2,n:2},{m:1,n:1}],desc:"Reaches depth 4"},{label:"Gilded Pick",depth:5,cost:[{m:3,n:1},{m:2,n:2}],desc:"Reaches depth 5"},{label:"Platinum Pick",depth:6,cost:[{m:4,n:1},{m:3,n:1}],desc:"Reaches depth 6"},{label:"Void Excavator",depth:7,cost:[{m:5,n:1},{m:4,n:1}],desc:"Reaches depth 7"},{label:"Eldritch Drill",depth:8,cost:[{m:6,n:1},{m:5,n:1}],desc:"Reaches depth 8"},{label:"Astral Cleaver",depth:9,cost:[{m:7,n:1},{m:6,n:1}],desc:"Reaches depth 9 — Maxed"}];
 const BRUSH_UPS=[{label:"Rough Brush",alpha:BA,shinyChance:.005,cost:null,desc:"0.5% shiny chance"},{label:"Boar Bristle",alpha:.55,shinyChance:.015,cost:[{m:0,n:2}],desc:"1.5% shiny chance"},{label:"Silver Brush",alpha:.9,shinyChance:.03,cost:[{m:0,n:1},{m:2,n:2}],desc:"3% shiny chance"},{label:"Gold Brush",alpha:1.0,shinyChance:.05,cost:[{m:3,n:1},{m:2,n:1}],desc:"5% shiny chance"},{label:"Void Brush",alpha:1.0,shinyChance:.08,cost:[{m:5,n:1}],desc:"8% shiny chance — tarot buffs stack on top"}];
@@ -709,9 +740,11 @@ function tarotBuffs(equippedIds){
 // Each shovel level has a max durability. Base wear is 1 per dig; tarot can halve it.
 const SHOVEL_MAX_DUR=[null,40,60,90,130,180,250,350,500,700]; // index by shovelLevel
 function shovelMaxDur(lv){return SHOVEL_MAX_DUR[Math.min(lv,SHOVEL_MAX_DUR.length-1)]||40;}
-// Repair cost scales with shovel level — 8 marks per missing point at Lv1, doubling roughly per level.
+// Repair cost — flatter curve so repairs feel routine, not punishing.
+// Was (6 + lv*4) per point. Now (3 + lv*1.5) per point.
+// At Lv6: 12/pt (was 30, then 14 — ~13% additional drop).
 function repairCost(missing,shovelLevel){
-  return Math.max(1,Math.round(missing*(6+shovelLevel*4)));
+  return Math.max(1,Math.round(missing*(3+shovelLevel*1.3)));
 }
 
 const GAMBLES=[
@@ -896,9 +929,16 @@ export default function MintForge(){
   const [marks,setMarks]=useState(0);
   const [shovelDur,setShovelDur]=useState(40);
   const [hangedManUsed,setHangedManUsed]=useState(false); // resets on each successful coin found
+  const [pickerSlot,setPickerSlot]=useState(null);  // index of cabinet slot being filled, or null
   const marksCounterRef=useRef(null);  // for scrap flyer targeting
+  // Per-dig scrap budget. Generated when entering dig phase. Some non-coin cells contain
+  // scrap (chosen randomly per dig); each scrap-cell awards budget/scrapCellCount marks.
+  // Remaining budget (unawarded if you found the coin early) is granted as bonus on success.
+  const digBudgetRef=useRef({total:0,perCell:0,remaining:0,scrapCells:new Set()});
   const [ownedTarots,setOwnedTarots]=useState([]);   // array of card IDs
   const [equippedTarots,setEquippedTarots]=useState([]); // up to 5
+  const [ownedFrames,setOwnedFrames]=useState([]);   // premium frames purchased
+  const [ownedTitles,setOwnedTitles]=useState([]);   // premium titles purchased
   const [schemaWarning,setSchemaWarning]=useState(null);
   const buff=useMemo(()=>tarotBuffs(equippedTarots),[equippedTarots]);
   const maxPins=6+(buff.pinSlots||0);
@@ -913,8 +953,14 @@ export default function MintForge(){
 
   // Auto-revert frame if the player falls below requirement
   useEffect(()=>{if(level<FRAMES[frame].minLvl)setFrame("stone");},[level,frame]);
-  // Keep selected title legal
-  useEffect(()=>{if(!unlockedTitles(level).includes(selectedTitle))setSelectedTitle(unlockedTitles(level).slice(-1)[0]||TITLES[0]);},[level,selectedTitle]);
+  // Keep selected title legal — accepts XP-unlocked titles AND any owned premium title.
+  useEffect(()=>{
+    const legal=unlockedTitles(level);
+    const ownedPremiumLabels=ownedTitles.map(id=>PREMIUM_TITLE_BY_ID[id]?.label).filter(Boolean);
+    if(!legal.includes(selectedTitle)&&!ownedPremiumLabels.includes(selectedTitle)){
+      setSelectedTitle(legal.slice(-1)[0]||TITLES[0]);
+    }
+  },[level,selectedTitle,ownedTitles]);
 
   const [huntCoin,setHuntCoin]=useState(()=>mkCoin(newSeed(),1,null,1));
   const [coinFrac,setCoinFrac]=useState(()=>({x:.2+Math.random()*.6,y:.2+Math.random()*.6}));
@@ -926,6 +972,7 @@ export default function MintForge(){
 
   const [gambMode,setGambMode]=useState("toss");
   const [tavernView,setTavernView]=useState("shop"); // shop · wager · repair
+  const [shopTab,setShopTab]=useState("tarot");      // tarot · banners · titles
   const [betIds,setBetIds]=useState([]);
   const [gambPhase,setGambPhase]=useState("select");
   const [gambResult,setGambResult]=useState(null);
@@ -964,6 +1011,8 @@ export default function MintForge(){
       setShovelDur(v.shovelDur!=null?v.shovelDur:shovelMaxDur(v.shovelLevel||1));
       setOwnedTarots(v.ownedTarots||[]);
       setEquippedTarots(v.equippedTarots||[]);
+      setOwnedFrames(v.ownedFrames||[]);
+      setOwnedTitles(v.ownedTitles||[]);
       setSchemaWarning(v.schemaWarning||null);
       // reconstruct coins from stored {seed, metalIdx, shiny, locked, id}
       setCoins((v.coins||[]).map(row=>{
@@ -1002,6 +1051,7 @@ export default function MintForge(){
     setToken(null);setPlayer(null);setCoins([]);setXP(0);setShovelLevel(1);setBrushLevel(0);
     setFrame("stone");setBio("");setSelectedTitle(TITLES[0]);setPinnedIds(null);
     setMarks(0);setShovelDur(40);setOwnedTarots([]);setEquippedTarots([]);
+    setOwnedFrames([]);setOwnedTitles([]);
     setPhase("hunt");setFoundCoin(null);setTooDeepMsg(null);setTab("hunt");
     setLoadedFromServer(false);setAuthReady(true);
   },[api]);
@@ -1009,8 +1059,8 @@ export default function MintForge(){
   /* ── sync scalar state (debounced) ─────────────────────────────── */
   useDebouncedEffect(()=>{
     if(!loadedFromServer)return;
-    api.tx({state:{xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots}}).catch(()=>{});
-  },[xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,loadedFromServer],800);
+    api.tx({state:{xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles}}).catch(()=>{});
+  },[xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles,loadedFromServer],800);
 
   /* ── load friends list on auth + when entering social tab ──── */
   useEffect(()=>{
@@ -1068,6 +1118,24 @@ export default function MintForge(){
   const onDig=()=>{
     if(!canDig||phase!=="hunt")return;
     if(shovelDur<=0){setTooDeepMsg("Pickaxe broken — repair it in the Shop.");return;}
+    // ─ Pre-budget the scrap reward for this dig ─
+    // Total budget scales with shovel level + Empress/Wheel of Fortune.
+    const baseBudget=Math.round((24+shovelLevel*8)*(1+buff.marksMul));
+    // Pick 3-5 scrap cells (deterministic per coin seed but excluding the coin cell).
+    const r=new RNG(huntCoin.seed^0x5c4ab);
+    const coinCellIdx=new RNG(huntCoin.seed^0xd16).int(0,GRID*GRID-1);
+    const scrapCells=new Set();
+    const scrapCellCount=r.int(3,5);
+    while(scrapCells.size<scrapCellCount){
+      const idx=r.int(0,GRID*GRID-1);
+      if(idx!==coinCellIdx)scrapCells.add(idx);
+    }
+    digBudgetRef.current={
+      total:baseBudget,
+      perCell:Math.round(baseBudget/scrapCellCount),
+      remaining:baseBudget,
+      scrapCells,
+    };
     setFoundCoin(huntCoin);setTooDeepMsg(null);setPhase("dig");
   };
 
@@ -1100,19 +1168,24 @@ export default function MintForge(){
     if(Math.random()<buff.tierUp){bonus+=1;if(!reason)reason="lucky";}
     if(bonus>=2)reason="first";
 
-    // Bonus scrap for finding the coin — first-try gets a big chunk, normal a small one.
-    const finalScrap=cnt===1?5:cnt<=3?3:1;
-    const scrapPerPiece=Math.max(4,Math.round(4+shovelLevel*0.5));
-    const scrapEarned=Math.round(finalScrap*scrapPerPiece*(1+buff.marksMul));
+    // Bonus scrap = whatever's left of the dig budget (cells you didn't dig
+    // through) plus a first-try / lucky premium on top. This makes finding the
+    // coin quickly more rewarding than digging every square — exhausting all
+    // cells gives you the same total marks but no exciting bonus payout.
+    const remaining=digBudgetRef.current?.remaining||0;
+    const premium=cnt===1?40:cnt<=3?20:0;
+    const scrapEarned=Math.max(premium,remaining+premium);
 
     if(bonus!==0||reason){
       const showFanfare=bonus>=2;
-      setFoundCoin(p=>p?{...p,metalIdx:Math.max(0,Math.min(MAX_TIER,p.metalIdx+bonus)),digBonus:reason,digCnt:cnt,scrapCount:finalScrap,scrapEarned}:p);
+      setFoundCoin(p=>p?{...p,metalIdx:Math.max(0,Math.min(MAX_TIER,p.metalIdx+bonus)),digBonus:reason,digCnt:cnt,scrapEarned}:p);
       if(showFanfare)setShowLucky(true);
     }else{
-      setFoundCoin(p=>p?{...p,digCnt:cnt,scrapCount:finalScrap,scrapEarned}:p);
+      setFoundCoin(p=>p?{...p,digCnt:cnt,scrapEarned}:p);
     }
-    setMarks(m=>m+scrapEarned);
+    if(scrapEarned>0)setMarks(m=>m+scrapEarned);
+    // Drain the budget so it can't be double-counted on remount
+    if(digBudgetRef.current)digBudgetRef.current.remaining=0;
     // Pickaxe wear — Hierophant tarot's durMul is multiplicative (0.5 per Hierophant).
     // Old logic used Math.round which floored 0.5 to 1, so Hierophant did literally nothing.
     // New approach: probabilistic wear. With durMul=0.5, each dig has 50% chance of wear.
@@ -1124,25 +1197,26 @@ export default function MintForge(){
     setPhase("brush");
   };
   // Per-cell scrap callback fired by DigPit when a non-coin cell is excavated.
-  // Spawns a flying scrap animation toward the marks counter and adds to marks.
-  // Rect is the bounding rect of the cell that was dug (for animation origin).
-  const [scrapFlyers,setScrapFlyers]=useState([]); // active flyer animations
-  const onCellScrap=useCallback((rect)=>{
-    const scrapPerPiece=Math.max(3,Math.round(3+shovelLevel*0.4));
-    const amount=Math.round(scrapPerPiece*(1+buff.marksMul));
+  // Only awards if this cell was in the pre-budgeted scrap set generated at onDig.
+  // Each scrap-cell awards budget.perCell marks, with the running total drained
+  // from budget.remaining so the bonus payout at the end shrinks accordingly.
+  const [scrapFlyers,setScrapFlyers]=useState([]);
+  const onCellScrap=useCallback((cellIdx,rect)=>{
+    const budget=digBudgetRef.current;
+    if(!budget?.scrapCells?.has?.(cellIdx))return; // not a scrap cell — nothing happens
+    const amount=budget.perCell;
+    if(amount<=0)return;
+    budget.remaining=Math.max(0,budget.remaining-amount);
     const id=Math.random().toString(36).slice(2);
-    // Determine where the marks counter is right now so the scrap can fly to it.
     const targetRect=marksCounterRef.current?.getBoundingClientRect();
     const startX=rect.left+rect.width/2;
     const startY=rect.top+rect.height/2;
     const dx=targetRect?(targetRect.left+targetRect.width/2-startX):0;
     const dy=targetRect?(targetRect.top+targetRect.height/2-startY):-300;
     setScrapFlyers(f=>[...f,{id,startX,startY,dx,dy,amount}]);
-    // Marks tick up just before the flyer reaches the counter (~75% through anim)
     setTimeout(()=>setMarks(m=>m+amount),700);
-    // Remove flyer after animation completes
     setTimeout(()=>setScrapFlyers(f=>f.filter(x=>x.id!==id)),1000);
-  },[shovelLevel,buff.marksMul]);
+  },[]);
   const onTooDeep=(d)=>setTooDeepMsg(`Coin lies at depth ${d} — upgrade your shovel.`);
   // Abandon the current dig — prevents soft-lock when a too-deep coin is
   // unreachable AND the player can't afford to forge. Generates a new hunt
@@ -1197,6 +1271,46 @@ export default function MintForge(){
     if(prev.length<maxPins)return [...prev,id];
     return prev;
   });
+  // Add a coin to the cabinet, unconditionally if there's room. Used by the
+  // picker modal opened from an empty slot — the bug was that the only way to
+  // pin was double-tap-vault, which was unreliable on mobile.
+  const pinCoinToSlot=(id)=>{
+    setPinnedIds(prev=>{
+      // Snapshot current pins (transitioning auto→manual takes the auto list as base)
+      const base=prev??autoTop.map(c=>c.id);
+      if(base.includes(id))return base; // already pinned
+      if(base.length>=maxPins)return base;
+      return [...base,id];
+    });
+    setPickerSlot(null);
+  };
+  // Place a coin in a specific cabinet slot. Used by the slot-tap-to-pick flow:
+  // tapping an empty slot opens a picker, then the picker calls this with (slotIdx, coinId).
+  // If we were in auto mode, transitions to manual mode seeded with current showcase.
+  const pinToSlot=(slotIdx,coinId)=>{
+    setPinnedIds(prev=>{
+      // Start from current visible showcase if we were in auto mode
+      let next=prev==null?showcaseCoins.map(c=>c.id):[...prev];
+      // If the coin was already pinned elsewhere, remove that previous slot first
+      const existingIdx=next.indexOf(coinId);
+      if(existingIdx>=0)next.splice(existingIdx,1);
+      // Place into target slot, padding with empties as needed
+      while(next.length<slotIdx)next.push(null);
+      next[slotIdx]=coinId;
+      // Trim trailing nulls and clamp to maxPins
+      while(next.length&&next[next.length-1]==null)next.pop();
+      next=next.filter(x=>x!=null).slice(0,maxPins);
+      return next;
+    });
+    setPickerSlot(null);
+  };
+  const clearPinSlot=(slotIdx)=>{
+    setPinnedIds(prev=>{
+      const next=prev==null?showcaseCoins.map(c=>c.id):[...prev];
+      next.splice(slotIdx,1);
+      return next.length?next:[];
+    });
+  };
 
   // Sell a coin from the vault for marks (locked coins protected)
   const sellCoin=useCallback((id)=>{
@@ -1218,6 +1332,18 @@ export default function MintForge(){
     setShovelDur(maxDur);
   };
 
+  // When pickaxe is broken AND can't afford a repair, the shop sells a fresh Lv1
+  // pickaxe at proportional cost. Resets shovel level to 1 — a true last-resort
+  // soft-lock break. Always available so a player can always escape the deadlock.
+  const NEW_PICKAXE_COST=200;
+  const buyNewPickaxe=()=>{
+    if(marks<NEW_PICKAXE_COST)return;
+    if(shovelDur>0)return; // only when broken
+    setMarks(m=>m-NEW_PICKAXE_COST);
+    setShovelLevel(1);
+    setShovelDur(shovelMaxDur(1));
+  };
+
   // Buy a tarot card from the shop
   const buyTarot=(cardId)=>{
     const card=TAROT_BY_ID[cardId];if(!card)return;
@@ -1227,6 +1353,20 @@ export default function MintForge(){
     setOwnedTarots(prev=>[...prev,cardId]);
     // Persist the purchase + new marks balance atomically
     api.tx({tarotBuy:[cardId],state:{marks:marks-card.price}}).catch(()=>{});
+  };
+  // Buy a premium frame (banner). XP-gated and marks-priced.
+  const buyFrame=(frameId)=>{
+    const f=FRAMES[frameId];if(!f||!f.premium)return;
+    if(level<f.minLvl||marks<f.price||ownedFrames.includes(frameId))return;
+    setMarks(m=>m-f.price);
+    setOwnedFrames(prev=>[...prev,frameId]);
+  };
+  // Buy a premium title. XP-gated and marks-priced.
+  const buyTitle=(titleId)=>{
+    const ti=PREMIUM_TITLE_BY_ID[titleId];if(!ti)return;
+    if(level<ti.minLvl||marks<ti.price||ownedTitles.includes(titleId))return;
+    setMarks(m=>m-ti.price);
+    setOwnedTitles(prev=>[...prev,titleId]);
   };
 
   // Equip / unequip tarot (max 5 active slots)
@@ -1399,13 +1539,15 @@ export default function MintForge(){
             <div style={{height:130,borderRadius:"0 0 20px 20px",background:BANNERS[frame],position:"relative",overflow:"hidden",marginTop:-18,marginLeft:-14,marginRight:-14,border:`1px solid ${t.border}`,borderTop:"none"}}>
               <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 30% 60%,rgba(255,255,255,.06),transparent 65%)"}}/>
               <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 70% 30%,rgba(212,160,23,.08),transparent 60%)"}}/>
+              {/* Image banners get a subtle darkening overlay for text legibility */}
+              {FRAMES[frame]?.premium&&<div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,rgba(0,0,0,.15) 0%,rgba(0,0,0,0) 30%,rgba(0,0,0,0) 70%,rgba(0,0,0,.45) 100%)"}}/>}
               <div className="noise-overlay" style={{opacity:.06}}/>
               <div style={{position:"absolute",top:12,right:14}}>
                 <select value={frame} onChange={e=>setFrame(e.target.value)} style={{background:"rgba(0,0,0,.6)",border:`1px solid rgba(255,255,255,.16)`,color:"#c8b89a",borderRadius:6,padding:"4px 10px",...F,fontSize:11,cursor:"pointer",fontWeight:600,letterSpacing:.5}}>
-                  {Object.entries(FRAMES).map(([k,f])=><option key={k} value={k} disabled={level<f.minLvl}>{f.lbl}{level<f.minLvl?` · Lv${f.minLvl}`:""}</option>)}
+                  {Object.entries(FRAMES).filter(([k,f])=>!f.premium||ownedFrames.includes(k)).map(([k,f])=><option key={k} value={k} disabled={level<f.minLvl}>{f.lbl}{level<f.minLvl?` · Lv${f.minLvl}`:""}</option>)}
                 </select>
               </div>
-              <div style={{position:"absolute",bottom:8,left:16,...microLabel,fontSize:9,color:fr.accent,opacity:.7}}>{fr.lbl}</div>
+              <div style={{position:"absolute",bottom:8,left:16,...microLabel,fontSize:9,color:fr.accent,opacity:.85,textShadow:"0 1px 3px rgba(0,0,0,.7)"}}>{fr.lbl}</div>
             </div>
 
             {/* Avatar sits fully below banner now (no overlap) */}
@@ -1440,6 +1582,10 @@ export default function MintForge(){
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                     {unlockedTitles(level).map(title=>{const sel=selectedTitle===title;return(
                       <button key={title} onClick={()=>setSelectedTitle(title)} style={{padding:"6px 13px",borderRadius:20,border:`1px solid ${sel?t.accent:t.border}`,background:sel?`${t.accent}18`:t.surface,cursor:"pointer",...F,fontSize:12,fontWeight:600,color:sel?t.accent:t.textDim,transition:"all .15s",letterSpacing:.5}}>{title}</button>
+                    );})}
+                    {/* Premium owned titles render with their animated effect even in selection chips */}
+                    {ownedTitles.map(id=>{const ti=PREMIUM_TITLE_BY_ID[id];if(!ti)return null;const sel=selectedTitle===ti.label;return(
+                      <button key={id} onClick={()=>setSelectedTitle(ti.label)} style={{padding:"6px 13px",borderRadius:20,border:`1px solid ${sel?t.accent:t.border}`,background:sel?`${t.accent}18`:t.surface,cursor:"pointer",...F,fontSize:12,fontWeight:700,letterSpacing:.5,transition:"all .15s"}}><span className={`title-${ti.effect}`}>{ti.label}</span></button>
                     );})}
                     {level<TITLE_LEVELS[unlockedTitles(level).length]&&<span style={{...mu,fontSize:11,alignSelf:"center",fontStyle:"italic"}}>Lv.{TITLE_LEVELS[unlockedTitles(level).length]} unlocks next</span>}
                   </div>
@@ -1477,16 +1623,28 @@ export default function MintForge(){
 
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:12,padding:"0 4px"}}>
               <div style={{...sectionTitle,fontSize:18}}>Display Cabinet</div>
-              <div style={{...microLabel}}>{pinnedIds?"Manual":"Auto"}{maxPins>6&&` · ${maxPins} slots`}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                {pinnedIds!=null&&(
+                  <button onClick={()=>{if(confirm("Reset to auto-pinned (top 6 by rarity)?"))setPinnedIds(null);}} style={{...F,fontSize:9,fontWeight:700,color:t.muted,letterSpacing:1.5,textTransform:"uppercase",border:`1px solid ${t.border}`,padding:"3px 8px",borderRadius:5,background:"transparent",cursor:"pointer"}}>Reset</button>
+                )}
+                <div style={{...microLabel}}>{pinnedIds?"Manual":"Auto"}{maxPins>6&&` · ${maxPins} slots`}</div>
+              </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:9}}>
               {Array.from({length:maxPins}).map((_,i)=>{
                 const coin=showcaseCoins[i];
-                if(!coin)return<div key={i} style={{minHeight:144,border:`1px dashed ${t.border}`,borderRadius:13,display:"flex",alignItems:"center",justifyContent:"center",background:`${t.surface}66`}}><span style={{...mu,fontSize:24,opacity:.3}}>+</span></div>;
+                if(!coin)return(
+                  <button key={i} onClick={()=>setPickerSlot(i)} style={{minHeight:144,border:`1px dashed ${t.border}`,borderRadius:13,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,background:`${t.surface}66`,cursor:"pointer",transition:"all .15s",color:t.muted,fontFamily:"Outfit,sans-serif"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=t.borderHi;e.currentTarget.style.background=t.surfaceHi;}} onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.background=`${t.surface}66`;}}>
+                    <span style={{fontSize:22,opacity:.4}}>+</span>
+                    <span style={{...F,fontSize:9,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",opacity:.55}}>Pick coin</span>
+                  </button>
+                );
                 const m=METALS[coin.metalIdx];
-                return(<div key={coin.id} className={coin.shiny?"shiny-card":""} style={{background:isDark?`linear-gradient(160deg,${m.dark}40,${t.surface})`:t.surface,border:`1px solid ${m.eng}30`,borderTop:`2px solid ${fr.accent}`,borderRadius:13,padding:"13px 8px 10px",textAlign:"center",position:"relative",transition:"transform .2s",cursor:"pointer"}} onClick={()=>setSelectedCoin(coin)} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";}} onMouseLeave={e=>{e.currentTarget.style.transform="";}}>
+                return(<div key={coin.id} className={coin.shiny?"shiny-card":""} style={{background:isDark?`linear-gradient(160deg,${m.dark}40,${t.surface})`:t.surface,border:`1px solid ${m.eng}30`,borderTop:`2px solid ${fr.accent}`,borderRadius:13,padding:"13px 8px 10px",textAlign:"center",position:"relative",transition:"transform .2s",cursor:"pointer",overflow:"visible"}} onClick={()=>setSelectedCoin(coin)} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";}} onMouseLeave={e=>{e.currentTarget.style.transform="";}}>
                   {coin.shiny&&<div className="shiny-aura"/>}
-                  {coin.shiny&&<div style={{position:"absolute",top:6,right:7,fontSize:11,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
+                  {coin.metalIdx>=7&&<div className={`ambient-particles ${coin.metalIdx===8?"astral":"eldritch"}`}><span/><span/><span/></div>}
+                  <button onClick={(e)=>{e.stopPropagation();togglePin(coin.id);}} title="Unpin from display" style={{position:"absolute",top:5,right:5,width:20,height:20,borderRadius:"50%",border:`1px solid ${t.border}`,background:`${t.surface}cc`,cursor:"pointer",fontFamily:"Outfit,sans-serif",fontSize:11,color:t.muted,padding:0,lineHeight:1,display:"flex",alignItems:"center",justifyContent:"center",zIndex:3}}>×</button>
+                  {coin.shiny&&<div style={{position:"absolute",top:6,left:7,fontSize:11,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
                   <div style={{display:"flex",justifyContent:"center",marginBottom:7}}><CoinCanvas coin={coin} size={64}/></div>
                   <div style={{...VT,fontSize:15,color:m.hl,letterSpacing:3,lineHeight:1}}>{coin.runes}</div>
                   <div style={{...microLabel,fontSize:8,marginTop:3,color:m.hl,opacity:.6}}>{m.name}{coin.shiny?" ✦":""}</div>
@@ -1652,6 +1810,7 @@ export default function MintForge(){
                           return(
                             <div key={i} className={cs.shiny?"shiny-card":""} style={{background:isDark?`linear-gradient(160deg,${m.dark}40,${t.surface})`:t.surface,border:`1px solid ${m.eng}30`,borderTop:`2px solid ${pfr.accent}`,borderRadius:13,padding:"13px 8px 10px",textAlign:"center",position:"relative"}}>
                               {cs.shiny&&<div className="shiny-aura"/>}
+                              {cs.metalIdx>=7&&<div className={`ambient-particles ${cs.metalIdx===8?"astral":"eldritch"}`}><span/><span/><span/></div>}
                               {cs.shiny&&<div style={{position:"absolute",top:6,right:7,fontSize:11,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
                               <div style={{display:"flex",justifyContent:"center",marginBottom:7}}><CoinCanvas coin={dispCoin} size={64}/></div>
                               <div style={{...VT,fontSize:14,color:m.hl,letterSpacing:2,lineHeight:1.1}}>{dispCoin.runes}</div>
@@ -1713,6 +1872,7 @@ export default function MintForge(){
                         }
                       }}>
                       {coin.shiny&&<div className="shiny-aura"/>}
+                      {coin.metalIdx>=7&&<div className={`ambient-particles ${coin.metalIdx===8?"astral":"eldritch"}`}><span/><span/><span/></div>}
                       {pinned&&<div style={{position:"absolute",top:7,right:7,width:6,height:6,borderRadius:"50%",background:m.hl,boxShadow:`0 0 6px ${m.hl}`}}/>}
                       {coin.shiny&&<div style={{position:"absolute",top:6,left:7,fontSize:10,color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
                       {coin.locked&&<div style={{position:"absolute",bottom:6,right:7,fontSize:10,opacity:.85,filter:"drop-shadow(0 0 4px rgba(0,0,0,.6))"}}>🔒</div>}
@@ -1908,6 +2068,15 @@ export default function MintForge(){
             {/* ── SHOP VIEW ── */}
             {tavernView==="shop"&&(
               <div style={{animation:"fadein .25s ease"}}>
+                {/* Shop sub-tab picker */}
+                <div style={{display:"flex",gap:5,marginBottom:12,padding:3,borderRadius:9,background:t.surfaceHi,border:`1px solid ${t.border}`}}>
+                  {[["tarot","🃏","Tarot"],["banners","🖼","Banners"],["titles","✦","Titles"]].map(([id,ic,lbl])=>{const active=shopTab===id;return(
+                    <button key={id} onClick={()=>setShopTab(id)} style={{flex:1,padding:"7px 0",borderRadius:7,border:"none",background:active?(isDark?"#2a1a08":"#f0e0c0"):"transparent",cursor:"pointer",...F,fontSize:10,fontWeight:800,color:active?t.accent:t.muted,letterSpacing:1.5,textTransform:"uppercase",transition:"all .15s",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><span style={{fontSize:12}}>{ic}</span>{lbl}</button>
+                  );})}
+                </div>
+
+                {/* ── TAROT SUB-TAB ── */}
+                {shopTab==="tarot"&&(<>
                 <div style={{...mu,fontSize:12,marginBottom:12,fontStyle:"italic",padding:"0 2px"}}>Tarot cards grant passive buffs while equipped (max 5). One copy each.</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10}}>
                   {TAROT_CARDS.map(card=>{
@@ -1927,6 +2096,74 @@ export default function MintForge(){
                     );
                   })}
                 </div>
+                </>)}
+
+                {/* ── BANNERS SUB-TAB ── */}
+                {shopTab==="banners"&&(<>
+                <div style={{...mu,fontSize:12,marginBottom:12,fontStyle:"italic",padding:"0 2px"}}>Premium banners — once owned, equip them in your Profile. Standard frames are XP-unlocked separately.</div>
+                <div style={{display:"flex",flexDirection:"column",gap:12}}>
+                  {Object.entries(FRAMES).filter(([,f])=>f.premium).map(([id,f])=>{
+                    const owned=ownedFrames.includes(id);
+                    const equipped=frame===id;
+                    const lvlMet=level>=f.minLvl;
+                    const canBuy=!owned&&lvlMet&&marks>=f.price;
+                    const bg=BANNERS[id];
+                    return(
+                      <div key={id} style={{borderRadius:12,overflow:"hidden",border:`1px solid ${equipped?f.accent:t.border}`,background:t.surface,boxShadow:equipped?`0 0 14px ${f.accent}55`:"none"}}>
+                        <div style={{height:120,backgroundImage:bg,backgroundSize:"cover",backgroundPosition:"center",position:"relative",filter:owned?"none":"grayscale(.4) brightness(.75)"}}>
+                          <div style={{position:"absolute",inset:0,background:"linear-gradient(to bottom,transparent 30%,rgba(0,0,0,.55) 100%)"}}/>
+                          <div style={{position:"absolute",bottom:8,left:12,right:12,display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:10}}>
+                            <div>
+                              <div style={{...FR,fontWeight:800,fontSize:18,color:"#fff",letterSpacing:-.3,textShadow:"0 2px 6px rgba(0,0,0,.8)"}}>{f.lbl}</div>
+                              <div style={{...F,fontSize:10,color:"#e0d0a0",fontStyle:"italic",letterSpacing:.3,textShadow:"0 1px 3px rgba(0,0,0,.9)"}}>{f.desc}</div>
+                            </div>
+                            <div style={{...F,fontSize:9,fontWeight:700,color:lvlMet?"#fff":"#f0a060",background:"rgba(0,0,0,.55)",padding:"3px 8px",borderRadius:5,letterSpacing:1.5,textTransform:"uppercase",whiteSpace:"nowrap"}}>Lv {f.minLvl}+</div>
+                          </div>
+                        </div>
+                        <div style={{padding:"10px 12px"}}>
+                          {!owned?(
+                            <button onClick={()=>{if(canBuy&&confirm(`Purchase ${f.lbl} banner for ◈${f.price}?`))buyFrame(id);}} disabled={!canBuy} style={{width:"100%",padding:"9px 0",borderRadius:8,border:`1px solid ${canBuy?t.accent:t.border}`,background:canBuy?`linear-gradient(135deg,${t.accentHi},${t.accent})`:t.surfaceHi,cursor:canBuy?"pointer":"not-allowed",...F,fontSize:11,fontWeight:800,color:canBuy?t.accentInk:t.muted,letterSpacing:1.5,textTransform:"uppercase"}}>{!lvlMet?`Reach Lv ${f.minLvl}`:marks<f.price?`Need ◈ ${f.price.toLocaleString()}`:`Purchase · ◈ ${f.price.toLocaleString()}`}</button>
+                          ):equipped?(
+                            <div style={{...F,fontSize:11,fontWeight:800,color:t.success,textAlign:"center",letterSpacing:1.5,textTransform:"uppercase",padding:"9px 0"}}>✓ Currently equipped</div>
+                          ):(
+                            <button onClick={()=>setFrame(id)} style={{width:"100%",padding:"9px 0",borderRadius:8,border:`1px solid ${t.borderHi}`,background:t.surfaceHi,cursor:"pointer",...F,fontSize:11,fontWeight:800,color:t.text,letterSpacing:1.5,textTransform:"uppercase"}}>Equip</button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                </>)}
+
+                {/* ── TITLES SUB-TAB ── */}
+                {shopTab==="titles"&&(<>
+                <div style={{...mu,fontSize:12,marginBottom:12,fontStyle:"italic",padding:"0 2px"}}>Premium titles with animated text effects. Equip in your Profile after purchase.</div>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {PREMIUM_TITLES.map(ti=>{
+                    const owned=ownedTitles.includes(ti.id);
+                    const equipped=selectedTitle===ti.label;
+                    const lvlMet=level>=ti.minLvl;
+                    const canBuy=!owned&&lvlMet&&marks>=ti.price;
+                    return(
+                      <div key={ti.id} style={{...card,padding:"14px 16px",border:`1px solid ${equipped?t.accent:t.border}`,boxShadow:equipped?`0 0 12px ${t.accent}33`:"none"}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,marginBottom:10}}>
+                          <div style={{minWidth:0,flex:1}}>
+                            <div style={{...FR,fontSize:18,letterSpacing:-.2,marginBottom:4}}><span className={`title-${ti.effect}`}>{ti.label}</span></div>
+                            <div style={{...F,fontSize:10,color:t.muted,letterSpacing:1.5,textTransform:"uppercase",fontWeight:700}}>Lv {ti.minLvl}+ · ◈ {ti.price.toLocaleString()}</div>
+                          </div>
+                        </div>
+                        {!owned?(
+                          <button onClick={()=>{if(canBuy&&confirm(`Purchase title "${ti.label}" for ◈${ti.price}?`))buyTitle(ti.id);}} disabled={!canBuy} style={{width:"100%",padding:"8px 0",borderRadius:7,border:`1px solid ${canBuy?t.accent:t.border}`,background:canBuy?`linear-gradient(135deg,${t.accentHi},${t.accent})`:t.surfaceHi,cursor:canBuy?"pointer":"not-allowed",...F,fontSize:10,fontWeight:800,color:canBuy?t.accentInk:t.muted,letterSpacing:1.5,textTransform:"uppercase"}}>{!lvlMet?`Reach Lv ${ti.minLvl}`:marks<ti.price?`Need ◈ ${ti.price.toLocaleString()}`:`Purchase`}</button>
+                        ):equipped?(
+                          <div style={{...F,fontSize:10,fontWeight:800,color:t.success,textAlign:"center",letterSpacing:1.5,textTransform:"uppercase",padding:"8px 0"}}>✓ Currently equipped</div>
+                        ):(
+                          <button onClick={()=>setSelectedTitle(ti.label)} style={{width:"100%",padding:"8px 0",borderRadius:7,border:`1px solid ${t.borderHi}`,background:t.surfaceHi,cursor:"pointer",...F,fontSize:10,fontWeight:800,color:t.text,letterSpacing:1.5,textTransform:"uppercase"}}>Equip</button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                </>)}
               </div>
             )}
 
@@ -1960,11 +2197,17 @@ export default function MintForge(){
                     <div style={{...mu,fontSize:11,marginTop:10,fontStyle:"italic",textAlign:"center"}}>Each dig consumes 1 durability. The Hierophant tarot halves it.</div>
                   </div>
 
-                  {/* Frame purchases — placeholder for now: frames are XP-gated, not coin-gated */}
-                  <div style={{...card,padding:"14px 16px"}}>
-                    <div style={{...FR,fontWeight:700,fontSize:14,marginBottom:8,letterSpacing:-.2}}>Banner Frames</div>
-                    <div style={{...mu,fontSize:12,fontStyle:"italic"}}>Frames unlock with player level — equip them in your Profile.</div>
-                  </div>
+                  {/* Broken-pickaxe last-resort replacement — only visible when shovel is broken.
+                      Lets a soft-locked player buy a fresh Lv1 pickaxe at fixed cost. */}
+                  {shovelDur<=0&&(
+                    <div style={{...card,padding:"14px 16px",border:`1px dashed ${t.danger}66`,background:isDark?"#1a0606":"#fff0ec"}}>
+                      <div style={{...FR,fontWeight:700,fontSize:14,marginBottom:6,color:t.danger,letterSpacing:-.2}}>Pickaxe Broken</div>
+                      <div style={{...mu,fontSize:12,fontStyle:"italic",lineHeight:1.5,marginBottom:10}}>Stuck without enough marks to repair? Buy a fresh Lv1 pickaxe — resets your shovel level and refills durability.</div>
+                      <button onClick={()=>{if(marks>=NEW_PICKAXE_COST&&confirm(`Buy a fresh Lv1 pickaxe for ◈${NEW_PICKAXE_COST}? Your shovel level will reset to 1.`))buyNewPickaxe();}} disabled={marks<NEW_PICKAXE_COST} style={{width:"100%",padding:"10px 0",borderRadius:9,border:`1px solid ${marks>=NEW_PICKAXE_COST?t.danger:t.border}`,cursor:marks>=NEW_PICKAXE_COST?"pointer":"not-allowed",background:marks>=NEW_PICKAXE_COST?(isDark?"linear-gradient(135deg,#3a1010,#5a1818)":"linear-gradient(135deg,#fbe8e8,#f0c4c4)"):t.surfaceHi,...F,fontWeight:800,fontSize:12,color:marks>=NEW_PICKAXE_COST?(isDark?"#ffb0a0":t.danger):t.muted,letterSpacing:2,textTransform:"uppercase"}}>
+                        ⛏ Buy New Pickaxe · ◈ {NEW_PICKAXE_COST}
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -2082,6 +2325,43 @@ export default function MintForge(){
       )}
       {phase==="banner"&&foundCoin&&<RevealBanner coin={foundCoin} onDone={onBannerDone}/>}
       {selectedCoin&&<CoinModal coin={coins.find(c=>c.id===selectedCoin.id)||selectedCoin} onClose={()=>setSelectedCoin(null)} onToggleLock={toggleLock} onSell={sellCoin} t={t} isDark={isDark}/>}
+
+      {/* Cabinet slot picker — opens when an empty cabinet slot is tapped.
+          Shows all coins, tapping one assigns it to the slot. */}
+      {pickerSlot!==null&&(
+        <div onClick={()=>setPickerSlot(null)} style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"fadein .18s ease",padding:"24px 12px"}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,maxHeight:"80vh",background:t.surface,border:`1px solid ${t.borderHi}`,borderRadius:16,boxShadow:"0 -12px 40px rgba(0,0,0,.6)",display:"flex",flexDirection:"column",animation:"slideUp .25s cubic-bezier(.2,.8,.3,1)"}}>
+            <div style={{padding:"16px 18px 12px",borderBottom:`1px solid ${t.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div>
+                <div style={{...FR,fontWeight:800,fontSize:16,letterSpacing:-.2,color:t.text}}>Choose a coin</div>
+                <div style={{...mu,fontSize:11,marginTop:2,fontStyle:"italic"}}>Slot {pickerSlot+1} · {coins.length} coins available</div>
+              </div>
+              <button onClick={()=>setPickerSlot(null)} style={{width:30,height:30,borderRadius:"50%",border:`1px solid ${t.border}`,background:t.surfaceHi,cursor:"pointer",...F,fontSize:14,color:t.muted,padding:0,lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"12px"}}>
+              {coins.length===0?(
+                <div style={{...mu,fontSize:13,fontStyle:"italic",textAlign:"center",padding:"32px 0"}}>No coins yet — go hunt some!</div>
+              ):(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(82px,1fr))",gap:7}}>
+                  {[...coins].sort((a,b)=>b.metalIdx-a.metalIdx||(b.shiny?1:0)-(a.shiny?1:0)).map(c=>{
+                    const m=METALS[c.metalIdx];
+                    const alreadyPinned=pinnedIds?.includes(c.id);
+                    return(
+                      <button key={c.id} onClick={()=>pinToSlot(pickerSlot,c.id)} className={c.shiny?"shiny-card":""} style={{position:"relative",padding:"8px 4px 5px",borderRadius:9,border:`1px solid ${alreadyPinned?t.accent:m.eng+"40"}`,background:isDark?`linear-gradient(160deg,${m.dark}30,${t.surface})`:t.surface,cursor:"pointer",transition:"transform .12s, border-color .12s",overflow:"visible"}} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=t.borderHi;}} onMouseLeave={e=>{e.currentTarget.style.transform="";e.currentTarget.style.borderColor=alreadyPinned?t.accent:m.eng+"40";}}>
+                        {c.shiny&&<div className="shiny-aura"/>}
+                        {c.metalIdx>=7&&<div className={`ambient-particles ${c.metalIdx===8?"astral":"eldritch"}`}><span/><span/><span/></div>}
+                        {alreadyPinned&&<div style={{position:"absolute",top:3,right:3,...F,fontSize:7,fontWeight:800,letterSpacing:1,color:t.accent,background:`${t.surface}dd`,padding:"1px 4px",borderRadius:3,zIndex:2}}>PINNED</div>}
+                        <div style={{display:"flex",justifyContent:"center",marginBottom:4}}><CoinCanvas coin={c} size={48}/></div>
+                        <div style={{...microLabel,fontSize:7,color:m.hl,opacity:.7,letterSpacing:1}}>{m.name}{c.shiny?" ✦":""}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
