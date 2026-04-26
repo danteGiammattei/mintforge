@@ -152,7 +152,7 @@ export async function onRequestPost({ request, env }) {
     const addV2 = (col, value) => { v2Binds.push(value); v2Fields.push(`${col} = ?${v2Binds.length}`); };
 
     if (Number.isFinite(s.xp))           addBase("xp", Math.max(0, s.xp | 0));
-    if (Number.isFinite(s.shovelLevel))  addBase("shovel_level", Math.max(1, Math.min(7, s.shovelLevel | 0)));
+    if (Number.isFinite(s.shovelLevel))  addBase("shovel_level", Math.max(1, Math.min(8, s.shovelLevel | 0)));
     if (Number.isFinite(s.brushLevel))   addBase("brush_level", Math.max(0, Math.min(4, s.brushLevel | 0)));
     if (typeof s.frame === "string")     addBase("frame", String(s.frame).slice(0, 20));
     if (typeof s.bio === "string")       addBase("bio", String(s.bio).slice(0, 120));
@@ -163,7 +163,7 @@ export async function onRequestPost({ request, env }) {
     }
     // v3+ columns
     if (Number.isFinite(s.marks))     addV2("marks", Math.max(0, s.marks | 0));
-    if (Number.isFinite(s.shovelDur)) addV2("shovel_dur", Math.max(0, Math.min(500, s.shovelDur | 0)));
+    if (Number.isFinite(s.shovelDur)) addV2("shovel_dur", Math.max(0, Math.min(800, s.shovelDur | 0)));
     if (Array.isArray(s.equippedTarots)) {
       const filtered = s.equippedTarots.filter(c => typeof c === "string" && VALID_TAROT_IDS.has(c)).slice(0, 5);
       addV2("equipped_tarots", JSON.stringify(filtered));
