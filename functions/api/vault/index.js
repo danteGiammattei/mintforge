@@ -5,6 +5,11 @@ const VALID_TAROT_IDS = new Set([
   "magician","high_priestess","empress","emperor","hierophant","lovers",
   "chariot","strength","hermit","wheel_of_fortune","justice","hanged_man",
 ]);
+/* Premium frame/banner IDs — only premium ones are validated since standard frames
+   are XP-gated and never require ownership tracking. */
+const VALID_FRAME_IDS = new Set(["stargazer","wanderer"]);
+/* Premium title IDs */
+const VALID_TITLE_IDS = new Set(["goldspun","voidtouched","astral"]);
 
 /* Helper — try a query, return null on any failure (typically schema mismatch). */
 async function tryQuery(env, sql, ...binds) {
@@ -40,6 +45,10 @@ export async function onRequestGet({ request, env }) {
   const v2Extras = await tryQuery(env,
     `SELECT marks, shovel_dur, equipped_tarots
        FROM player_state WHERE player_id = ?1`, pid);
+  // v3+ cosmetic columns. Separate query so v2 still works if v3 isn't applied.
+  const v3Extras = await tryQuery(env,
+    `SELECT owned_frames, owned_titles
+       FROM player_state WHERE player_id = ?1`, pid);
 
   const coins = await tryQueryAll(env,
     `SELECT id, seed, metal_idx, shiny, locked, acquired_at FROM coins
@@ -62,6 +71,8 @@ export async function onRequestGet({ request, env }) {
     shovelDur: v2Extras?.shovel_dur != null ? v2Extras.shovel_dur : 40,
     ownedTarots: tarots.map(r => r.card_id),
     equippedTarots: v2Extras?.equipped_tarots ? JSON.parse(v2Extras.equipped_tarots) : [],
+    ownedFrames: v3Extras?.owned_frames ? JSON.parse(v3Extras.owned_frames) : [],
+    ownedTitles: v3Extras?.owned_titles ? JSON.parse(v3Extras.owned_titles) : [],
     coins: coins.map(r => ({
       id: r.id,
       seed: r.seed >>> 0,
@@ -70,7 +81,9 @@ export async function onRequestGet({ request, env }) {
       locked: !!r.locked,
     })),
     // Flag the client can use to warn about pending migrations.
-    schemaWarning: v2Extras ? null : "Server is missing v3 migration — currency, durability, and tarot features will not persist.",
+    schemaWarning: !v2Extras ? "Server is missing v3 migration — currency, durability, and tarot features will not persist."
+                   : !v3Extras ? "Server is missing v4 migration — premium banner and title purchases will not persist."
+                   : null,
   });
 }
 
@@ -148,8 +161,10 @@ export async function onRequestPost({ request, env }) {
     const s = body.state;
     const baseFields = []; const baseBinds = [pid];
     const v2Fields = []; const v2Binds = [pid];
+    const v3Fields = []; const v3Binds = [pid];
     const addBase = (col, value) => { baseBinds.push(value); baseFields.push(`${col} = ?${baseBinds.length}`); };
     const addV2 = (col, value) => { v2Binds.push(value); v2Fields.push(`${col} = ?${v2Binds.length}`); };
+    const addV3 = (col, value) => { v3Binds.push(value); v3Fields.push(`${col} = ?${v3Binds.length}`); };
 
     if (Number.isFinite(s.xp))           addBase("xp", Math.max(0, s.xp | 0));
     if (Number.isFinite(s.shovelLevel))  addBase("shovel_level", Math.max(1, Math.min(8, s.shovelLevel | 0)));
@@ -168,6 +183,15 @@ export async function onRequestPost({ request, env }) {
       const filtered = s.equippedTarots.filter(c => typeof c === "string" && VALID_TAROT_IDS.has(c)).slice(0, 5);
       addV2("equipped_tarots", JSON.stringify(filtered));
     }
+    // v3+ cosmetic ownership lists
+    if (Array.isArray(s.ownedFrames)) {
+      const filtered = s.ownedFrames.filter(f => typeof f === "string" && VALID_FRAME_IDS.has(f)).slice(0, 20);
+      addV3("owned_frames", JSON.stringify(filtered));
+    }
+    if (Array.isArray(s.ownedTitles)) {
+      const filtered = s.ownedTitles.filter(t => typeof t === "string" && VALID_TITLE_IDS.has(t)).slice(0, 20);
+      addV3("owned_titles", JSON.stringify(filtered));
+    }
 
     if (baseFields.length) {
       stmts.push(env.DB.prepare(
@@ -178,6 +202,11 @@ export async function onRequestPost({ request, env }) {
       optionalStmts.push(env.DB.prepare(
         `UPDATE player_state SET ${v2Fields.join(", ")} WHERE player_id = ?1`
       ).bind(...v2Binds));
+    }
+    if (v3Fields.length) {
+      optionalStmts.push(env.DB.prepare(
+        `UPDATE player_state SET ${v3Fields.join(", ")} WHERE player_id = ?1`
+      ).bind(...v3Binds));
     }
   }
 
