@@ -102,8 +102,7 @@ const METALS=[
 ];
 const MAX_TIER=8;
 // SHOVEL_TIER_CAP[shovelLevel-1] = highest metal index reachable at that level.
-// Updated for 9 metals — top tiers locked behind max shovel.
-const SHOVEL_TIER_CAP=[1,2,3,4,5,6,8];
+const SHOVEL_TIER_CAP=[1,2,3,4,5,6,7,8];
 function pickMetal(rng,pLvl=1,tierCap=MAX_TIER){
   const b=Math.min(pLvl-1,50);
   // 9 tiers: copper, bronze, silver, gold, platinum, obsidian, void, eldritch, astral
@@ -290,14 +289,11 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,t,isDark}){
     const ds=Array.from({length:GRID*GRID},(_,i)=>{
       const d=new RNG(coin.seed^i^0xd16);
       if(i===cc){
-        // At max shovel level (6 with current SHOVEL_UPS), all coins must be reachable.
-        // SHOVEL_UPS has 7 entries (index 0 = base, 1-6 = upgrades), so MAX_SH=6.
-        // Previously checked >=7 which was unreachable, leaving 18% of coins permanently
-        // stuck at depth 7 with no upgrade path.
-        if(shovelLevel>=6)return d.int(1,shovelLevel);                   // max shovel: never too-deep
+        // At max shovel level (now 8 with extended SHOVEL_UPS), all coins must be reachable.
+        if(shovelLevel>=8)return d.int(1,shovelLevel);                   // max shovel: never too-deep
         return d.bool(0.82)?d.int(1,shovelLevel):shovelLevel+1;          // 18% are one level too deep
       }
-      return d.int(1,Math.min(7,shovelLevel+1));                         // non-coin cells: visual flavour only
+      return d.int(1,Math.min(9,shovelLevel+1));                         // non-coin cells: visual flavour only
     });
     return{coinCell:cc,depths:ds};
   },[coin.seed,shovelLevel]);
@@ -463,6 +459,12 @@ function RevealBanner({coin,onDone}){
         <div style={{fontFamily:"VT323,monospace",fontSize:isShiny?56:50,letterSpacing:6,lineHeight:1,marginBottom:6,animation:isShiny?"shinyText 1.2s linear infinite":undefined,color:isShiny?undefined:m.hl}}>{coin.runes}</div>
         <div style={{fontFamily:"'Fraunces',serif",fontStyle:"italic",fontWeight:600,fontSize:18,color:"#b8a890",letterSpacing:3,marginBottom:6}}>{coin.raw}</div>
         <div style={{fontFamily:"'Fraunces',serif",fontStyle:"italic",fontSize:12,color:"#5a4a38",letterSpacing:.5}}>{coin.era}</div>
+        {coin.scrapEarned>0&&(
+          <div style={{marginTop:14,padding:"7px 14px",display:"inline-flex",alignItems:"center",gap:8,background:"rgba(212,160,23,.08)",border:"1px solid rgba(212,160,23,.22)",borderRadius:6,fontFamily:"Outfit,sans-serif",fontSize:11,fontWeight:700,color:"#d4a017",letterSpacing:1.5,animation:"flashIn .5s ease-out .3s backwards"}}>
+            <span style={{fontSize:13}}>⚙</span>
+            +{coin.scrapCount} scrap · ◈ {coin.scrapEarned}
+          </div>
+        )}
         <div style={{fontFamily:"Outfit,sans-serif",fontSize:10,color:"#3a3024",marginTop:18,letterSpacing:3,textTransform:"uppercase"}}>tap to continue</div>
       </div>
     </div>
@@ -593,7 +595,7 @@ const FRAMES={
   void:{lbl:"Void",minLvl:50,accent:"#5050e8"},
 };
 
-const SHOVEL_UPS=[null,{label:"Iron Shovel",depth:2,cost:[{m:0,n:3}],desc:"Reaches depth 2"},{label:"Bronze Pick",depth:3,cost:[{m:0,n:2},{m:1,n:2}],desc:"Reaches depth 3"},{label:"Steel Pick",depth:4,cost:[{m:2,n:2},{m:1,n:1}],desc:"Reaches depth 4"},{label:"Gilded Pick",depth:5,cost:[{m:3,n:1},{m:2,n:2}],desc:"Reaches depth 5"},{label:"Platinum Pick",depth:6,cost:[{m:4,n:1},{m:3,n:1}],desc:"Reaches depth 6"},{label:"Void Excavator",depth:7,cost:[{m:5,n:1},{m:4,n:1}],desc:"Reaches depth 7 — Maxed"}];
+const SHOVEL_UPS=[null,{label:"Iron Shovel",depth:2,cost:[{m:0,n:3}],desc:"Reaches depth 2"},{label:"Bronze Pick",depth:3,cost:[{m:0,n:2},{m:1,n:2}],desc:"Reaches depth 3"},{label:"Steel Pick",depth:4,cost:[{m:2,n:2},{m:1,n:1}],desc:"Reaches depth 4"},{label:"Gilded Pick",depth:5,cost:[{m:3,n:1},{m:2,n:2}],desc:"Reaches depth 5"},{label:"Platinum Pick",depth:6,cost:[{m:4,n:1},{m:3,n:1}],desc:"Reaches depth 6"},{label:"Void Excavator",depth:7,cost:[{m:5,n:1},{m:4,n:1}],desc:"Reaches depth 7"},{label:"Eldritch Drill",depth:8,cost:[{m:6,n:1},{m:5,n:1}],desc:"Reaches depth 8"},{label:"Astral Cleaver",depth:9,cost:[{m:7,n:1},{m:6,n:1}],desc:"Reaches depth 9 — Maxed"}];
 const BRUSH_UPS=[{label:"Rough Brush",alpha:BA,shinyChance:.005,cost:null,desc:"0.5% shiny chance"},{label:"Boar Bristle",alpha:.55,shinyChance:.015,cost:[{m:0,n:2}],desc:"1.5% shiny chance"},{label:"Silver Brush",alpha:.9,shinyChance:.03,cost:[{m:0,n:1},{m:2,n:2}],desc:"3% shiny chance"},{label:"Gold Brush",alpha:1.0,shinyChance:.05,cost:[{m:3,n:1},{m:2,n:1}],desc:"5% shiny chance"},{label:"Void Brush",alpha:1.0,shinyChance:.08,cost:[{m:5,n:1}],desc:"8% shiny chance — tarot buffs stack on top"}];
 const MAX_SH=SHOVEL_UPS.length-1,MAX_BR=BRUSH_UPS.length-1;
 
@@ -639,7 +641,7 @@ function tarotBuffs(equippedIds){
 
 /* ─── PICKAXE DURABILITY ─────────────────────────────────────────────── */
 // Each shovel level has a max durability. Base wear is 1 per dig; tarot can halve it.
-const SHOVEL_MAX_DUR=[null,40,60,90,130,180,250,350]; // index by shovelLevel
+const SHOVEL_MAX_DUR=[null,40,60,90,130,180,250,350,500,700]; // index by shovelLevel
 function shovelMaxDur(lv){return SHOVEL_MAX_DUR[Math.min(lv,SHOVEL_MAX_DUR.length-1)]||40;}
 // Repair cost scales with shovel level — 8 marks per missing point at Lv1, doubling roughly per level.
 function repairCost(missing,shovelLevel){
@@ -649,8 +651,6 @@ function repairCost(missing,shovelLevel){
 const GAMBLES=[
   {id:"toss",label:"Coin Toss",icon:"🪙",desc:"1 coin · 50/50: tier up or lost",odds:"50/50",count:1,same:false,
    resolve:(bet)=>{const c=bet[0];if(Math.random()<.5){return{won:true,remove:[c.id],add:[mkCoin(newSeed(),1,Math.min(MAX_TIER,c.metalIdx+1))],msg:"LUCKY FLIP"};}return{won:false,remove:[c.id],add:[],msg:"TAILS — COIN LOST"};}},
-  {id:"crucible",label:"Crucible",icon:"⚗️",desc:"3 of same tier · 40% up · 40% return · 20% bust",odds:"40/40/20",count:3,same:true,
-   resolve:(bet)=>{const ids=bet.map(c=>c.id);const tier=bet[0].metalIdx;const r=Math.random();if(r<.4)return{won:true,remove:ids,add:[mkCoin(newSeed(),1,Math.min(MAX_TIER,tier+1))],msg:"TRANSMUTED"};if(r<.8)return{won:true,remove:ids,add:[mkCoin(newSeed(),1,tier)],msg:"STABLE RETURN"};return{won:false,remove:ids,add:[],msg:"CRUCIBLE COLLAPSED"};}},
 ];
 
 /* ─── TAROT CARD COMPONENT ────────────────────────────────────────────
@@ -1030,14 +1030,25 @@ export default function MintForge(){
     else if(cnt===3&&Math.random()<buff.digSpeed){bonus=1;reason="lucky";}
     else if(cnt>=total){bonus=-1;reason="damaged";}
     if(Math.random()<buff.tierUp){bonus+=1;if(!reason)reason="lucky";}
-    if(bonus>=2)reason="first";  // upgrade label to first-try if Emperor pushed bonus to 2
+    if(bonus>=2)reason="first";
+
+    // Scrap drops — every dig produces 1-3 scrap (more with luck and Empress tarot).
+    // Scrap converts directly to marks at award time. Soft-lock prevention: even a
+    // -1 tier "damaged" dig still nets you the dig's scrap so you're never empty-handed.
+    const scrapBase=cnt<=2?3:cnt<=8?2:1;            // first/lucky digs yield more scrap
+    const scrapBonus=Math.random()<buff.marksMul?1:0; // Empress/Wheel of Fortune: chance for +1 scrap
+    const scrapCount=scrapBase+scrapBonus;
+    // Each scrap is worth 4-7 marks scaled by shovel level (top shovel = 7 each)
+    const scrapPerPiece=Math.max(4,Math.round(4+shovelLevel*0.5));
+    const scrapEarned=Math.round(scrapCount*scrapPerPiece*(1+buff.marksMul));
+    setMarks(m=>m+scrapEarned);
 
     if(bonus!==0||reason){
       const showFanfare=bonus>=2;
-      setFoundCoin(p=>p?{...p,metalIdx:Math.max(0,Math.min(MAX_TIER,p.metalIdx+bonus)),digBonus:reason,digCnt:cnt}:p);
+      setFoundCoin(p=>p?{...p,metalIdx:Math.max(0,Math.min(MAX_TIER,p.metalIdx+bonus)),digBonus:reason,digCnt:cnt,scrapCount,scrapEarned}:p);
       if(showFanfare)setShowLucky(true);
     }else{
-      setFoundCoin(p=>p?{...p,digCnt:cnt}:p);
+      setFoundCoin(p=>p?{...p,digCnt:cnt,scrapCount,scrapEarned}:p);
     }
     // Pickaxe wear — Hierophant halves it (multiplicative)
     const wear=Math.max(1,Math.round(1*buff.durMul));
@@ -1052,6 +1063,10 @@ export default function MintForge(){
   // unreachable AND the player can't afford to forge. Generates a new hunt
   // coin and returns to the hunt phase. No reward, no penalty.
   const onAbandon=()=>{
+    // Consolation scrap so abandoning isn't a dead loss — soft-lock prevention.
+    // 1 scrap × shovel-level marks each, scaled by Empress/Wheel of Fortune.
+    const consolation=Math.max(1,Math.round((4+shovelLevel*0.5)*(1+buff.marksMul)));
+    setMarks(m=>m+consolation);
     const tc=SHOVEL_TIER_CAP[Math.min(shovelLevel-1,SHOVEL_TIER_CAP.length-1)];
     const next=mkCoin(newSeed(),level,null,tc);
     setHuntCoin(next);setCoinFrac({x:.1+Math.random()*.8,y:.1+Math.random()*.8});
@@ -1725,6 +1740,24 @@ export default function MintForge(){
                       </div>
                     </div>
                     <div style={{padding:"13px 17px"}}>
+                      {type==="shovel"&&(()=>{
+                        const durPct=Math.round((shovelDur/maxDur)*100);
+                        const durColor=durPct>50?t.success:durPct>20?t.accent:t.danger;
+                        return(
+                          <div style={{marginBottom:12,padding:"10px 12px",background:t.surfaceHi,borderRadius:8,border:`1px solid ${t.border}`}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6,...F,fontSize:11}}>
+                              <span style={{color:t.muted,letterSpacing:1.5,textTransform:"uppercase",fontWeight:700}}>Durability</span>
+                              <span style={{color:durColor,fontWeight:800,fontVariantNumeric:"tabular-nums"}}>{shovelDur} / {maxDur}</span>
+                            </div>
+                            <div style={{height:6,background:t.faint,borderRadius:3,overflow:"hidden",border:`1px solid ${t.border}`}}>
+                              <div style={{width:`${durPct}%`,height:"100%",background:`linear-gradient(to right,${durColor}88,${durColor})`,transition:"width .4s",boxShadow:`0 0 6px ${durColor}66`}}/>
+                            </div>
+                            {shovelDur<maxDur&&(
+                              <button onClick={()=>{setTab("tavern");setTavernView("repair");}} style={{marginTop:8,width:"100%",padding:"7px 0",borderRadius:7,border:`1px solid ${t.border}`,background:"transparent",cursor:"pointer",...F,fontSize:10,fontWeight:700,color:t.textDim,letterSpacing:2,textTransform:"uppercase"}}>⚒ Repair in Tavern</button>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <div style={{display:"flex",justifyContent:"space-between",marginBottom:10,...F,fontSize:12,alignItems:"baseline"}}>
                         <span style={{color:t.muted,letterSpacing:.5}}>{stat}</span>
                         <span style={{color:t.text,fontWeight:700,...FR,fontSize:14,fontStyle:"italic"}}>{statV(lv)}</span>
@@ -1836,12 +1869,12 @@ export default function MintForge(){
             {/* ── WAGER VIEW (existing UI) ── */}
             {tavernView==="wager"&&(<>
             <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:2}}>
-              {[["toss","🪙","Coin Toss"],["crucible","⚗️","Crucible"],["roulette","🎰","Roulette"]].map(([id,ic,lbl])=>{const active=gambMode===id;return(
+              {[["toss","🪙","Coin Toss"],["roulette","🎰","Roulette"]].map(([id,ic,lbl])=>{const active=gambMode===id;return(
                 <button key={id} onClick={()=>{setGambMode(id);resetGamble();resetRoulette();}} style={{padding:"9px 15px",borderRadius:10,border:`1px solid ${active?t.oxbloodHi:t.border}`,background:active?(isDark?"linear-gradient(135deg,#1a0810,#2a1018)":"linear-gradient(135deg,#f8eef3,#f0d8e0)"):"transparent",...F,fontSize:12,fontWeight:700,color:active?t.oxbloodHi:t.muted,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,letterSpacing:.5,display:"flex",alignItems:"center",gap:6,transition:"all .15s"}}><span style={{fontSize:14}}>{ic}</span>{lbl}</button>
               );})}
             </div>
 
-            {(gambMode==="toss"||gambMode==="crucible")&&(()=>{
+            {(gambMode==="toss")&&(()=>{
               const gDef=GAMBLES.find(g=>g.id===gambMode);
               return(<>
                 <div style={{...card,padding:"13px 16px",marginBottom:12,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
