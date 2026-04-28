@@ -744,7 +744,9 @@ const BANNERS={
   void:"linear-gradient(135deg,#04041a 0%,#101030 50%,#020210 100%)",
   // Image-backed banners — bannerStyle() turns these into proper image properties
   stargazer:"image:/banners/stargazer.webp",
+  archive:"image:/banners/archive.webp",
   wanderer:"image:/banners/wanderer.webp",
+  astrarium:"image:/banners/astrarium.webp",
 };
 // Returns the style object to spread for a banner background — handles both
 // gradient strings and image URLs. Mixing CSS shorthand (`background:`) with
@@ -766,7 +768,9 @@ const FRAMES={
   void:{lbl:"Void",minLvl:50,accent:"#5050e8"},
   // Premium frames — gated by both XP and a marks purchase. Keys must match BANNERS.
   stargazer:{lbl:"Stargazer",minLvl:15,accent:"#c8b878",premium:true,price:1800,desc:"A lone scholar at the edge of the world"},
+  archive:{lbl:"The Archive",minLvl:20,accent:"#d4a850",premium:true,price:2100,desc:"Where every collected lore is bound in light"},
   wanderer:{lbl:"The Wanderer",minLvl:25,accent:"#a89060",premium:true,price:2400,desc:"Crowned spires beyond the wandering staff"},
+  astrarium:{lbl:"The Astrarium",minLvl:30,accent:"#b8a060",premium:true,price:3000,desc:"Where the heavens are charted on stone"},
 };
 // Premium titles — purchasable, with animated text effects.
 // Free titles are still managed by the existing TITLES list (XP-gated by index).
@@ -781,15 +785,15 @@ const FRAMES={
    The catalog is intentionally aspirational so the engine has somewhere to
    grow without the data layer needing changes. */
 const ARTEFACTS=[
-  {metal:0, name:"Sun-Forged Pendant",      icon:"☉",  desc:"A copper disc that catches the morning light"},
-  {metal:1, name:"Bronze Astrolabe",        icon:"⊙",  desc:"Charts the wandering of forgotten stars"},
-  {metal:2, name:"Silver Crescent",         icon:"☽",  desc:"Resonates faintly under the moon"},
-  {metal:3, name:"Gilded Tome",             icon:"✦",  desc:"Pages whisper in a tongue you almost remember"},
-  {metal:4, name:"Platinum Compass",        icon:"✥",  desc:"Points away from north, toward something stranger"},
-  {metal:5, name:"Obsidian Mirror",         icon:"◈",  desc:"Reflects what was, not what is"},
-  {metal:6, name:"Voidstone Anchor",        icon:"✶",  desc:"Heavier than any object should be"},
-  {metal:7, name:"Eldritch Sigil",          icon:"⌬",  desc:"The geometry hurts to focus on"},
-  {metal:8, name:"Astral Reliquary",        icon:"❋",  desc:"A fragment of the heavens themselves"},
+  {metal:0, name:"Sunforged Pendant", icon:"☉", art:"copper",   desc:"A pendant blessed by solar fire. It radiates warmth and courage, burning darkness at bay."},
+  {metal:1, name:"Bronze Astrolabe",  icon:"⊙", art:"bronze",   desc:"An ancient instrument used to chart the stars and measure fate's endless cycles."},
+  {metal:2, name:"Silver Crescent",   icon:"☽", art:"silver",   desc:"A crescent of cold silver. It whispers of the night and guides travelers in darkness."},
+  {metal:3, name:"Gilded Time",       icon:"⧗", art:"gold",     desc:"Time is suspended within. It grants moments to those who dare command it."},
+  {metal:4, name:"Platinum Compass",  icon:"✥", art:"platinum", desc:"A flawless compass that points not north, but to destiny's truest path."},
+  {metal:5, name:"Obsidian Mirror",   icon:"◈", art:"obsidian", desc:"It reflects not your face, but your hidden self. Beware what gazes back."},
+  {metal:6, name:"Voidstone Anchor",  icon:"✶", art:null,       desc:"Heavier than any object should be — its weight pulls at more than gravity."},
+  {metal:7, name:"Eldritch Codex",    icon:"⌬", art:"eldritch", desc:"Written in a language that unminds. It holds knowledge meant to remain unseen."},
+  {metal:8, name:"Celestial Orb",     icon:"❋", art:"astral",   desc:"A remnant from the heavens. It hums with starlight and cosmic harmony."},
 ];
 const ARTEFACT_GRADES=[
   {id:0,name:"Worn",     color:"#9a8870",threshold:0},
@@ -803,9 +807,12 @@ function gradeForRaritySum(avgRarity){
   for(let i=0;i<ARTEFACT_GRADES.length;i++)if(avgRarity>=ARTEFACT_GRADES[i].threshold)g=i;
   return g;
 }
-// Marks cost to forge an artefact. Scales with metal tier — top tiers more expensive
-// to use as a meaningful sink for accumulated currency.
-const ARTEFACT_FORGE_COST=[80,150,300,600,1200,2200,4000,7000,12000];
+// Marks cost to forge an artefact. Aggressive curve so the abundant low-tier
+// coins still cost meaningful marks to convert, while top tiers serve as a
+// long-term currency sink:
+//   Copper 250 / Bronze 600 / Silver 1.5k / Gold 3.5k / Platinum 7.5k
+//   Obsidian 14k / Void 22k / Eldritch 32k / Astral 50k
+const ARTEFACT_FORGE_COST=[250,600,1500,3500,7500,14000,22000,32000,50000];
 
 const PREMIUM_TITLES=[
   {id:"goldspun",   label:"Goldspun",         minLvl:10, price:600,  effect:"shimmer"},
@@ -2513,7 +2520,7 @@ export default function MintForge(){
                           <div key={metalIdx} style={{...card,padding:"14px 16px",border:`1px solid ${m.eng}55`}}>
                             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}>
                               <div style={{display:"flex",alignItems:"center",gap:11,minWidth:0,flex:1}}>
-                                <div style={{width:42,height:42,borderRadius:10,background:isDark?`linear-gradient(135deg,${m.dark},${m.mid})`:`linear-gradient(135deg,${m.mid},${m.base})`,border:`1px solid ${m.eng}88`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:m.hl,flexShrink:0,fontFamily:"'Fraunces',serif"}}>{def.icon}</div>
+                                <div style={{width:42,height:42,borderRadius:10,background:isDark?`linear-gradient(135deg,${m.dark},${m.mid})`:`linear-gradient(135deg,${m.mid},${m.base})`,border:`1px solid ${m.eng}88`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:m.hl,flexShrink:0,fontFamily:"'Fraunces',serif",overflow:"hidden"}}>{def.art?<img src={`/artefacts/${def.art}.webp`} alt={def.name} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:def.icon}</div>
                                 <div style={{minWidth:0,flex:1}}>
                                   <div style={{...FR,fontWeight:700,fontSize:15,letterSpacing:-.2}}>{def.name}</div>
                                   <div style={{...mu,fontSize:11,fontStyle:"italic",marginTop:1}}>{m.name} · {arr.length} available</div>
@@ -2544,11 +2551,19 @@ export default function MintForge(){
                     {artefacts.map(a=>{
                       const m=METALS[a.metal];const def=ARTEFACTS[a.metal];const g=ARTEFACT_GRADES[a.grade]||ARTEFACT_GRADES[0];
                       return(
-                        <div key={a.id} style={{...card,padding:"13px 8px 10px",textAlign:"center",border:`1px solid ${g.color}55`,borderTop:`2px solid ${g.color}`,position:"relative",background:isDark?`linear-gradient(160deg,${m.dark}20,${t.surface})`:t.surface,boxShadow:`0 0 0 1px ${g.color}22`}}>
-                          <div style={{width:54,height:54,margin:"0 auto 8px",borderRadius:"50%",background:isDark?`radial-gradient(circle,${m.mid},${m.dark})`:`radial-gradient(circle,${m.base},${m.mid})`,border:`1px solid ${m.eng}88`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,color:m.hl,fontFamily:"'Fraunces',serif",boxShadow:`0 0 12px ${g.color}33`}}>{def.icon}</div>
-                          <div style={{...FR,fontSize:11,fontWeight:700,lineHeight:1.2,letterSpacing:-.1,padding:"0 2px"}}>{def.name}</div>
-                          <div style={{...microLabel,fontSize:7.5,marginTop:3,color:g.color,fontWeight:800,letterSpacing:1.5}}>{g.name}</div>
-                          <div style={{...microLabel,fontSize:7,marginTop:1,color:m.hl,opacity:.5}}>{m.name}</div>
+                        <div key={a.id} style={{...card,padding:0,textAlign:"center",border:`1px solid ${g.color}55`,borderTop:`2px solid ${g.color}`,position:"relative",background:"#0a0604",boxShadow:`0 0 0 1px ${g.color}22, 0 0 14px ${g.color}22`,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                          {def.art?(
+                            <div style={{aspectRatio:"280/254",width:"100%",position:"relative",background:`radial-gradient(ellipse at center,${m.dark}40,#000)`}}>
+                              <img src={`/artefacts/${def.art}.webp`} alt={def.name} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+                            </div>
+                          ):(
+                            <div style={{aspectRatio:"280/254",width:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:isDark?`radial-gradient(circle,${m.mid},${m.dark})`:`radial-gradient(circle,${m.base},${m.mid})`,fontSize:48,color:m.hl,fontFamily:"'Fraunces',serif",textShadow:`0 0 20px ${m.hl}88`}}>{def.icon}</div>
+                          )}
+                          <div style={{padding:"8px 6px 9px",borderTop:`1px solid ${g.color}33`,background:"linear-gradient(to bottom,#15100d,#0a0604)"}}>
+                            <div style={{...FR,fontSize:11,fontWeight:700,lineHeight:1.2,letterSpacing:-.1,color:"#e8d8a0"}}>{def.name}</div>
+                            <div style={{...microLabel,fontSize:7.5,marginTop:3,color:g.color,fontWeight:800,letterSpacing:1.5}}>{g.name}</div>
+                            <div style={{...microLabel,fontSize:7,marginTop:1,color:m.hl,opacity:.55}}>{m.name}</div>
+                          </div>
                         </div>
                       );
                     })}
@@ -2894,7 +2909,7 @@ export default function MintForge(){
           <div onClick={close} style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.78)",backdropFilter:"blur(8px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"fadein .18s ease",padding:"20px 12px"}}>
             <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,maxHeight:"85vh",background:t.surface,border:`1px solid ${m.eng}88`,borderRadius:16,boxShadow:"0 -12px 40px rgba(0,0,0,.6)",display:"flex",flexDirection:"column",animation:"slideUp .25s cubic-bezier(.2,.8,.3,1)"}}>
               <div style={{padding:"16px 18px 12px",borderBottom:`1px solid ${t.border}`,display:"flex",alignItems:"center",gap:12}}>
-                <div style={{width:46,height:46,borderRadius:11,background:isDark?`linear-gradient(135deg,${m.dark},${m.mid})`:`linear-gradient(135deg,${m.mid},${m.base})`,border:`1px solid ${m.eng}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:m.hl,fontFamily:"'Fraunces',serif",flexShrink:0}}>{def.icon}</div>
+                <div style={{width:46,height:46,borderRadius:11,background:isDark?`linear-gradient(135deg,${m.dark},${m.mid})`:`linear-gradient(135deg,${m.mid},${m.base})`,border:`1px solid ${m.eng}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:m.hl,fontFamily:"'Fraunces',serif",flexShrink:0,overflow:"hidden"}}>{def.art?<img src={`/artefacts/${def.art}.webp`} alt={def.name} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:def.icon}</div>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{...FR,fontWeight:800,fontSize:16,letterSpacing:-.2,color:t.text}}>Forge {def.name}</div>
                   <div style={{...mu,fontSize:11,marginTop:1,fontStyle:"italic"}}>{def.desc}</div>
