@@ -50,13 +50,24 @@ export async function onRequestGet({ request, env }) {
     `SELECT owned_frames, owned_titles
        FROM player_state WHERE player_id = ?1`, pid);
 
-  const coins = await tryQueryAll(env,
-    `SELECT id, seed, metal_idx, shiny, locked, acquired_at FROM coins
+  // Coins. Try with rarity first; fall back to v1 schema if column missing.
+  let coins = await tryQueryAll(env,
+    `SELECT id, seed, metal_idx, shiny, locked, rarity, acquired_at FROM coins
       WHERE player_id = ?1 ORDER BY acquired_at DESC`, pid);
+  if (!coins.length) {
+    // Either truly empty OR rarity column missing — try without that column to be sure
+    coins = await tryQueryAll(env,
+      `SELECT id, seed, metal_idx, shiny, locked, acquired_at FROM coins
+        WHERE player_id = ?1 ORDER BY acquired_at DESC`, pid);
+  }
 
   // tarot_cards table may not exist yet — empty array is the right default.
   const tarots = await tryQueryAll(env,
     `SELECT card_id FROM tarot_cards WHERE player_id = ?1 ORDER BY acquired_at`, pid);
+
+  // artefacts table may not exist yet (v5+) — empty array fallback.
+  const artefactsRows = await tryQueryAll(env,
+    `SELECT id, metal, grade, forged_at FROM artefacts WHERE player_id = ?1 ORDER BY forged_at DESC`, pid);
 
   return json({
     username: auth.player.username,
@@ -73,12 +84,19 @@ export async function onRequestGet({ request, env }) {
     equippedTarots: v2Extras?.equipped_tarots ? JSON.parse(v2Extras.equipped_tarots) : [],
     ownedFrames: v3Extras?.owned_frames ? JSON.parse(v3Extras.owned_frames) : [],
     ownedTitles: v3Extras?.owned_titles ? JSON.parse(v3Extras.owned_titles) : [],
+    artefacts: artefactsRows.map(r => ({
+      id: r.id,
+      metal: r.metal,
+      grade: r.grade,
+      forgedAt: r.forged_at,
+    })),
     coins: coins.map(r => ({
       id: r.id,
       seed: r.seed >>> 0,
       metalIdx: r.metal_idx,
       shiny: !!r.shiny,
       locked: !!r.locked,
+      ...(r.rarity != null ? { rarity: r.rarity } : {}),
     })),
     // Flag the client can use to warn about pending migrations.
     schemaWarning: !v2Extras ? "Server is missing v3 migration — currency, durability, and tarot features will not persist."
@@ -119,10 +137,19 @@ export async function onRequestPost({ request, env }) {
       if (typeof c?.id !== "string" || c.id.length > 80) continue;
       if (typeof c.seed !== "number") continue;
       if (typeof c.metalIdx !== "number" || c.metalIdx < 0 || c.metalIdx > 8) continue;
+      const rarity = (typeof c.rarity === "number" && c.rarity >= 0 && c.rarity <= 5) ? (c.rarity | 0) : null;
+      // Always do the v1 insert (works without migration).
       stmts.push(env.DB.prepare(
         `INSERT OR REPLACE INTO coins (id, player_id, seed, metal_idx, shiny, locked, acquired_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`
       ).bind(c.id, pid, (c.seed >>> 0), c.metalIdx | 0, c.shiny ? 1 : 0, c.locked ? 1 : 0, now));
+      // Then update rarity column separately — only succeeds if the column exists,
+      // doesn't poison the batch if it doesn't.
+      if (rarity != null) {
+        optionalStmts.push(env.DB.prepare(
+          `UPDATE coins SET rarity = ?3 WHERE player_id = ?1 AND id = ?2`
+        ).bind(pid, c.id, rarity));
+      }
     }
   }
 
@@ -151,6 +178,18 @@ export async function onRequestPost({ request, env }) {
       optionalStmts.push(env.DB.prepare(
         `DELETE FROM tarot_cards WHERE player_id = ?1 AND card_id = ?2`
       ).bind(pid, cid));
+    }
+  }
+
+  // ── artefact additions (v5+) — optional, may fail on un-migrated DBs
+  if (Array.isArray(body.artefactAdd) && body.artefactAdd.length) {
+    for (const a of body.artefactAdd.slice(0, 5)) {
+      if (typeof a?.id !== "string" || a.id.length > 80) continue;
+      if (typeof a.metal !== "number" || a.metal < 0 || a.metal > 8) continue;
+      if (typeof a.grade !== "number" || a.grade < 0 || a.grade > 4) continue;
+      optionalStmts.push(env.DB.prepare(
+        `INSERT OR IGNORE INTO artefacts (id, player_id, metal, grade, forged_at) VALUES (?1, ?2, ?3, ?4, ?5)`
+      ).bind(a.id, pid, a.metal | 0, a.grade | 0, a.forgedAt || now));
     }
   }
 
