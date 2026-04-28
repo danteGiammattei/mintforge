@@ -7,7 +7,7 @@ const VALID_TAROT_IDS = new Set([
 ]);
 /* Premium frame/banner IDs — only premium ones are validated since standard frames
    are XP-gated and never require ownership tracking. */
-const VALID_FRAME_IDS = new Set(["stargazer","wanderer"]);
+const VALID_FRAME_IDS = new Set(["stargazer","wanderer","archive","astrarium"]);
 /* Premium title IDs */
 const VALID_TITLE_IDS = new Set(["goldspun","voidtouched","astral"]);
 
