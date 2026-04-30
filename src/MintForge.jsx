@@ -910,7 +910,7 @@ const TAROT_CARDS=[
    desc:"Every 8th find is guaranteed Rare or higher. Counter visible on hunt screen."},
   // Build-defining for shrine players — substantial forge discount
   {id:"tower", title:"The Tower", roman:"XVI", rarity:"epic", price:3500, minLvl:25,
-   forgeDiscount:0.30,
+   forgeDiscount:0.30, glyph:"⚯",
    desc:"All artefact forging costs reduced by 30%."},
 ];
 const TAROT_BY_ID=Object.fromEntries(TAROT_CARDS.map(c=>[c.id,c]));
@@ -969,6 +969,9 @@ const GAMBLES=[
 function TarotCard({card,owned=true,equipped=false,onClick,size="md",t}){
   const dims=size==="sm"?{w:88,fs:9}:size==="lg"?{w:170,fs:14}:{w:120,fs:11};
   const rarColor=RARITY_COLOR[card.rarity]||"#888";
+  // Track image load failure so we can render a styled fallback for cards
+  // without art (e.g. The Tower, which wasn't in the original 12).
+  const [imgFailed,setImgFailed]=useState(false);
   return(
     <div onClick={onClick} style={{
       width:dims.w,
@@ -984,8 +987,18 @@ function TarotCard({card,owned=true,equipped=false,onClick,size="md",t}){
     }}
     onMouseEnter={e=>{if(onClick){e.currentTarget.style.transform="translateY(-3px)";}}}
     onMouseLeave={e=>{if(onClick){e.currentTarget.style.transform="";}}}>
-      <div style={{position:"relative",aspectRatio:"241 / 495",overflow:"hidden",background:"#0a0604"}}>
-        <img src={`/tarot/${card.id}.webp`} alt={card.title} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+      <div style={{position:"relative",aspectRatio:"241 / 495",overflow:"hidden",background:imgFailed?`linear-gradient(165deg,${rarColor}22,#0a0604 60%)`:"#0a0604"}}>
+        {!imgFailed?(
+          <img src={`/tarot/${card.id}.webp`} alt={card.title} loading="lazy" onError={()=>setImgFailed(true)} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
+        ):(
+          // Stylised placeholder: roman numeral, glyph, frame ornaments.
+          // Keeps the visual rhythm consistent so a card without art doesn't break the row.
+          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"space-between",padding:"14% 8%",fontFamily:"'Fraunces',serif",color:rarColor,textAlign:"center"}}>
+            <div style={{fontSize:dims.fs+2,fontWeight:700,letterSpacing:2,opacity:.85}}>{card.roman}</div>
+            <div style={{fontSize:Math.round(dims.w*0.5),lineHeight:1,filter:`drop-shadow(0 0 14px ${rarColor}88)`,opacity:.9}}>{card.glyph||"✦"}</div>
+            <div style={{fontSize:Math.round(dims.fs*0.78),fontStyle:"italic",letterSpacing:.5,opacity:.65,padding:"0 4%"}}>{card.title}</div>
+          </div>
+        )}
         {equipped&&<div style={{position:"absolute",top:5,right:5,background:rarColor,color:"#000",fontFamily:"Outfit,sans-serif",fontSize:8,fontWeight:900,padding:"2px 6px",borderRadius:3,letterSpacing:1,textTransform:"uppercase",boxShadow:`0 0 8px ${rarColor}`}}>Equipped</div>}
       </div>
       <div style={{padding:"6px 7px 7px",borderTop:`1px solid ${rarColor}33`,background:"linear-gradient(to bottom,#1a1310,#0e0a08)"}}>
@@ -1004,26 +1017,46 @@ function TarotCard({card,owned=true,equipped=false,onClick,size="md",t}){
    "⛏" emoji in the Forge upgrade card. */
 /* ─── HUNT FIELD: FOG REVEAL CANVAS ─────────────────────────────────────
    Renders a darkening overlay that reveals (becomes transparent) wherever
-   the detector has swept. Pure visual — doesn't affect the underlying
-   detection logic. The fog re-fogs gently over time so it doesn't permanently
-   reveal everything, keeping the field feeling explorable on each new hunt. */
-function FogCanvas({detFrac,isDark,resetKey}){
+   the detector has swept. Pure visual — doesn't affect detection logic.
+
+   Performance: a single requestAnimationFrame loop reads the detector position
+   from a ref (so React doesn't have to re-render at input rate). The canvas
+   only redraws when the position actually moved since last frame. */
+function FogCanvas({detFracRef,active,isDark,resetKey}){
   const canvasRef=useRef(null);
   const lastSizeRef=useRef({w:0,h:0});
+  const lastPosRef=useRef({x:-1,y:-1});
+  const lastFogTimeRef=useRef(0);
   const rafRef=useRef(0);
 
-  // Reset fog when a new hunt starts (resetKey changes)
+  // Reset fog whenever a new hunt starts. Also pre-clear at the cursor's
+  // current position so the mechanic is immediately visible — otherwise
+  // the field is just a black square until the player moves.
   useEffect(()=>{
-    const c=canvasRef.current;if(!c)return;
+    const c=canvasRef.current;if(!c||c.width===0)return;
     const ctx=c.getContext("2d");
     ctx.globalCompositeOperation="source-over";
-    ctx.fillStyle=isDark?"rgba(2,4,8,0.92)":"rgba(80,72,60,0.5)";
+    ctx.fillStyle=isDark?"rgba(2,4,8,0.55)":"rgba(80,72,60,0.32)";
     ctx.fillRect(0,0,c.width,c.height);
-  },[resetKey,isDark]);
+    // Carve out a starting clearing at the cursor position
+    const pos=detFracRef.current;
+    const cx=pos.x*c.width,cy=pos.y*c.height;
+    const radius=Math.min(c.width,c.height)*0.18;
+    ctx.globalCompositeOperation="destination-out";
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,radius);
+    g.addColorStop(0,"rgba(0,0,0,0.85)");
+    g.addColorStop(0.6,"rgba(0,0,0,0.4)");
+    g.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.arc(cx,cy,radius,0,Math.PI*2);
+    ctx.fill();
+    lastPosRef.current={x:pos.x,y:pos.y};
+  },[resetKey,isDark,detFracRef]);
 
-  // Fit canvas to container, re-fill on resize
+  // Fit canvas to container on mount + resize
   useEffect(()=>{
-    const c=canvasRef.current;if(!c)return;
+    const c=canvasRef.current;if(!c||!c.parentElement)return;
     const fit=()=>{
       const r=c.parentElement.getBoundingClientRect();
       const dpr=Math.min(2,window.devicePixelRatio||1);
@@ -1033,7 +1066,7 @@ function FogCanvas({detFrac,isDark,resetKey}){
       c.width=w;c.height=h;
       c.style.width=r.width+"px";c.style.height=r.height+"px";
       const ctx=c.getContext("2d");
-      ctx.fillStyle=isDark?"rgba(2,4,8,0.92)":"rgba(80,72,60,0.5)";
+      ctx.fillStyle=isDark?"rgba(2,4,8,0.55)":"rgba(80,72,60,0.32)";
       ctx.fillRect(0,0,w,h);
     };
     fit();
@@ -1041,46 +1074,50 @@ function FogCanvas({detFrac,isDark,resetKey}){
     return()=>ro.disconnect();
   },[isDark]);
 
-  // Reveal a circle at the detector's current position. Use destination-out
-  // composite so each draw "erases" fog rather than adding to it.
+  // Single animation loop: only runs while `active`. Reads detFrac from a ref so
+  // mousemove can fire at any rate without causing extra React renders.
   useEffect(()=>{
-    const c=canvasRef.current;if(!c)return;
-    const ctx=c.getContext("2d");
-    const W=c.width,H=c.height;
-    const cx=detFrac.x*W,cy=detFrac.y*H;
-    const radius=Math.min(W,H)*0.12;
-    // Soft erase: build a radial gradient brush that fades at the edges
-    ctx.save();
-    ctx.globalCompositeOperation="destination-out";
-    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,radius);
-    g.addColorStop(0,"rgba(0,0,0,0.55)");
-    g.addColorStop(0.6,"rgba(0,0,0,0.35)");
-    g.addColorStop(1,"rgba(0,0,0,0)");
-    ctx.fillStyle=g;
-    ctx.beginPath();
-    ctx.arc(cx,cy,radius,0,Math.PI*2);
-    ctx.fill();
-    ctx.restore();
-  },[detFrac.x,detFrac.y]);
-
-  // Slow re-fogging — every ~3 seconds, paint a faint layer of fog so paths
-  // gradually re-cover. Keeps the field from becoming fully revealed.
-  useEffect(()=>{
-    let last=performance.now();
+    if(!active)return;
+    let cancelled=false;
     const tick=(now)=>{
-      const c=canvasRef.current;if(!c){rafRef.current=requestAnimationFrame(tick);return;}
-      if(now-last>3000){
-        last=now;
+      if(cancelled)return;
+      const c=canvasRef.current;
+      if(!c){rafRef.current=requestAnimationFrame(tick);return;}
+      const pos=detFracRef.current;
+      const W=c.width,H=c.height;
+      // Only erase if the cursor moved meaningfully (≥0.4% of field width).
+      const dx=Math.abs(pos.x-lastPosRef.current.x);
+      const dy=Math.abs(pos.y-lastPosRef.current.y);
+      if(dx>0.004||dy>0.004){
+        lastPosRef.current={x:pos.x,y:pos.y};
+        const ctx=c.getContext("2d");
+        const cx=pos.x*W,cy=pos.y*H;
+        const radius=Math.min(W,H)*0.12;
+        ctx.save();
+        ctx.globalCompositeOperation="destination-out";
+        const g=ctx.createRadialGradient(cx,cy,0,cx,cy,radius);
+        g.addColorStop(0,"rgba(0,0,0,0.45)");
+        g.addColorStop(0.6,"rgba(0,0,0,0.25)");
+        g.addColorStop(1,"rgba(0,0,0,0)");
+        ctx.fillStyle=g;
+        ctx.beginPath();
+        ctx.arc(cx,cy,radius,0,Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+      // Slow re-fog every 4 seconds to keep field replenished.
+      if(now-lastFogTimeRef.current>4000){
+        lastFogTimeRef.current=now;
         const ctx=c.getContext("2d");
         ctx.globalCompositeOperation="source-over";
-        ctx.fillStyle=isDark?"rgba(2,4,8,0.04)":"rgba(80,72,60,0.04)";
-        ctx.fillRect(0,0,c.width,c.height);
+        ctx.fillStyle=isDark?"rgba(2,4,8,0.025)":"rgba(80,72,60,0.025)";
+        ctx.fillRect(0,0,W,H);
       }
       rafRef.current=requestAnimationFrame(tick);
     };
     rafRef.current=requestAnimationFrame(tick);
-    return()=>cancelAnimationFrame(rafRef.current);
-  },[isDark]);
+    return()=>{cancelled=true;cancelAnimationFrame(rafRef.current);};
+  },[active,isDark,detFracRef]);
 
   return<canvas ref={canvasRef} style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:2}}/>;
 }
@@ -1323,6 +1360,12 @@ export default function MintForge(){
   const [huntCoin,setHuntCoin]=useState(()=>mkCoin(newSeed(),1,null,1));
   const [coinFrac,setCoinFrac]=useState(()=>({x:.2+Math.random()*.6,y:.2+Math.random()*.6}));
   const [detFrac,setDetFrac]=useState({x:.5,y:.5});
+  // Always-current detector position — updated synchronously on every input event
+  // so the canvas (which animates via requestAnimationFrame) reads the freshest
+  // position without forcing React to re-render at input rate.
+  const detFracRef=useRef({x:.5,y:.5});
+  // Throttle React state updates to one per animation frame at most.
+  const detRafRef=useRef(0);
   const [phase,setPhase]=useState("hunt");
   const [foundCoin,setFoundCoin]=useState(null);
   const fieldRef=useRef();
@@ -1489,7 +1532,16 @@ export default function MintForge(){
     if(!fieldRef.current||phase!=="hunt")return;e.preventDefault();
     const rect=fieldRef.current.getBoundingClientRect();
     const cx2=e.touches?e.touches[0].clientX:e.clientX;const cy2=e.touches?e.touches[0].clientY:e.clientY;
-    setDetFrac({x:Math.max(0,Math.min(1,(cx2-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(cy2-rect.top)/rect.height))});
+    const x=Math.max(0,Math.min(1,(cx2-rect.left)/rect.width));
+    const y=Math.max(0,Math.min(1,(cy2-rect.top)/rect.height));
+    // Update the ref synchronously so the canvas's RAF loop sees the latest position
+    detFracRef.current={x,y};
+    // Throttle React state updates to one per animation frame.
+    if(detRafRef.current)return;
+    detRafRef.current=requestAnimationFrame(()=>{
+      detRafRef.current=0;
+      setDetFrac(detFracRef.current);
+    });
   },[phase]);
 
   const onDig=()=>{
@@ -2106,7 +2158,7 @@ export default function MintForge(){
             {/* ─── EQUIPPED TAROTS ─── */}
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:12,marginTop:22,padding:"0 4px"}}>
               <div style={{...sectionTitle,fontSize:18}}>Tarot Spread</div>
-              <div style={{...microLabel}}>{equippedTarots.length} / 5</div>
+              <div style={{...microLabel}}>{equippedTarots.length} / {MAX_EQUIPPED_TAROTS}</div>
             </div>
             {equippedTarots.length===0&&ownedTarots.length===0?(
               <div style={{textAlign:"center",padding:"24px 18px",...card,borderStyle:"dashed"}}>
@@ -2300,7 +2352,7 @@ export default function MintForge(){
                     {/* Equipped tarots — visible on friends' profiles too */}
                     {Array.isArray(pd.equippedTarots)&&pd.equippedTarots.length>0&&(
                       <div style={{padding:"0 2px",marginTop:18}}>
-                        <div style={{...microLabel,marginBottom:9}}>Tarot Spread · {pd.equippedTarots.length}/5</div>
+                        <div style={{...microLabel,marginBottom:9}}>Tarot Spread · {pd.equippedTarots.length}/{MAX_EQUIPPED_TAROTS}</div>
                         <div style={{display:"flex",gap:8,overflowX:"auto",paddingBottom:6,paddingLeft:2,paddingRight:2}}>
                           {pd.equippedTarots.map(cid=>{const card=TAROT_BY_ID[cid];if(!card)return null;return(
                             <div key={cid} style={{flexShrink:0}}><TarotCard card={card} owned equipped size="sm" t={t}/></div>
@@ -2437,8 +2489,10 @@ export default function MintForge(){
               <div ref={fieldRef} onMouseMove={onFieldInteract} onTouchMove={onFieldInteract} onClick={onFieldInteract}
                 style={{position:"relative",height:300,borderRadius:16,overflow:"hidden",cursor:"crosshair",userSelect:"none",background:isDark?"radial-gradient(ellipse at center,#0c0e16 0%,#04050a 100%)":"radial-gradient(ellipse at center,#d8d4c8,#b8b4a8)",border:`1px solid ${t.border}`,backgroundImage:`radial-gradient(circle,${isDark?"rgba(120,90,40,.07)":"rgba(60,40,20,.07)"} 1px,transparent 1px), radial-gradient(circle at 30% 60%,${isDark?"rgba(80,60,30,.12)":"rgba(60,40,20,.06)"},transparent 60%)`,backgroundSize:"24px 24px, 100% 100%",touchAction:"none",boxShadow:`inset 0 0 80px rgba(0,0,0,.55)`}}>
 
-                {/* Layer 1: fog of war canvas (revealed by sweep, slowly re-fogs) */}
-                <FogCanvas detFrac={detFrac} isDark={isDark} resetKey={huntCoin.seed}/>
+                {/* Layer 1: fog of war canvas (revealed by sweep, slowly re-fogs).
+                    detFracRef passes the live cursor position; canvas reads it on its
+                    own RAF loop so React doesn't need to re-render at input rate. */}
+                <FogCanvas detFracRef={detFracRef} active={phase==="hunt"} isDark={isDark} resetKey={huntCoin.seed}/>
 
                 {/* Layer 2: directional pulse from coin's true location.
                     Always positioned at coinFrac, but opacity scales with signal strength
@@ -2827,7 +2881,7 @@ export default function MintForge(){
 
                 {/* ── TAROT SUB-TAB ── */}
                 {shopTab==="tarot"&&(<>
-                <div style={{...mu,fontSize:12,marginBottom:12,fontStyle:"italic",padding:"0 2px"}}>Tarot cards grant passive buffs while equipped (max 5). One copy each.</div>
+                <div style={{...mu,fontSize:12,marginBottom:12,fontStyle:"italic",padding:"0 2px"}}>Tarot cards grant a single, build-defining effect while equipped. Maximum 2 active at a time — choose carefully. One copy each.</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))",gap:10}}>
                   {TAROT_CARDS.map(card=>{
                     const owned=ownedTarots.includes(card.id);
