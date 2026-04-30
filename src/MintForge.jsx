@@ -49,6 +49,9 @@ button{-webkit-tap-highlight-color:transparent;}
 @keyframes ping{0%{transform:translate(-50%,-50%) scale(.8);opacity:.85}100%{transform:translate(-50%,-50%) scale(3.6);opacity:0}}
 @keyframes scanline{0%{transform:translateX(-4%)}100%{transform:translateX(104%)}}
 @keyframes pulseDot{0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 12px currentColor}50%{transform:translate(-50%,-50%) scale(1.15);box-shadow:0 0 22px currentColor}}
+@keyframes huntPulse{0%{transform:translate(-50%,-50%) scale(.4);opacity:0.7}80%{opacity:0.15}100%{transform:translate(-50%,-50%) scale(1.4);opacity:0}}
+@keyframes huntCoreGlow{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.85}50%{transform:translate(-50%,-50%) scale(1.3);opacity:1}}
+@keyframes detectorBump{0%,100%{transform:translate(-50%,-50%) scale(1)}40%{transform:translate(-50%,-58%) scale(1.08)}60%{transform:translate(-50%,-46%) scale(1.04)}}
 @keyframes gleam{0%{transform:translateX(-60%);opacity:0}10%{opacity:1}60%{opacity:.9}100%{transform:translateX(140%);opacity:0}}
 @keyframes flashIn{0%{opacity:0;transform:scale(.7) translateY(14px)}55%{transform:scale(1.06) translateY(-3px)}100%{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes rarityFlash{0%,100%{opacity:1}50%{opacity:.35}}
@@ -121,7 +124,9 @@ const METALS=[
 ];
 const MAX_TIER=8;
 // SHOVEL_TIER_CAP[shovelLevel-1] = highest metal index reachable at that level.
-const SHOVEL_TIER_CAP=[1,2,3,4,5,6,7,8];
+// Lv9 doesn't unlock a new metal — caps at 8 (Astral). The top tier provides
+// non-metal benefits (durability, depth bonus). See SHOVEL_UPS for details.
+const SHOVEL_TIER_CAP=[1,2,3,4,5,6,7,8,8];
 function pickMetal(rng,pLvl=1,tierCap=MAX_TIER){
   const b=Math.min(pLvl-1,50);
   // 9 tiers: copper, bronze, silver, gold, platinum, obsidian, void, eldritch, astral
@@ -822,7 +827,7 @@ const PREMIUM_TITLES=[
 const PREMIUM_TITLE_BY_ID=Object.fromEntries(PREMIUM_TITLES.map(t=>[t.id,t]));
 const PREMIUM_TITLE_LABELS=new Set(PREMIUM_TITLES.map(t=>t.label));
 
-const SHOVEL_UPS=[null,{label:"Iron Shovel",depth:2,cost:[{m:0,n:3}],desc:"Reaches depth 2"},{label:"Bronze Pick",depth:3,cost:[{m:0,n:2},{m:1,n:2}],desc:"Reaches depth 3"},{label:"Steel Pick",depth:4,cost:[{m:2,n:2},{m:1,n:1}],desc:"Reaches depth 4"},{label:"Gilded Pick",depth:5,cost:[{m:3,n:1},{m:2,n:2}],desc:"Reaches depth 5"},{label:"Platinum Pick",depth:6,cost:[{m:4,n:1},{m:3,n:1}],desc:"Reaches depth 6"},{label:"Void Excavator",depth:7,cost:[{m:5,n:1},{m:4,n:1}],desc:"Reaches depth 7"},{label:"Eldritch Drill",depth:8,cost:[{m:6,n:1},{m:5,n:1}],desc:"Reaches depth 8"},{label:"Astral Cleaver",depth:9,cost:[{m:7,n:1},{m:6,n:1}],desc:"Reaches depth 9 — Maxed"}];
+const SHOVEL_UPS=[null,{label:"Iron Shovel",depth:2,cost:[{m:0,n:3}],desc:"Reaches depth 2"},{label:"Bronze Pick",depth:3,cost:[{m:0,n:2},{m:1,n:2}],desc:"Reaches depth 3"},{label:"Steel Pick",depth:4,cost:[{m:2,n:2},{m:1,n:1}],desc:"Reaches depth 4"},{label:"Gilded Pick",depth:5,cost:[{m:3,n:1},{m:2,n:2}],desc:"Reaches depth 5"},{label:"Platinum Pick",depth:6,cost:[{m:4,n:1},{m:3,n:1}],desc:"Reaches depth 6"},{label:"Void Excavator",depth:7,cost:[{m:5,n:1},{m:4,n:1}],desc:"Reaches depth 7"},{label:"Eldritch Drill",depth:8,cost:[{m:6,n:1},{m:5,n:1}],desc:"Reaches depth 8"},{label:"Astral Cleaver",depth:9,cost:[{m:7,n:1},{m:6,n:1}],desc:"Reaches depth 9 — all metals"},{label:"Eldritch Maul",depth:9,cost:[{m:8,n:2},{m:7,n:2}],desc:"+ Heavy build · 50% more durability"}];
 
 // Visual representation of each shovel tier — distinct SVG art so progression
 // feels tangible. The shaft, head, and accents change as you tier up.
@@ -878,21 +883,39 @@ const MAX_SH=SHOVEL_UPS.length-1,MAX_BR=BRUSH_UPS.length-1;
    Each card has: id (matches /public/tarot/<id>.webp), title, suit, buff
    description, gameplay-affecting fields the engine reads, and a marks
    price in the shop. Cards stack additively up to 5 equipped slots. */
+/* ─── TAROT ─────────────────────────────────────────────────────────────
+   Six cards. Each does something *meaningful and visible*, not a small
+   percent bonus. Maximum 2 equipped at a time so equipping is a real choice.
+   Costs raised so cards feel like commitments. */
 const TAROT_CARDS=[
-  {id:"magician",         title:"The Magician",       roman:"I",    rarity:"common",   price:300,   shinyBonus:0.015, desc:"+1.5% shiny chance"},
-  {id:"high_priestess",   title:"The High Priestess", roman:"II",   rarity:"common",   price:300,   xpMul:0.10,      desc:"+10% XP from digs"},
-  {id:"empress",          title:"The Empress",        roman:"III",  rarity:"common",   price:400,   marksMul:0.15,   desc:"+15% marks earned"},
-  {id:"emperor",          title:"The Emperor",        roman:"IV",   rarity:"uncommon", price:650,   tierUp:0.05,     desc:"+5% chance any dig is one tier higher"},
-  {id:"hierophant",       title:"The Hierophant",     roman:"V",    rarity:"uncommon", price:600,   durMul:0.50,     desc:"Pickaxe wear halved"},
-  {id:"lovers",           title:"The Lovers",         roman:"VI",   rarity:"uncommon", price:700,   pinSlots:2,      desc:"+2 display cabinet slots"},
-  {id:"chariot",          title:"The Chariot",        roman:"VII",  rarity:"rare",     price:1200,  digSpeed:0.20,   desc:"+20% lucky-dig chance (≤2 digs to find)"},
-  {id:"strength",         title:"Strength",           roman:"VIII", rarity:"rare",     price:1500,  shinyBonus:0.04, desc:"+4% shiny chance"},
-  {id:"hermit",           title:"The Hermit",         roman:"rare", rarity:"rare",     price:1300,  artefactRate:0.10, desc:"+10% artefact find chance · coming soon"},
-  {id:"wheel_of_fortune", title:"Wheel of Fortune",   roman:"X",    rarity:"epic",     price:2400,  marksMul:0.40,   desc:"+40% marks earned"},
-  {id:"justice",          title:"Justice",            roman:"XI",   rarity:"epic",     price:2200,  forgeRefund:0.25, desc:"25% chance to recover forge materials"},
-  {id:"hanged_man",       title:"The Hanged Man",     roman:"XII",  rarity:"epic",     price:2800,  rerollDig:1,     desc:"Once per hunt, retry a too-deep coin"},
+  // Glass-cannon leveling — clear tradeoff
+  {id:"magician", title:"The Magician", roman:"I", rarity:"uncommon", price:1500, minLvl:10,
+   xpMul:0.50, durPenalty:1.0,
+   desc:"+50% XP from finds, but pickaxe wear is doubled."},
+  // Information advantage — tells you what's about to be dug
+  {id:"hermit", title:"The Hermit", roman:"IX", rarity:"rare", price:2000, minLvl:12,
+   revealRarity:true,
+   desc:"Reveals the rarity tier of the next coin before you dig."},
+  // Daily reroll — the player-agency moment, but applied to rarity (not too-deep)
+  {id:"hanged_man", title:"The Hanged Man", roman:"XII", rarity:"rare", price:2500, minLvl:15,
+   rerollRarity:1,
+   desc:"Once per day, reroll the rarity of a coin you just found."},
+  // Cabinet expansion — kept from old design
+  {id:"lovers", title:"The Lovers", roman:"VI", rarity:"uncommon", price:1800, minLvl:8,
+   pinSlots:2,
+   desc:"+2 display cabinet slots."},
+  // Predictable jackpot — every 8th find guaranteed Rare+
+  {id:"wheel_of_fortune", title:"Wheel of Fortune", roman:"X", rarity:"epic", price:3000, minLvl:20,
+   guaranteedEvery:8, guaranteedFloor:2,
+   desc:"Every 8th find is guaranteed Rare or higher. Counter visible on hunt screen."},
+  // Build-defining for shrine players — substantial forge discount
+  {id:"tower", title:"The Tower", roman:"XVI", rarity:"epic", price:3500, minLvl:25,
+   forgeDiscount:0.30,
+   desc:"All artefact forging costs reduced by 30%."},
 ];
 const TAROT_BY_ID=Object.fromEntries(TAROT_CARDS.map(c=>[c.id,c]));
+// Maximum tarots equipped at once. Cut from 5 → 2 so equipping has weight.
+const MAX_EQUIPPED_TAROTS=2;
 /* ─── RARITY (separate from metal) ─────────────────────────────────────
    Six tiers. A coin's rarity is independent of its metal — a Common Bronze
    and a Legendary Bronze are both possible. Rarity is rolled at find time
@@ -903,19 +926,22 @@ const RARITY_COLOR={common:"#8a7560",uncommon:"#7ad888",rare:"#80c0ff",epic:"#c0
 
 // Aggregate active buffs from a list of equipped tarot card ids.
 function tarotBuffs(equippedIds){
-  const buff={shinyBonus:0,xpMul:0,marksMul:0,tierUp:0,durMul:1,pinSlots:0,digSpeed:0,artefactRate:0,forgeRefund:0,rerollDig:0};
+  const buff={
+    xpMul:0, durPenalty:0, revealRarity:false, rerollRarity:0, pinSlots:0,
+    guaranteedEvery:0, guaranteedFloor:0, forgeDiscount:0,
+    // Legacy fields kept at neutral defaults so older code that reads them doesn't break
+    shinyBonus:0, marksMul:0, tierUp:0, durMul:1, digSpeed:0, artefactRate:0, forgeRefund:0, rerollDig:0,
+  };
   for(const id of equippedIds||[]){
     const c=TAROT_BY_ID[id];if(!c)continue;
-    if(c.shinyBonus)buff.shinyBonus+=c.shinyBonus;
     if(c.xpMul)buff.xpMul+=c.xpMul;
-    if(c.marksMul)buff.marksMul+=c.marksMul;
-    if(c.tierUp)buff.tierUp+=c.tierUp;
-    if(c.durMul!=null)buff.durMul*=c.durMul; // multiplicative — two halvings = quartered
+    if(c.durPenalty)buff.durPenalty+=c.durPenalty;
+    if(c.revealRarity)buff.revealRarity=true;
+    if(c.rerollRarity)buff.rerollRarity+=c.rerollRarity;
     if(c.pinSlots)buff.pinSlots+=c.pinSlots;
-    if(c.digSpeed)buff.digSpeed+=c.digSpeed;
-    if(c.artefactRate)buff.artefactRate+=c.artefactRate;
-    if(c.forgeRefund)buff.forgeRefund+=c.forgeRefund;
-    if(c.rerollDig)buff.rerollDig+=c.rerollDig;
+    if(c.guaranteedEvery&&!buff.guaranteedEvery)buff.guaranteedEvery=c.guaranteedEvery; // first-equipped wins
+    if(c.guaranteedFloor)buff.guaranteedFloor=Math.max(buff.guaranteedFloor,c.guaranteedFloor);
+    if(c.forgeDiscount)buff.forgeDiscount+=c.forgeDiscount;
   }
   return buff;
 }
@@ -976,72 +1002,131 @@ function TarotCard({card,owned=true,equipped=false,onClick,size="md",t}){
    1-2 are simple stone/iron picks, 3-5 are forged-metal picks, 6-8 add
    embellishments (runes, glow, double-headed). Drop-in replacement for the
    "⛏" emoji in the Forge upgrade card. */
+/* ─── HUNT FIELD: FOG REVEAL CANVAS ─────────────────────────────────────
+   Renders a darkening overlay that reveals (becomes transparent) wherever
+   the detector has swept. Pure visual — doesn't affect the underlying
+   detection logic. The fog re-fogs gently over time so it doesn't permanently
+   reveal everything, keeping the field feeling explorable on each new hunt. */
+function FogCanvas({detFrac,isDark,resetKey}){
+  const canvasRef=useRef(null);
+  const lastSizeRef=useRef({w:0,h:0});
+  const rafRef=useRef(0);
+
+  // Reset fog when a new hunt starts (resetKey changes)
+  useEffect(()=>{
+    const c=canvasRef.current;if(!c)return;
+    const ctx=c.getContext("2d");
+    ctx.globalCompositeOperation="source-over";
+    ctx.fillStyle=isDark?"rgba(2,4,8,0.92)":"rgba(80,72,60,0.5)";
+    ctx.fillRect(0,0,c.width,c.height);
+  },[resetKey,isDark]);
+
+  // Fit canvas to container, re-fill on resize
+  useEffect(()=>{
+    const c=canvasRef.current;if(!c)return;
+    const fit=()=>{
+      const r=c.parentElement.getBoundingClientRect();
+      const dpr=Math.min(2,window.devicePixelRatio||1);
+      const w=Math.floor(r.width*dpr),h=Math.floor(r.height*dpr);
+      if(w===lastSizeRef.current.w&&h===lastSizeRef.current.h)return;
+      lastSizeRef.current={w,h};
+      c.width=w;c.height=h;
+      c.style.width=r.width+"px";c.style.height=r.height+"px";
+      const ctx=c.getContext("2d");
+      ctx.fillStyle=isDark?"rgba(2,4,8,0.92)":"rgba(80,72,60,0.5)";
+      ctx.fillRect(0,0,w,h);
+    };
+    fit();
+    const ro=new ResizeObserver(fit);ro.observe(c.parentElement);
+    return()=>ro.disconnect();
+  },[isDark]);
+
+  // Reveal a circle at the detector's current position. Use destination-out
+  // composite so each draw "erases" fog rather than adding to it.
+  useEffect(()=>{
+    const c=canvasRef.current;if(!c)return;
+    const ctx=c.getContext("2d");
+    const W=c.width,H=c.height;
+    const cx=detFrac.x*W,cy=detFrac.y*H;
+    const radius=Math.min(W,H)*0.12;
+    // Soft erase: build a radial gradient brush that fades at the edges
+    ctx.save();
+    ctx.globalCompositeOperation="destination-out";
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,radius);
+    g.addColorStop(0,"rgba(0,0,0,0.55)");
+    g.addColorStop(0.6,"rgba(0,0,0,0.35)");
+    g.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.arc(cx,cy,radius,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  },[detFrac.x,detFrac.y]);
+
+  // Slow re-fogging — every ~3 seconds, paint a faint layer of fog so paths
+  // gradually re-cover. Keeps the field from becoming fully revealed.
+  useEffect(()=>{
+    let last=performance.now();
+    const tick=(now)=>{
+      const c=canvasRef.current;if(!c){rafRef.current=requestAnimationFrame(tick);return;}
+      if(now-last>3000){
+        last=now;
+        const ctx=c.getContext("2d");
+        ctx.globalCompositeOperation="source-over";
+        ctx.fillStyle=isDark?"rgba(2,4,8,0.04)":"rgba(80,72,60,0.04)";
+        ctx.fillRect(0,0,c.width,c.height);
+      }
+      rafRef.current=requestAnimationFrame(tick);
+    };
+    rafRef.current=requestAnimationFrame(tick);
+    return()=>cancelAnimationFrame(rafRef.current);
+  },[isDark]);
+
+  return<canvas ref={canvasRef} style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:2}}/>;
+}
+
+/* Sense text — single italicized line that drifts in based on signal strength.
+   Cycles through phrases for atmosphere. Uses the coin's metal index as a hint. */
+const SENSE_PHRASES={
+  faint:["a faint hum, far below","something stirs in the depths","an old presence, just barely"],
+  moderate:["the soil grows warmer","you sense weight, near","ancient echoes rise"],
+  strong:["close — the air thickens","metal-bright, calling","beneath your feet"],
+  locked:["here. dig.","the soil answers","this is the place"],
+};
+function senseLevel(signal){
+  if(signal<.04)return null;
+  if(signal<.28)return "faint";
+  if(signal<.58)return "moderate";
+  if(signal<.84)return "strong";
+  return "locked";
+}
+
+/* ─── PICKAXE ICON ──────────────────────────────────────────────────── */
 function PickaxeIcon({level=1,size=44}){
-  const lv=Math.max(1,Math.min(8,level|0));
-  // Map shovel level to a metal palette for color
-  const palette=[
-    null,
-    {head:"#6a5a4a",hi:"#8a7a6a",dark:"#3a2e22",handle:"#5a3818",glow:null},     // 1: rough stone
-    {head:"#7a6a5a",hi:"#a89078",dark:"#3e3024",handle:"#6a4220",glow:null},     // 2: iron
-    {head:"#9a7240",hi:"#d4a060",dark:"#3a2010",handle:"#5a3818",glow:null},     // 3: bronze
-    {head:"#888",   hi:"#d8eaf8",dark:"#384858",handle:"#5a4220",glow:null},     // 4: steel
-    {head:"#d4a017",hi:"#ffe878",dark:"#503800",handle:"#6a4220",glow:"#f0c850"},// 5: gilded
-    {head:"#90b8d0",hi:"#e8f4ff",dark:"#304860",handle:"#3a3850",glow:"#a8c8e8"},// 6: platinum
-    {head:"#5a1890",hi:"#c060ff",dark:"#0e0020",handle:"#1a1430",glow:"#c060ff"},// 7: void/eldritch (drill)
-    {head:"#f0c840",hi:"#fff8a0",dark:"#605030",handle:"#3a2810",glow:"#fff8a0"},// 8: astral (cleaver)
-  ];
-  const p=palette[lv]||palette[1];
-  // Head shape varies: 1-2 simple, 3-5 forged angular, 6 platinum-flat, 7 drill bit, 8 cleaver double-head
-  // Render as inline SVG so colors/effects are clean
-  const isDrill=lv===7;
-  const isCleaver=lv===8;
-  const hasRune=lv>=5;
-  const handleColor=p.handle;
+  // Map shovel level (1-9) to its art file. Levels above 9 use the top art.
+  const lv=Math.max(1,Math.min(9,level|0));
+  // Drop shadow color matches the metal's general tone
+  const glow=[null,
+    "rgba(150,80,30,.45)",  // 1 copper
+    "rgba(160,110,40,.45)", // 2 bronze
+    "rgba(160,170,180,.4)", // 3 silver
+    "rgba(220,170,40,.55)", // 4 gold
+    "rgba(160,170,180,.4)", // 5 platinum
+    "rgba(120,80,160,.5)",  // 6 obsidian
+    "rgba(160,80,255,.55)", // 7 void
+    "rgba(80,140,255,.55)", // 8 celestial
+    "rgba(180,80,200,.6)",  // 9 eldritch
+  ][lv];
   return(
-    <svg viewBox="0 0 64 64" width={size} height={size} style={{filter:p.glow?`drop-shadow(0 0 6px ${p.glow}88)`:"none",overflow:"visible"}}>
-      {/* Handle (wooden shaft) — angled diagonal */}
-      <rect x="28" y="14" width="6" height="44" rx="2" fill={handleColor} transform="rotate(35 31 36)"/>
-      <rect x="29" y="14" width="1.5" height="44" fill="rgba(255,255,255,.18)" transform="rotate(35 31 36)"/>
-      {/* Head — varies by level */}
-      {!isDrill&&!isCleaver&&(
-        <g transform="rotate(35 31 36)">
-          {/* Standard pickaxe head — pointed both sides */}
-          <path d={`M 8 14 L 28 12 L 36 18 L 28 22 L 8 20 Z`} fill={p.head} stroke={p.dark} strokeWidth="1.2"/>
-          <path d={`M 36 18 L 56 14 L 56 20 L 36 18 Z`} fill={p.head} stroke={p.dark} strokeWidth="1.2"/>
-          {/* Highlight on top */}
-          <path d={`M 10 13 L 28 12 L 36 17`} stroke={p.hi} strokeWidth="1" fill="none" opacity=".55"/>
-          {/* Rune accent on head for high tiers */}
-          {hasRune&&<circle cx="32" cy="17" r="2" fill={p.glow||p.hi} opacity=".75"/>}
-        </g>
-      )}
-      {isDrill&&(
-        <g transform="rotate(35 31 36)">
-          {/* Drill bit — conical head with spiraled flutes */}
-          <polygon points="6,16 26,12 26,24 6,20" fill={p.head} stroke={p.dark} strokeWidth="1.2"/>
-          <polygon points="26,12 56,17 26,24" fill={p.head} stroke={p.dark} strokeWidth="1.2"/>
-          <line x1="28" y1="13" x2="50" y2="17" stroke={p.dark} strokeWidth=".8"/>
-          <line x1="30" y1="15" x2="50" y2="19" stroke={p.dark} strokeWidth=".8"/>
-          <line x1="32" y1="17" x2="50" y2="21" stroke={p.dark} strokeWidth=".8"/>
-          <line x1="30" y1="21" x2="50" y2="23" stroke={p.dark} strokeWidth=".8"/>
-          <circle cx="32" cy="18" r="2.5" fill={p.glow} opacity=".85"/>
-        </g>
-      )}
-      {isCleaver&&(
-        <g transform="rotate(35 31 36)">
-          {/* Double-bladed cleaver — wider, more elaborate */}
-          <path d="M 4 13 L 30 10 L 30 26 L 4 23 Z" fill={p.head} stroke={p.dark} strokeWidth="1.2"/>
-          <path d="M 30 10 L 60 13 L 60 23 L 30 26 Z" fill={p.head} stroke={p.dark} strokeWidth="1.2"/>
-          <path d="M 6 14 L 28 11 L 30 14" stroke={p.hi} strokeWidth="1" fill="none" opacity=".7"/>
-          <path d="M 32 11 L 58 14 L 58 17" stroke={p.hi} strokeWidth="1" fill="none" opacity=".7"/>
-          {/* Twin runes */}
-          <circle cx="18" cy="17" r="1.8" fill={p.glow||p.hi} opacity=".85"/>
-          <circle cx="46" cy="17" r="1.8" fill={p.glow||p.hi} opacity=".85"/>
-        </g>
-      )}
-      {/* Wrap pin where head meets handle */}
-      <circle cx="31" cy="36" r="3.5" fill={p.dark} transform="rotate(35 31 36)"/>
-      <circle cx="31" cy="36" r="2" fill={p.head} transform="rotate(35 31 36)"/>
-    </svg>
+    <img src={`/pickaxes/lv${lv}.webp`} alt={`Pickaxe Lv${lv}`} loading="lazy"
+      width={size} height={size}
+      style={{
+        width:size,height:size,
+        objectFit:"contain",
+        filter:`drop-shadow(0 2px 4px rgba(0,0,0,.6)) drop-shadow(0 0 8px ${glow})`,
+        userSelect:"none",
+        pointerEvents:"none",
+      }}/>
   );
 }
 
@@ -1188,6 +1273,14 @@ export default function MintForge(){
   const [marks,setMarks]=useState(0);
   const [shovelDur,setShovelDur]=useState(40);
   const [hangedManUsed,setHangedManUsed]=useState(false); // resets on each successful coin found
+  // Wheel of Fortune: counts finds since last guaranteed Rare+ trigger.
+  // Resets to 0 after a guaranteed find. Persisted so it survives reloads.
+  const [findStreak,setFindStreak]=useState(0);
+  // Hanged Man: daily reroll usage. Stores ISO date string of last use.
+  const [hangedManDate,setHangedManDate]=useState("");
+  // Hermit: peek at the rarity that *would* roll for the current hunt coin.
+  // Computed via deterministic seed branch so it matches what onDigFound rolls.
+  const [hermitPeek,setHermitPeek]=useState(null);
   const [pickerSlot,setPickerSlot]=useState(null);  // index of cabinet slot being filled, or null
   const marksCounterRef=useRef(null);  // for scrap flyer targeting
   // Per-dig scrap budget. Generated when entering dig phase. Some non-coin cells contain
@@ -1279,6 +1372,8 @@ export default function MintForge(){
       setEquippedTarots(v.equippedTarots||[]);
       setOwnedFrames(v.ownedFrames||[]);
       setOwnedTitles(v.ownedTitles||[]);
+      setFindStreak(typeof v.findStreak==="number"?v.findStreak:0);
+      setHangedManDate(typeof v.hangedManDate==="string"?v.hangedManDate:"");
       setArtefacts(v.artefacts||[]);
       setSchemaWarning(v.schemaWarning||null);
       // reconstruct coins from stored {seed, metalIdx, shiny, locked, id, rarity?}
@@ -1328,8 +1423,8 @@ export default function MintForge(){
   /* ── sync scalar state (debounced) ─────────────────────────────── */
   useDebouncedEffect(()=>{
     if(!loadedFromServer)return;
-    api.tx({state:{xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles}}).catch(()=>{});
-  },[xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles,loadedFromServer],800);
+    api.tx({state:{xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles,findStreak,hangedManDate}}).catch(()=>{});
+  },[xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles,findStreak,hangedManDate,loadedFromServer],800);
 
   /* ── load friends list on auth + when entering social tab ──── */
   useEffect(()=>{
@@ -1400,10 +1495,11 @@ export default function MintForge(){
   const onDig=()=>{
     if(!canDig||phase!=="hunt")return;
     if(shovelDur<=0){setTooDeepMsg("Pickaxe broken — repair it in the Shop.");return;}
-    // ─ Pre-budget the scrap reward for this dig ─
-    // Total budget scales with shovel level + Empress/Wheel of Fortune.
-    const baseBudget=Math.round((24+shovelLevel*8)*(1+buff.marksMul));
-    // Pick 3-5 scrap cells (deterministic per coin seed but excluding the coin cell).
+    // ─ Per-cell scrap budget infrastructure (kept for visual feedback only) ─
+    // Marks income from digging was removed in the economy rebalance — now there's
+    // no payout per cell. The budget structure stays so the scrap-cells set still
+    // exists for the on-cell-dug effect (currently a no-op visually since the
+    // flyer was removed too). Future feature can re-use this hook.
     const r=new RNG(huntCoin.seed^0x5c4ab);
     const coinCellIdx=new RNG(huntCoin.seed^0xd16).int(0,GRID*GRID-1);
     const scrapCells=new Set();
@@ -1412,12 +1508,7 @@ export default function MintForge(){
       const idx=r.int(0,GRID*GRID-1);
       if(idx!==coinCellIdx)scrapCells.add(idx);
     }
-    digBudgetRef.current={
-      total:baseBudget,
-      perCell:Math.round(baseBudget/scrapCellCount),
-      remaining:baseBudget,
-      scrapCells,
-    };
+    digBudgetRef.current={total:0,perCell:0,remaining:0,scrapCells};
     setFoundCoin(huntCoin);setTooDeepMsg(null);setPhase("dig");
   };
 
@@ -1447,33 +1538,39 @@ export default function MintForge(){
     let reason=null;
     if(cnt===1)reason="first";
     else if(cnt===2)reason="lucky";
-    else if(cnt===3&&Math.random()<buff.digSpeed)reason="lucky";
     else if(cnt>=total)reason="damaged";
-    const emperorBonus=Math.random()<buff.tierUp;
 
     // Roll rarity now (shiny gets folded in at brush phase). Player level + dig
-    // condition + emperor are the inputs.
+    // condition are the inputs.
     const rRng=new RNG(foundCoin.seed^0xfa11);
     let rarity=rollRarity(rRng,level,reason,false);
-    if(emperorBonus)rarity=Math.min(MAX_RARITY,rarity+1);
-    // If Emperor pushed it over the line for a fanfare-worthy find, upgrade label
-    if(emperorBonus&&!reason)reason="lucky";
+    // Wheel of Fortune: every Nth find (default N=8) is guaranteed at least Rare.
+    // findStreak counts consecutive finds since last guaranteed trigger.
+    const newStreak=findStreak+1;
+    let streakReset=false;
+    if(buff.guaranteedEvery>0&&newStreak>=buff.guaranteedEvery){
+      const floor=buff.guaranteedFloor||2; // Rare = index 2
+      if(rarity<floor){rarity=floor;}
+      streakReset=true;
+    }
+    setFindStreak(streakReset?0:newStreak);
     if(rarity>=4)reason="first"; // Legendary or Mythic always feels like a first-try moment
 
-    // Bonus scrap = whatever's left of the dig budget + a first-try premium.
-    const remaining=digBudgetRef.current?.remaining||0;
-    const premium=cnt===1?40:cnt<=3?20:0;
-    const scrapEarned=Math.max(premium,remaining+premium);
+    // Skill bonus only — small marks reward for fast digs. No more
+    // "remaining budget" payout. Income now flows almost entirely through
+    // selling/forging coins, not through the dig itself.
+    const skillBonus=cnt===1?20:cnt<=3?8:0;
 
     const showFanfare=rarity>=4||reason==="first";
-    setFoundCoin(p=>p?{...p,rarity,digBonus:reason,digCnt:cnt,scrapEarned}:p);
+    setFoundCoin(p=>p?{...p,rarity,digBonus:reason,digCnt:cnt,scrapEarned:skillBonus}:p);
     if(showFanfare)setShowLucky(true);
 
-    if(scrapEarned>0)setMarks(m=>m+scrapEarned);
+    if(skillBonus>0)setMarks(m=>m+skillBonus);
     if(digBudgetRef.current)digBudgetRef.current.remaining=0;
-    // Probabilistic pickaxe wear — Hierophant tarot's durMul is multiplicative.
-    const wear=Math.random()<buff.durMul?1:0;
-    if(wear)setShovelDur(d=>Math.max(0,d-1));
+    // Pickaxe wear: 1 base, plus integer extra from durPenalty (Magician adds 1).
+    // Old durMul-as-probability removed in tarot rework.
+    const wearAmount=1+Math.round(buff.durPenalty||0);
+    setShovelDur(d=>Math.max(0,d-wearAmount));
     // XP scales with rarity now too — finding a Legendary feels meaningfully better
     const xpBase=80+(cnt===1?40:cnt<=3?15:0);
     const xpRarityBonus=rarity*30; // 0/30/60/90/120/150 by rarity
@@ -1487,44 +1584,42 @@ export default function MintForge(){
   // from budget.remaining so the bonus payout at the end shrinks accordingly.
   const [scrapFlyers,setScrapFlyers]=useState([]);
   const onCellScrap=useCallback((cellIdx,rect)=>{
+    // Per-cell scrap marks were removed in the economy rebalance — hunting now
+    // rewards via coin sales, not via scrap during dig. The visual flyer is
+    // kept for tactile feedback (you uncovered a piece of coin matter), just
+    // without awarding marks. The "remaining" budget is still tracked because
+    // it gets consumed-then-returned as a bonus payout in onDigFound.
     const budget=digBudgetRef.current;
-    if(!budget?.scrapCells?.has?.(cellIdx))return; // not a scrap cell — nothing happens
-    const amount=budget.perCell;
-    if(amount<=0)return;
-    budget.remaining=Math.max(0,budget.remaining-amount);
-    const id=Math.random().toString(36).slice(2);
-    const targetRect=marksCounterRef.current?.getBoundingClientRect();
-    const startX=rect.left+rect.width/2;
-    const startY=rect.top+rect.height/2;
-    const dx=targetRect?(targetRect.left+targetRect.width/2-startX):0;
-    const dy=targetRect?(targetRect.top+targetRect.height/2-startY):-300;
-    setScrapFlyers(f=>[...f,{id,startX,startY,dx,dy,amount}]);
-    setTimeout(()=>setMarks(m=>m+amount),700);
-    setTimeout(()=>setScrapFlyers(f=>f.filter(x=>x.id!==id)),1000);
+    if(!budget?.scrapCells?.has?.(cellIdx))return;
+    // Subtract from the remaining budget so the dig completion bonus reflects
+    // that you "found" some of the budget cell-by-cell — but no marks change.
+    budget.remaining=Math.max(0,budget.remaining-budget.perCell);
   },[]);
   const onTooDeep=(d)=>setTooDeepMsg(`Coin lies at depth ${d} — upgrade your shovel.`);
   // Abandon the current dig — prevents soft-lock when a too-deep coin is
   // unreachable AND the player can't afford to forge. Generates a new hunt
   // coin and returns to the hunt phase. No reward, no penalty.
   const onAbandon=()=>{
-    // Consolation scrap so abandoning isn't a dead loss — soft-lock prevention.
-    // 1 scrap × shovel-level marks each, scaled by Empress/Wheel of Fortune.
-    const consolation=Math.max(1,Math.round((4+shovelLevel*0.5)*(1+buff.marksMul)));
+    // Small consolation so abandoning isn't a dead loss — soft-lock prevention.
+    const consolation=Math.max(1,Math.round(4+shovelLevel*0.5));
     setMarks(m=>m+consolation);
     const tc=SHOVEL_TIER_CAP[Math.min(shovelLevel-1,SHOVEL_TIER_CAP.length-1)];
     const next=mkCoin(newSeed(),level,null,tc);
     setHuntCoin(next);setCoinFrac({x:.1+Math.random()*.8,y:.1+Math.random()*.8});
     setDetFrac({x:.5,y:.5});setFoundCoin(null);setTooDeepMsg(null);setPhase("hunt");
   };
-  // Hanged Man tarot: once per hunt, reroll a too-deep coin without penalty.
-  // Uses one reroll charge that resets when you successfully find a coin.
-  const onReroll=()=>{
-    if(hangedManUsed||buff.rerollDig<=0)return;
-    setHangedManUsed(true);
-    const tc=SHOVEL_TIER_CAP[Math.min(shovelLevel-1,SHOVEL_TIER_CAP.length-1)];
-    const next=mkCoin(newSeed(),level,null,tc);
-    setHuntCoin(next);setCoinFrac({x:.1+Math.random()*.8,y:.1+Math.random()*.8});
-    setDetFrac({x:.5,y:.5});setFoundCoin(null);setTooDeepMsg(null);setPhase("hunt");
+  // Hanged Man tarot: once per day, reroll the rarity of a coin you just found.
+  // Used during the brush phase — the player gets to gamble for a better outcome.
+  // Date-keyed to player's local date string so it resets at midnight in their TZ.
+  const todayDate=()=>new Date().toDateString();
+  const hangedManAvailable=buff.rerollRarity>0&&hangedManDate!==todayDate();
+  const rerollFoundRarity=()=>{
+    if(!hangedManAvailable||!foundCoin)return;
+    setHangedManDate(todayDate());
+    // New rarity roll, fresh RNG, weighted by player level. Doesn't carry digBonus reason
+    // so the player gets a "fair" base roll — the gamble is whether RNG smiles.
+    const newRarity=pickRarity(new RNG(((Date.now()^0x4ace)>>>0)),level);
+    setFoundCoin(p=>p?{...p,rarity:newRarity,rerolled:true}:p);
   };
   const onBrushDone=(isShiny)=>{
     setFoundCoin(p=>{
@@ -1702,7 +1797,9 @@ export default function MintForge(){
     if(inputs.some(c=>c.locked))return{ok:false,error:"Cannot use locked coins"};
     const metal=inputs[0].metalIdx;
     if(!inputs.every(c=>c.metalIdx===metal))return{ok:false,error:"All 5 must be the same metal"};
-    const cost=ARTEFACT_FORGE_COST[metal]||80;
+    const baseCost=ARTEFACT_FORGE_COST[metal]||80;
+    // Tower tarot reduces forge cost by 30% if equipped
+    const cost=Math.max(1,Math.round(baseCost*(1-(buff.forgeDiscount||0))));
     if(marks<cost)return{ok:false,error:`Need ◈${cost.toLocaleString()}`};
     // Average rarity → grade
     const avgRarity=inputs.reduce((s,c)=>s+coinRarity(c),0)/5;
@@ -1723,11 +1820,11 @@ export default function MintForge(){
     return{ok:true,artefact:newArtefact,def,gradeName:ARTEFACT_GRADES[grade].name};
   };
 
-  // Equip / unequip tarot (max 5 active slots)
+  // Equip / unequip tarot (max MAX_EQUIPPED_TAROTS active slots — currently 2)
   const toggleTarot=(cardId)=>{
     setEquippedTarots(prev=>{
       if(prev.includes(cardId))return prev.filter(x=>x!==cardId);
-      if(prev.length>=5)return prev; // full
+      if(prev.length>=MAX_EQUIPPED_TAROTS)return prev; // full
       return [...prev,cardId];
     });
   };
@@ -2338,14 +2435,122 @@ export default function MintForge(){
                 {shovelDur<=0&&<button onClick={()=>{setTab("tavern");setTavernView("repair");}} style={{padding:"11px 22px",borderRadius:11,border:`1px solid ${t.danger}`,cursor:"pointer",background:isDark?"linear-gradient(135deg,#2a0808,#481010)":"linear-gradient(135deg,#fbe8e8,#f0c4c4)",...F,fontWeight:800,fontSize:13,color:t.danger,flexShrink:0,letterSpacing:1.5,textTransform:"uppercase"}}>⚒ Repair Pickaxe</button>}
               </div>
               <div ref={fieldRef} onMouseMove={onFieldInteract} onTouchMove={onFieldInteract} onClick={onFieldInteract}
-                style={{position:"relative",height:280,borderRadius:16,overflow:"hidden",cursor:"crosshair",userSelect:"none",background:isDark?"radial-gradient(ellipse at center,#0e1018 0%,#06070c 100%)":"radial-gradient(ellipse at center,#e8e4d8,#c8c4b8)",border:`1px solid ${t.border}`,backgroundImage:`radial-gradient(circle,${isDark?"rgba(212,160,23,.06)":"rgba(0,0,0,.05)"} 1px,transparent 1px)`,backgroundSize:"24px 24px",touchAction:"none",boxShadow:`inset 0 0 60px rgba(0,0,0,.4)`}}>
-                <div style={{position:"absolute",top:0,height:"100%",width:"3px",background:"linear-gradient(to bottom,transparent,rgba(80,140,255,.18),transparent)",animation:"scanline 8s linear infinite",pointerEvents:"none",left:0}}/>
-                <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at ${detFrac.x*100}% ${detFrac.y*100}%, ${signalColor}22 0%, transparent 30%)`,pointerEvents:"none",transition:"background .15s"}}/>
-                {[0,1,2,3].map(i=>{const visible=signal>(i*.22);return(
-                  <div key={i} style={{position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,width:54+i*28,height:54+i*28,borderRadius:"50%",border:`1.5px solid ${signalColor}`,animation:`ping 1.4s ease-out ${i*.28}s infinite`,opacity:visible?.85:0,transition:"opacity .4s, border-color .4s",pointerEvents:"none"}}/>
-                );})}
-                <div style={{position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,width:canDig?18:11,height:canDig?18:11,borderRadius:"50%",background:canDig?"#50ff90":signalColor,transform:"translate(-50%,-50%)",border:`2px solid ${canDig?"#20c060":"#33445a"}`,boxShadow:canDig?`0 0 16px #50ff90`:signal>.5?`0 0 8px ${signalColor}66`:"none",transition:"all .25s",pointerEvents:"none",animation:canDig?"pulseDot 1.2s ease-in-out infinite":"none",color:canDig?"#50ff90":signalColor}}/>
-                {signal<.04&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}><span style={{...mu,fontSize:13,opacity:.5,fontStyle:"italic",letterSpacing:1}}>Sweep to scan</span></div>}
+                style={{position:"relative",height:300,borderRadius:16,overflow:"hidden",cursor:"crosshair",userSelect:"none",background:isDark?"radial-gradient(ellipse at center,#0c0e16 0%,#04050a 100%)":"radial-gradient(ellipse at center,#d8d4c8,#b8b4a8)",border:`1px solid ${t.border}`,backgroundImage:`radial-gradient(circle,${isDark?"rgba(120,90,40,.07)":"rgba(60,40,20,.07)"} 1px,transparent 1px), radial-gradient(circle at 30% 60%,${isDark?"rgba(80,60,30,.12)":"rgba(60,40,20,.06)"},transparent 60%)`,backgroundSize:"24px 24px, 100% 100%",touchAction:"none",boxShadow:`inset 0 0 80px rgba(0,0,0,.55)`}}>
+
+                {/* Layer 1: fog of war canvas (revealed by sweep, slowly re-fogs) */}
+                <FogCanvas detFrac={detFrac} isDark={isDark} resetKey={huntCoin.seed}/>
+
+                {/* Layer 2: directional pulse from coin's true location.
+                    Always positioned at coinFrac, but opacity scales with signal strength
+                    so it only becomes visible as the player approaches. The visible
+                    *edge* of the pulse acts as a directional cue — players see pulses
+                    appearing from the side of their detector facing the coin. */}
+                {(() => {
+                  const dx=coinFrac.x-detFrac.x;
+                  const dy=coinFrac.y-detFrac.y;
+                  const distNorm=Math.hypot(dx,dy); // 0..~1.4 max diagonal
+                  // Visible only inside ~50% of field range
+                  const proximity=Math.max(0,1-distNorm*2.2);
+                  if(proximity<=0)return null;
+                  // Pulse rate quickens with proximity: slow far, rapid close
+                  const pulseDur=Math.max(0.35,1.4-proximity*1.1);
+                  // Hint color from coin's metal — gives a subtle clue what's there
+                  const m=METALS[huntCoin.metalIdx]||METALS[0];
+                  const pulseColor=m.hl;
+                  return(
+                    <>
+                      {[0,1,2].map(i=>(
+                        <div key={i} style={{
+                          position:"absolute",
+                          left:`${coinFrac.x*100}%`,top:`${coinFrac.y*100}%`,
+                          width:60+i*40,height:60+i*40,
+                          borderRadius:"50%",
+                          border:`2px solid ${pulseColor}`,
+                          transform:"translate(-50%,-50%)",
+                          opacity:proximity*0.55*(1-i*0.18),
+                          animation:`huntPulse ${pulseDur}s ease-out ${i*pulseDur*0.33}s infinite`,
+                          pointerEvents:"none",
+                          boxShadow:`0 0 ${10+i*4}px ${pulseColor}55`,
+                          zIndex:3,
+                        }}/>
+                      ))}
+                      {/* Inner glow at the coin's location, only when very close */}
+                      {proximity>0.55&&(
+                        <div style={{
+                          position:"absolute",
+                          left:`${coinFrac.x*100}%`,top:`${coinFrac.y*100}%`,
+                          width:32,height:32,borderRadius:"50%",
+                          background:`radial-gradient(circle,${pulseColor}88,transparent 70%)`,
+                          transform:"translate(-50%,-50%)",
+                          pointerEvents:"none",
+                          opacity:(proximity-0.55)*2.2,
+                          animation:"huntCoreGlow 1.4s ease-in-out infinite",
+                          zIndex:3,
+                          filter:"blur(4px)",
+                        }}/>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* Layer 3: ambient scanline */}
+                <div style={{position:"absolute",top:0,height:"100%",width:"3px",background:`linear-gradient(to bottom,transparent,${signalColor}33,transparent)`,animation:"scanline 8s linear infinite",pointerEvents:"none",left:0,zIndex:4}}/>
+
+                {/* Layer 4: detector cursor with bump animation when locked */}
+                <div style={{
+                  position:"absolute",
+                  left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,
+                  width:canDig?22:14,height:canDig?22:14,
+                  borderRadius:"50%",
+                  background:canDig?"#50ff90":signalColor,
+                  transform:"translate(-50%,-50%)",
+                  border:`2px solid ${canDig?"#20c060":"#33445a"}`,
+                  boxShadow:canDig?`0 0 22px #50ff90, 0 0 8px #50ff9088`:signal>.5?`0 0 10px ${signalColor}88`:"none",
+                  transition:"all .25s",
+                  pointerEvents:"none",
+                  animation:canDig?"detectorBump .8s ease-in-out infinite":signal>.6?"pulseDot 1.2s ease-in-out infinite":"none",
+                  zIndex:6,
+                }}/>
+
+                {/* Layer 5: sense text — italicized line in the field, drifts in based on signal */}
+                {(() => {
+                  const lvl=senseLevel(signal);
+                  if(!lvl)return(
+                    <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:5}}>
+                      <span style={{...mu,fontSize:13,opacity:.45,fontStyle:"italic",letterSpacing:1.5,color:isDark?"#8a8270":"#5a5040"}}>Sweep the field</span>
+                    </div>
+                  );
+                  // Pick a phrase deterministically from coin seed so it doesn't flicker
+                  const phrases=SENSE_PHRASES[lvl];
+                  const phrase=phrases[huntCoin.seed%phrases.length];
+                  return(
+                    <div style={{position:"absolute",bottom:14,left:0,right:0,textAlign:"center",pointerEvents:"none",zIndex:5,animation:"fadein .4s ease"}}>
+                      <span style={{...mu,fontSize:lvl==="locked"?14:12,opacity:lvl==="locked"?.95:.65,fontStyle:"italic",letterSpacing:1.2,color:lvl==="locked"?"#50ff90":isDark?"#c8b89a":"#5a4830",textShadow:lvl==="locked"?"0 0 10px #50ff9066":"0 1px 2px rgba(0,0,0,.5)"}}>{phrase}</span>
+                    </div>
+                  );
+                })()}
+
+                {/* Layer 6: Hermit reveal — shows the coming coin's rarity tier */}
+                {buff.revealRarity&&(()=>{
+                  // Compute the rarity that *would* roll for this huntCoin (without dig bonuses)
+                  const rRng=new RNG(huntCoin.seed^0xfa11);
+                  const previewRarity=rollRarity(rRng,level,null,false);
+                  const r=RARITIES[previewRarity];
+                  return(
+                    <div style={{position:"absolute",top:10,left:10,padding:"5px 11px",borderRadius:7,background:"rgba(0,0,0,.65)",border:`1px solid ${r.color}88`,backdropFilter:"blur(6px)",zIndex:7,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{...microLabel,fontSize:8,color:isDark?"#8a8270":"#aaa",letterSpacing:1.5}}>Hermit sees</span>
+                      <span style={{...F,fontSize:11,fontWeight:800,color:r.color,letterSpacing:.5,textShadow:`0 0 6px ${r.color}88`}}>{r.name}</span>
+                    </div>
+                  );
+                })()}
+
+                {/* Layer 7: Wheel of Fortune streak counter */}
+                {buff.guaranteedEvery>0&&(
+                  <div style={{position:"absolute",top:10,right:10,padding:"5px 11px",borderRadius:7,background:"rgba(0,0,0,.65)",border:`1px solid ${RARITY_COLOR.epic}88`,backdropFilter:"blur(6px)",zIndex:7,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{...microLabel,fontSize:8,color:isDark?"#8a8270":"#aaa",letterSpacing:1.5}}>Wheel</span>
+                    <span style={{...F,fontSize:11,fontWeight:800,color:RARITY_COLOR.epic,letterSpacing:.5,fontVariantNumeric:"tabular-nums"}}>{findStreak%buff.guaranteedEvery}/{buff.guaranteedEvery}</span>
+                  </div>
+                )}
               </div>
             </>)}
             {phase==="dig"&&foundCoin&&(
@@ -2361,18 +2566,29 @@ export default function MintForge(){
                   <button onClick={onAbandon} style={{padding:"8px 18px",borderRadius:8,border:`1px solid ${t.border}`,background:"transparent",cursor:"pointer",...F,fontSize:11,fontWeight:600,color:t.muted,letterSpacing:2,textTransform:"uppercase",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.color=t.textDim;e.currentTarget.style.borderColor=t.borderHi;}} onMouseLeave={e=>{e.currentTarget.style.color=t.muted;e.currentTarget.style.borderColor=t.border;}}>
                     ← Leave buried
                   </button>
-                  {buff.rerollDig>0&&!hangedManUsed&&tooDeepMsg&&(
-                    <button onClick={onReroll} style={{padding:"8px 18px",borderRadius:8,border:`1px solid ${RARITY_COLOR.epic}`,background:`linear-gradient(135deg,${RARITY_COLOR.epic}22,${RARITY_COLOR.epic}11)`,cursor:"pointer",...F,fontSize:11,fontWeight:700,color:RARITY_COLOR.epic,letterSpacing:2,textTransform:"uppercase",transition:"all .15s",boxShadow:`0 0 12px ${RARITY_COLOR.epic}22`}}>
-                      ✦ Reroll · Hanged Man
-                    </button>
-                  )}
                 </div>
               </div>
             )}
             {phase==="brush"&&foundCoin&&(
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16,animation:"fadein .4s ease"}}>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,animation:"fadein .4s ease"}}>
                 <div style={{...sectionTitle,textAlign:"center"}}>Brush It Off</div>
+                {/* Show what rarity was rolled — the Hanged Man choice is informed */}
+                {(()=>{
+                  const r=RARITIES[coinRarity(foundCoin)]||RARITIES[0];
+                  return(
+                    <div style={{...microLabel,fontSize:10,padding:"6px 13px",background:`${r.color}15`,border:`1px solid ${r.color}66`,borderRadius:6,color:r.color,fontWeight:800,letterSpacing:1.5,boxShadow:`0 0 10px ${r.color}22`,display:"flex",alignItems:"center",gap:6}}>
+                      <span>Rolled · {r.name}</span>
+                      {foundCoin.rerolled&&<span style={{opacity:.7,fontSize:8}}>(rerolled)</span>}
+                    </div>
+                  );
+                })()}
                 <div style={{...microLabel,fontSize:10,padding:"5px 13px",background:t.surfaceHi,border:`1px solid ${t.border}`,borderRadius:6,color:t.textDim}}>🖌️ {brushData.label} · {Math.round(Math.min(0.95,brushData.shinyChance+buff.shinyBonus)*100)}% shiny{buff.shinyBonus>0&&<span style={{color:t.success,marginLeft:4}}>(+{Math.round(buff.shinyBonus*100)}%)</span>}</div>
+                {/* Hanged Man reroll button — only when tarot equipped, not used today, and not already rerolled */}
+                {hangedManAvailable&&!foundCoin.rerolled&&(
+                  <button onClick={rerollFoundRarity} style={{padding:"9px 22px",borderRadius:9,border:`1px solid ${RARITY_COLOR.epic}`,background:`linear-gradient(135deg,${RARITY_COLOR.epic}33,${RARITY_COLOR.epic}11)`,cursor:"pointer",...F,fontSize:11,fontWeight:800,color:RARITY_COLOR.epic,letterSpacing:2,textTransform:"uppercase",transition:"all .15s",boxShadow:`0 0 16px ${RARITY_COLOR.epic}33`}}>
+                    ✦ Hanged Man · Reroll Rarity
+                  </button>
+                )}
                 <BrushReveal coin={foundCoin} brushAlpha={brushData.alpha} shinyChance={Math.min(0.95,brushData.shinyChance+buff.shinyBonus)} onRevealed={onBrushDone} t={t}/>
               </div>
             )}
@@ -2514,7 +2730,9 @@ export default function MintForge(){
                         const m=METALS[metalIdx];
                         const arr=grouped[metalIdx];
                         const def=ARTEFACTS[metalIdx];
-                        const cost=ARTEFACT_FORGE_COST[metalIdx];
+                        const baseCost=ARTEFACT_FORGE_COST[metalIdx];
+                        const cost=Math.max(1,Math.round(baseCost*(1-(buff.forgeDiscount||0))));
+                        const discounted=cost<baseCost;
                         const canAfford=marks>=cost;
                         return(
                           <div key={metalIdx} style={{...card,padding:"14px 16px",border:`1px solid ${m.eng}55`}}>
@@ -2527,7 +2745,7 @@ export default function MintForge(){
                                 </div>
                               </div>
                             </div>
-                            <button onClick={()=>setShrinePicker({metalIdx,available:arr})} disabled={!canAfford} style={{width:"100%",padding:"10px 0",borderRadius:8,border:`1px solid ${canAfford?m.eng:t.border}`,background:canAfford?`linear-gradient(135deg,${m.dark}80,${m.mid}90)`:t.surfaceHi,cursor:canAfford?"pointer":"not-allowed",...F,fontSize:11,fontWeight:800,color:canAfford?m.hl:t.muted,letterSpacing:1.5,textTransform:"uppercase"}}>{canAfford?`Forge · ◈ ${cost.toLocaleString()}`:`Need ◈ ${cost.toLocaleString()}`}</button>
+                            <button onClick={()=>setShrinePicker({metalIdx,available:arr})} disabled={!canAfford} style={{width:"100%",padding:"10px 0",borderRadius:8,border:`1px solid ${canAfford?m.eng:t.border}`,background:canAfford?`linear-gradient(135deg,${m.dark}80,${m.mid}90)`:t.surfaceHi,cursor:canAfford?"pointer":"not-allowed",...F,fontSize:11,fontWeight:800,color:canAfford?m.hl:t.muted,letterSpacing:1.5,textTransform:"uppercase"}}>{canAfford?`Forge · ◈ ${cost.toLocaleString()}${discounted?" ✦":""}`:`Need ◈ ${cost.toLocaleString()}`}</button>
                           </div>
                         );
                       })}
@@ -2622,7 +2840,7 @@ export default function MintForge(){
                         {!owned?(
                           <button onClick={()=>{if(canBuy&&confirm(`Purchase ${card.title} for ◈${card.price}?`))buyTarot(card.id);}} disabled={!canBuy} style={{padding:"7px 0",borderRadius:8,border:`1px solid ${canBuy?t.accent:t.border}`,background:canBuy?`linear-gradient(135deg,${t.accentHi},${t.accent})`:t.surfaceHi,cursor:canBuy?"pointer":"not-allowed",...F,fontSize:11,fontWeight:800,color:canBuy?t.accentInk:t.muted,letterSpacing:1,textTransform:"uppercase",fontVariantNumeric:"tabular-nums"}}>◈ {card.price.toLocaleString()}</button>
                         ):(
-                          <button onClick={()=>toggleTarot(card.id)} disabled={!equipped&&equippedTarots.length>=5} style={{padding:"7px 0",borderRadius:8,border:`1px solid ${equipped?t.success:(equippedTarots.length>=5?t.border:t.borderHi)}`,background:equipped?(isDark?"#0e2810":"#e8f8ee"):t.surfaceHi,cursor:(!equipped&&equippedTarots.length>=5)?"not-allowed":"pointer",...F,fontSize:11,fontWeight:800,color:equipped?t.success:(equippedTarots.length>=5?t.muted:t.textDim),letterSpacing:1,textTransform:"uppercase"}}>{equipped?"✓ Equipped":(equippedTarots.length>=5?"Slots Full":"Equip")}</button>
+                          <button onClick={()=>toggleTarot(card.id)} disabled={!equipped&&equippedTarots.length>=MAX_EQUIPPED_TAROTS} style={{padding:"7px 0",borderRadius:8,border:`1px solid ${equipped?t.success:(equippedTarots.length>=MAX_EQUIPPED_TAROTS?t.border:t.borderHi)}`,background:equipped?(isDark?"#0e2810":"#e8f8ee"):t.surfaceHi,cursor:(!equipped&&equippedTarots.length>=MAX_EQUIPPED_TAROTS)?"not-allowed":"pointer",...F,fontSize:11,fontWeight:800,color:equipped?t.success:(equippedTarots.length>=MAX_EQUIPPED_TAROTS?t.muted:t.textDim),letterSpacing:1,textTransform:"uppercase"}}>{equipped?"✓ Equipped":(equippedTarots.length>=MAX_EQUIPPED_TAROTS?"Slots Full":"Equip")}</button>
                         )}
                       </div>
                     );
@@ -2898,7 +3116,8 @@ export default function MintForge(){
       {shrinePicker&&(()=>{
         const m=METALS[shrinePicker.metalIdx];
         const def=ARTEFACTS[shrinePicker.metalIdx];
-        const cost=ARTEFACT_FORGE_COST[shrinePicker.metalIdx];
+        const baseCost=ARTEFACT_FORGE_COST[shrinePicker.metalIdx];
+        const cost=Math.max(1,Math.round(baseCost*(1-(buff.forgeDiscount||0))));
         const close=()=>{setShrinePicker(null);setShrineSelection([]);};
         // Preview the grade we'd get with current selection
         const inputs=shrineSelection.map(id=>coins.find(c=>c.id===id)).filter(Boolean);
