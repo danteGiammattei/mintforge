@@ -2,8 +2,7 @@ import { json, bad, getAuth } from "../_utils.js";
 
 /* Valid tarot card IDs — kept in lockstep with the client TAROT_CARDS catalog. */
 const VALID_TAROT_IDS = new Set([
-  "magician","high_priestess","empress","emperor","hierophant","lovers",
-  "chariot","strength","hermit","wheel_of_fortune","justice","hanged_man",
+  "magician", "hermit", "hanged_man", "lovers", "wheel_of_fortune", "tower",
 ]);
 /* Premium frame/banner IDs — only premium ones are validated since standard frames
    are XP-gated and never require ownership tracking. */
@@ -49,6 +48,10 @@ export async function onRequestGet({ request, env }) {
   const v3Extras = await tryQuery(env,
     `SELECT owned_frames, owned_titles
        FROM player_state WHERE player_id = ?1`, pid);
+  // v4+ tarot-state columns (find streak for Wheel of Fortune, hanged-man daily-reroll date)
+  const v4Extras = await tryQuery(env,
+    `SELECT find_streak, hanged_man_date
+       FROM player_state WHERE player_id = ?1`, pid);
 
   // Coins. Try with rarity first; fall back to v1 schema if column missing.
   let coins = await tryQueryAll(env,
@@ -84,6 +87,8 @@ export async function onRequestGet({ request, env }) {
     equippedTarots: v2Extras?.equipped_tarots ? JSON.parse(v2Extras.equipped_tarots) : [],
     ownedFrames: v3Extras?.owned_frames ? JSON.parse(v3Extras.owned_frames) : [],
     ownedTitles: v3Extras?.owned_titles ? JSON.parse(v3Extras.owned_titles) : [],
+    findStreak: typeof v4Extras?.find_streak === "number" ? v4Extras.find_streak : 0,
+    hangedManDate: typeof v4Extras?.hanged_man_date === "string" ? v4Extras.hanged_man_date : "",
     artefacts: artefactsRows.map(r => ({
       id: r.id,
       metal: r.metal,
@@ -201,12 +206,14 @@ export async function onRequestPost({ request, env }) {
     const baseFields = []; const baseBinds = [pid];
     const v2Fields = []; const v2Binds = [pid];
     const v3Fields = []; const v3Binds = [pid];
+    const v4Fields = []; const v4Binds = [pid];
     const addBase = (col, value) => { baseBinds.push(value); baseFields.push(`${col} = ?${baseBinds.length}`); };
     const addV2 = (col, value) => { v2Binds.push(value); v2Fields.push(`${col} = ?${v2Binds.length}`); };
     const addV3 = (col, value) => { v3Binds.push(value); v3Fields.push(`${col} = ?${v3Binds.length}`); };
+    const addV4 = (col, value) => { v4Binds.push(value); v4Fields.push(`${col} = ?${v4Binds.length}`); };
 
     if (Number.isFinite(s.xp))           addBase("xp", Math.max(0, s.xp | 0));
-    if (Number.isFinite(s.shovelLevel))  addBase("shovel_level", Math.max(1, Math.min(8, s.shovelLevel | 0)));
+    if (Number.isFinite(s.shovelLevel))  addBase("shovel_level", Math.max(1, Math.min(9, s.shovelLevel | 0)));
     if (Number.isFinite(s.brushLevel))   addBase("brush_level", Math.max(0, Math.min(4, s.brushLevel | 0)));
     if (typeof s.frame === "string")     addBase("frame", String(s.frame).slice(0, 20));
     if (typeof s.bio === "string")       addBase("bio", String(s.bio).slice(0, 120));
@@ -219,7 +226,8 @@ export async function onRequestPost({ request, env }) {
     if (Number.isFinite(s.marks))     addV2("marks", Math.max(0, s.marks | 0));
     if (Number.isFinite(s.shovelDur)) addV2("shovel_dur", Math.max(0, Math.min(800, s.shovelDur | 0)));
     if (Array.isArray(s.equippedTarots)) {
-      const filtered = s.equippedTarots.filter(c => typeof c === "string" && VALID_TAROT_IDS.has(c)).slice(0, 5);
+      // Cap at 2 (cut from 5 in tarot rework). Server enforces too so a hacked client can't equip more.
+      const filtered = s.equippedTarots.filter(c => typeof c === "string" && VALID_TAROT_IDS.has(c)).slice(0, 2);
       addV2("equipped_tarots", JSON.stringify(filtered));
     }
     // v3+ cosmetic ownership lists
@@ -231,6 +239,9 @@ export async function onRequestPost({ request, env }) {
       const filtered = s.ownedTitles.filter(t => typeof t === "string" && VALID_TITLE_IDS.has(t)).slice(0, 20);
       addV3("owned_titles", JSON.stringify(filtered));
     }
+    // v4+ tarot run-state
+    if (Number.isFinite(s.findStreak))     addV4("find_streak", Math.max(0, Math.min(99, s.findStreak | 0)));
+    if (typeof s.hangedManDate === "string") addV4("hanged_man_date", s.hangedManDate.slice(0, 24));
 
     if (baseFields.length) {
       stmts.push(env.DB.prepare(
@@ -246,6 +257,11 @@ export async function onRequestPost({ request, env }) {
       optionalStmts.push(env.DB.prepare(
         `UPDATE player_state SET ${v3Fields.join(", ")} WHERE player_id = ?1`
       ).bind(...v3Binds));
+    }
+    if (v4Fields.length) {
+      optionalStmts.push(env.DB.prepare(
+        `UPDATE player_state SET ${v4Fields.join(", ")} WHERE player_id = ?1`
+      ).bind(...v4Binds));
     }
   }
 
