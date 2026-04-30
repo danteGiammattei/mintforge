@@ -49,9 +49,11 @@ button{-webkit-tap-highlight-color:transparent;}
 @keyframes ping{0%{transform:translate(-50%,-50%) scale(.8);opacity:.85}100%{transform:translate(-50%,-50%) scale(3.6);opacity:0}}
 @keyframes scanline{0%{transform:translateX(-4%)}100%{transform:translateX(104%)}}
 @keyframes pulseDot{0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 12px currentColor}50%{transform:translate(-50%,-50%) scale(1.15);box-shadow:0 0 22px currentColor}}
-@keyframes huntPulse{0%{transform:translate(-50%,-50%) scale(.4);opacity:0.7}80%{opacity:0.15}100%{transform:translate(-50%,-50%) scale(1.4);opacity:0}}
-@keyframes huntCoreGlow{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.85}50%{transform:translate(-50%,-50%) scale(1.3);opacity:1}}
-@keyframes detectorBump{0%,100%{transform:translate(-50%,-50%) scale(1)}40%{transform:translate(-50%,-58%) scale(1.08)}60%{transform:translate(-50%,-46%) scale(1.04)}}
+@keyframes lensRingPulse{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.06);opacity:.9}}
+@keyframes lensGlyphFloat{0%,100%{transform:translate(-50%,-50%) translateY(0)}50%{transform:translate(-50%,-50%) translateY(-2px)}}
+@keyframes lensFoundPulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes senseFadeIn{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes ambientDrift{0%,100%{transform:translateX(0)}50%{transform:translateX(8px)}}
 @keyframes gleam{0%{transform:translateX(-60%);opacity:0}10%{opacity:1}60%{opacity:.9}100%{transform:translateX(140%);opacity:0}}
 @keyframes flashIn{0%{opacity:0;transform:scale(.7) translateY(14px)}55%{transform:scale(1.06) translateY(-3px)}100%{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes rarityFlash{0%,100%{opacity:1}50%{opacity:.35}}
@@ -1015,112 +1017,6 @@ function TarotCard({card,owned=true,equipped=false,onClick,size="md",t}){
    1-2 are simple stone/iron picks, 3-5 are forged-metal picks, 6-8 add
    embellishments (runes, glow, double-headed). Drop-in replacement for the
    "⛏" emoji in the Forge upgrade card. */
-/* ─── HUNT FIELD: FOG REVEAL CANVAS ─────────────────────────────────────
-   Renders a darkening overlay that reveals (becomes transparent) wherever
-   the detector has swept. Pure visual — doesn't affect detection logic.
-
-   Performance: a single requestAnimationFrame loop reads the detector position
-   from a ref (so React doesn't have to re-render at input rate). The canvas
-   only redraws when the position actually moved since last frame. */
-function FogCanvas({detFracRef,active,isDark,resetKey}){
-  const canvasRef=useRef(null);
-  const lastSizeRef=useRef({w:0,h:0});
-  const lastPosRef=useRef({x:-1,y:-1});
-  const lastFogTimeRef=useRef(0);
-  const rafRef=useRef(0);
-
-  // Reset fog whenever a new hunt starts. Also pre-clear at the cursor's
-  // current position so the mechanic is immediately visible — otherwise
-  // the field is just a black square until the player moves.
-  useEffect(()=>{
-    const c=canvasRef.current;if(!c||c.width===0)return;
-    const ctx=c.getContext("2d");
-    ctx.globalCompositeOperation="source-over";
-    ctx.fillStyle=isDark?"rgba(2,4,8,0.55)":"rgba(80,72,60,0.32)";
-    ctx.fillRect(0,0,c.width,c.height);
-    // Carve out a starting clearing at the cursor position
-    const pos=detFracRef.current;
-    const cx=pos.x*c.width,cy=pos.y*c.height;
-    const radius=Math.min(c.width,c.height)*0.18;
-    ctx.globalCompositeOperation="destination-out";
-    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,radius);
-    g.addColorStop(0,"rgba(0,0,0,0.85)");
-    g.addColorStop(0.6,"rgba(0,0,0,0.4)");
-    g.addColorStop(1,"rgba(0,0,0,0)");
-    ctx.fillStyle=g;
-    ctx.beginPath();
-    ctx.arc(cx,cy,radius,0,Math.PI*2);
-    ctx.fill();
-    lastPosRef.current={x:pos.x,y:pos.y};
-  },[resetKey,isDark,detFracRef]);
-
-  // Fit canvas to container on mount + resize
-  useEffect(()=>{
-    const c=canvasRef.current;if(!c||!c.parentElement)return;
-    const fit=()=>{
-      const r=c.parentElement.getBoundingClientRect();
-      const dpr=Math.min(2,window.devicePixelRatio||1);
-      const w=Math.floor(r.width*dpr),h=Math.floor(r.height*dpr);
-      if(w===lastSizeRef.current.w&&h===lastSizeRef.current.h)return;
-      lastSizeRef.current={w,h};
-      c.width=w;c.height=h;
-      c.style.width=r.width+"px";c.style.height=r.height+"px";
-      const ctx=c.getContext("2d");
-      ctx.fillStyle=isDark?"rgba(2,4,8,0.55)":"rgba(80,72,60,0.32)";
-      ctx.fillRect(0,0,w,h);
-    };
-    fit();
-    const ro=new ResizeObserver(fit);ro.observe(c.parentElement);
-    return()=>ro.disconnect();
-  },[isDark]);
-
-  // Single animation loop: only runs while `active`. Reads detFrac from a ref so
-  // mousemove can fire at any rate without causing extra React renders.
-  useEffect(()=>{
-    if(!active)return;
-    let cancelled=false;
-    const tick=(now)=>{
-      if(cancelled)return;
-      const c=canvasRef.current;
-      if(!c){rafRef.current=requestAnimationFrame(tick);return;}
-      const pos=detFracRef.current;
-      const W=c.width,H=c.height;
-      // Only erase if the cursor moved meaningfully (≥0.4% of field width).
-      const dx=Math.abs(pos.x-lastPosRef.current.x);
-      const dy=Math.abs(pos.y-lastPosRef.current.y);
-      if(dx>0.004||dy>0.004){
-        lastPosRef.current={x:pos.x,y:pos.y};
-        const ctx=c.getContext("2d");
-        const cx=pos.x*W,cy=pos.y*H;
-        const radius=Math.min(W,H)*0.12;
-        ctx.save();
-        ctx.globalCompositeOperation="destination-out";
-        const g=ctx.createRadialGradient(cx,cy,0,cx,cy,radius);
-        g.addColorStop(0,"rgba(0,0,0,0.45)");
-        g.addColorStop(0.6,"rgba(0,0,0,0.25)");
-        g.addColorStop(1,"rgba(0,0,0,0)");
-        ctx.fillStyle=g;
-        ctx.beginPath();
-        ctx.arc(cx,cy,radius,0,Math.PI*2);
-        ctx.fill();
-        ctx.restore();
-      }
-      // Slow re-fog every 4 seconds to keep field replenished.
-      if(now-lastFogTimeRef.current>4000){
-        lastFogTimeRef.current=now;
-        const ctx=c.getContext("2d");
-        ctx.globalCompositeOperation="source-over";
-        ctx.fillStyle=isDark?"rgba(2,4,8,0.025)":"rgba(80,72,60,0.025)";
-        ctx.fillRect(0,0,W,H);
-      }
-      rafRef.current=requestAnimationFrame(tick);
-    };
-    rafRef.current=requestAnimationFrame(tick);
-    return()=>{cancelled=true;cancelAnimationFrame(rafRef.current);};
-  },[active,isDark,detFracRef]);
-
-  return<canvas ref={canvasRef} style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:2}}/>;
-}
 
 /* Sense text — single italicized line that drifts in based on signal strength.
    Cycles through phrases for atmosphere. Uses the coin's metal index as a hint. */
@@ -1359,6 +1255,24 @@ export default function MintForge(){
 
   const [huntCoin,setHuntCoin]=useState(()=>mkCoin(newSeed(),1,null,1));
   const [coinFrac,setCoinFrac]=useState(()=>({x:.2+Math.random()*.6,y:.2+Math.random()*.6}));
+  // Mirror refs — read in onFieldInteract (the hot path) without triggering useCallback
+  // re-creation on every state change. Updated in a sync useEffect below.
+  const huntCoinRef=useRef(null);
+  const coinFracRef=useRef({x:.5,y:.5});
+  // Keep refs in sync with state on every render. Cheap.
+  huntCoinRef.current=huntCoin;
+  coinFracRef.current=coinFrac;
+  // Initialize lens DOM transform once the field is mounted and on each new hunt.
+  // Without this, the lens sits at translate3d(0,0,0) until the player moves.
+  useEffect(()=>{
+    if(phase!=="hunt"||!fieldRef.current||!lensRef.current)return;
+    const rect=fieldRef.current.getBoundingClientRect();
+    if(rect.width===0)return;
+    const x=detFracRef.current.x*rect.width;
+    const y=detFracRef.current.y*rect.height;
+    lensRef.current.style.transform=`translate3d(${x}px,${y}px,0)`;
+    if(glyphRef.current)glyphRef.current.style.opacity="0";
+  },[phase,huntCoin.seed]);
   const [detFrac,setDetFrac]=useState({x:.5,y:.5});
   // Always-current detector position — updated synchronously on every input event
   // so the canvas (which animates via requestAnimationFrame) reads the freshest
@@ -1369,6 +1283,15 @@ export default function MintForge(){
   const [phase,setPhase]=useState("hunt");
   const [foundCoin,setFoundCoin]=useState(null);
   const fieldRef=useRef();
+  // Refs to DOM nodes that update on every input event without going through
+  // React. iOS-critical: writing transform/opacity directly to a DOM node
+  // bypasses React's reconciliation entirely. The hot path is just ref reads
+  // and style assignments.
+  const lensRef=useRef();         // outer wrapper — gets transform: translate3d
+  const lensRingRef=useRef();     // ring element — border-color, box-shadow change
+  const lensGlowRef=useRef();     // inner glow ring — appears on signal
+  const lensBeadRef=useRef();     // center bead — color shifts
+  const glyphRef=useRef();        // buried glyph — opacity ramps with proximity
   const [showLucky,setShowLucky]=useState(false);
 
   const [gambMode,setGambMode]=useState("toss");
@@ -1528,21 +1451,89 @@ export default function MintForge(){
   const signal=Math.max(0,1-dist/.55);const canDig=dist<.09;
   const signalColor=signal>.75?"#50e890":signal>.4?"#f0c850":"#7088a8";
 
+  // Direct-write field interaction — iOS-critical perf path.
+  //
+  // Each input event:
+  //  1. Computes cursor position in field-local fraction (0..1).
+  //  2. Writes that to detFracRef (sync — anything reading the ref sees it).
+  //  3. Writes transform/opacity DIRECTLY to lens + glyph DOM nodes via refs.
+  //     React is NOT involved on this hot path. No re-render. No reconciliation.
+  //  4. Coalesces a *single* React state update per animation frame so consumers
+  //     that need to react (signal bar, sense text level) update eventually but
+  //     not at input-event rate.
   const onFieldInteract=useCallback((e)=>{
-    if(!fieldRef.current||phase!=="hunt")return;e.preventDefault();
+    if(!fieldRef.current||phase!=="hunt")return;
+    e.preventDefault();
     const rect=fieldRef.current.getBoundingClientRect();
-    const cx2=e.touches?e.touches[0].clientX:e.clientX;const cy2=e.touches?e.touches[0].clientY:e.clientY;
+    const cx2=e.touches?e.touches[0].clientX:e.clientX;
+    const cy2=e.touches?e.touches[0].clientY:e.clientY;
     const x=Math.max(0,Math.min(1,(cx2-rect.left)/rect.width));
     const y=Math.max(0,Math.min(1,(cy2-rect.top)/rect.height));
-    // Update the ref synchronously so the canvas's RAF loop sees the latest position
     detFracRef.current={x,y};
-    // Throttle React state updates to one per animation frame.
+
+    // ── Direct DOM writes — runs on every input event, no React render ──
+    // Lens cursor position (translate3d for GPU compositing)
+    if(lensRef.current){
+      lensRef.current.style.transform=`translate3d(${x*rect.width}px,${y*rect.height}px,0)`;
+    }
+    // Compute proximity once
+    const dx=coinFracRef.current.x-x;
+    const dy=coinFracRef.current.y-y;
+    const dist=Math.hypot(dx,dy);
+    const proximity=Math.max(0,Math.min(1,1-dist*1.9)); // 0..1, peaks near coin
+    const locked=dist<.09;
+    // Buried glyph opacity ramps in as you approach
+    if(glyphRef.current){
+      glyphRef.current.style.opacity=String(Math.pow(proximity,1.6)*0.85);
+    }
+    // Lens ring color/glow reflects signal strength (locked = green, hot = metal hue)
+    const m=METALS[huntCoinRef.current?.metalIdx??0];
+    if(lensRingRef.current){
+      const r=lensRingRef.current;
+      if(locked){
+        r.style.borderColor="#7cffb0";
+        r.style.boxShadow=`0 0 24px #7cffb088, 0 2px 6px rgba(0,0,0,.5), inset 0 0 0 4px rgba(124,255,176,.15), inset 0 0 0 6px #7cffb066`;
+      }else if(proximity>0.4){
+        const hue=m?.hl||"#d4a060";
+        r.style.borderColor=hue;
+        r.style.boxShadow=`0 0 ${Math.round(8+proximity*16)}px ${hue}66, 0 2px 6px rgba(0,0,0,.5), inset 0 0 0 4px rgba(0,0,0,.15), inset 0 0 0 6px ${hue}55`;
+      }else{
+        r.style.borderColor=isDark?"#a07840":"#5a3818";
+        r.style.boxShadow=`0 2px 6px rgba(0,0,0,.5), inset 0 0 0 4px rgba(0,0,0,.15), inset 0 0 0 6px ${isDark?"#3a2410":"#a08868"}55`;
+      }
+    }
+    // Inner glow ring
+    if(lensGlowRef.current){
+      const g=lensGlowRef.current;
+      if(proximity>0.15){
+        const hue=locked?"#7cffb0":(m?.hl||"#d4a060");
+        g.style.borderColor=`${hue}${Math.round(proximity*255).toString(16).padStart(2,"0")}`;
+        g.style.boxShadow=`inset 0 0 ${Math.round(proximity*16)}px ${hue}66`;
+      }else{
+        g.style.borderColor="transparent";
+        g.style.boxShadow="none";
+      }
+    }
+    // Center bead glows when active
+    if(lensBeadRef.current){
+      const b=lensBeadRef.current;
+      const hue=locked?"#7cffb0":proximity>0.5?(m?.hl||"#d4a060"):isDark?"#a07840":"#5a3818";
+      b.style.background=hue;
+      b.style.boxShadow=proximity>0.5?`0 0 8px ${hue}`:"none";
+    }
+    // Apply lensRingPulse animation on lock — handled by adding/removing className
+    if(lensRingRef.current){
+      if(locked){lensRingRef.current.style.animation="lensRingPulse 1s ease-in-out infinite";}
+      else{lensRingRef.current.style.animation="none";}
+    }
+
+    // ── Throttled React state update — for consumers that need to render ──
     if(detRafRef.current)return;
     detRafRef.current=requestAnimationFrame(()=>{
       detRafRef.current=0;
       setDetFrac(detFracRef.current);
     });
-  },[phase]);
+  },[phase,isDark]);
 
   const onDig=()=>{
     if(!canDig||phase!=="hunt")return;
@@ -2486,122 +2477,157 @@ export default function MintForge(){
                 </button>}
                 {shovelDur<=0&&<button onClick={()=>{setTab("tavern");setTavernView("repair");}} style={{padding:"11px 22px",borderRadius:11,border:`1px solid ${t.danger}`,cursor:"pointer",background:isDark?"linear-gradient(135deg,#2a0808,#481010)":"linear-gradient(135deg,#fbe8e8,#f0c4c4)",...F,fontWeight:800,fontSize:13,color:t.danger,flexShrink:0,letterSpacing:1.5,textTransform:"uppercase"}}>⚒ Repair Pickaxe</button>}
               </div>
+              {/* Hunt field — buried-cross-section design.
+                  iOS-optimized:
+                  - Cursor + glyph positions written DIRECTLY to DOM via refs in
+                    onFieldInteract, bypassing React render entirely on the hot path.
+                  - All animated properties are transform/opacity only (GPU compositor).
+                  - No canvas, no mask-image, no mix-blend-mode, no backdrop-filter,
+                    no filter:drop-shadow on hot-path elements.
+                  - Static SVG patterns for soil texture (browser caches once). */}
               <div ref={fieldRef} onMouseMove={onFieldInteract} onTouchMove={onFieldInteract} onClick={onFieldInteract}
-                style={{position:"relative",height:300,borderRadius:16,overflow:"hidden",cursor:"crosshair",userSelect:"none",background:isDark?"radial-gradient(ellipse at center,#0c0e16 0%,#04050a 100%)":"radial-gradient(ellipse at center,#d8d4c8,#b8b4a8)",border:`1px solid ${t.border}`,backgroundImage:`radial-gradient(circle,${isDark?"rgba(120,90,40,.07)":"rgba(60,40,20,.07)"} 1px,transparent 1px), radial-gradient(circle at 30% 60%,${isDark?"rgba(80,60,30,.12)":"rgba(60,40,20,.06)"},transparent 60%)`,backgroundSize:"24px 24px, 100% 100%",touchAction:"none",boxShadow:`inset 0 0 80px rgba(0,0,0,.55)`}}>
+                style={{
+                  position:"relative",height:300,borderRadius:16,overflow:"hidden",
+                  cursor:"crosshair",userSelect:"none",touchAction:"none",
+                  border:`1px solid ${isDark?"#3a2812":"#a08868"}`,
+                  background:isDark
+                    ? `linear-gradient(180deg,#1a0f06 0%,#241608 18%,#1c1006 32%,#2a1a0a 48%,#1e1208 65%,#160d05 82%,#0e0703 100%)`
+                    : `linear-gradient(180deg,#c8b090 0%,#b8a080 18%,#a89070 32%,#9a8260 48%,#8a7050 65%,#705840 82%,#5a4630 100%)`,
+                  boxShadow:`inset 0 4px 12px rgba(0,0,0,.5), inset 0 -4px 12px rgba(0,0,0,.6)`,
+                  WebkitTapHighlightColor:"transparent",
+                }}>
 
-                {/* Layer 1: fog of war canvas (revealed by sweep, slowly re-fogs).
-                    detFracRef passes the live cursor position; canvas reads it on its
-                    own RAF loop so React doesn't need to re-render at input rate. */}
-                <FogCanvas detFracRef={detFracRef} active={phase==="hunt"} isDark={isDark} resetKey={huntCoin.seed}/>
+                {/* Soil texture — static SVG pattern. Browser paints once and caches. */}
+                <svg width="100%" height="100%" style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,opacity:isDark?.4:.55}}>
+                  <defs>
+                    <pattern id="soilGrain" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+                      <circle cx="4" cy="6" r="0.6" fill={isDark?"#5a3818":"#3a2814"}/>
+                      <circle cx="11" cy="22" r="0.4" fill={isDark?"#704020":"#403018"}/>
+                      <circle cx="22" cy="9" r="0.7" fill={isDark?"#4a2810":"#5a4020"}/>
+                      <circle cx="27" cy="26" r="0.4" fill={isDark?"#604020":"#3e2c18"}/>
+                      <circle cx="16" cy="15" r="0.5" fill={isDark?"#503010":"#4a3418"}/>
+                    </pattern>
+                    <pattern id="soilDots" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+                      <circle cx="2" cy="2" r="0.3" fill={isDark?"#7a4a20":"#2a1c0c"} opacity="0.6"/>
+                      <circle cx="6" cy="5" r="0.2" fill={isDark?"#5a3818":"#3a280f"} opacity="0.4"/>
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#soilGrain)"/>
+                  <rect width="100%" height="100%" fill="url(#soilDots)"/>
+                  <line x1="0" y1="32%" x2="100%" y2="33%" stroke={isDark?"#3a2412":"#5a4020"} strokeWidth="0.5" opacity="0.4"/>
+                  <line x1="0" y1="58%" x2="100%" y2="60%" stroke={isDark?"#2a1a08":"#4a3418"} strokeWidth="0.5" opacity="0.5"/>
+                  <line x1="0" y1="82%" x2="100%" y2="83%" stroke={isDark?"#1a0e04":"#2a1c0c"} strokeWidth="0.5" opacity="0.5"/>
+                </svg>
 
-                {/* Layer 2: directional pulse from coin's true location.
-                    Always positioned at coinFrac, but opacity scales with signal strength
-                    so it only becomes visible as the player approaches. The visible
-                    *edge* of the pulse acts as a directional cue — players see pulses
-                    appearing from the side of their detector facing the coin. */}
-                {(() => {
-                  const dx=coinFrac.x-detFrac.x;
-                  const dy=coinFrac.y-detFrac.y;
-                  const distNorm=Math.hypot(dx,dy); // 0..~1.4 max diagonal
-                  // Visible only inside ~50% of field range
-                  const proximity=Math.max(0,1-distNorm*2.2);
-                  if(proximity<=0)return null;
-                  // Pulse rate quickens with proximity: slow far, rapid close
-                  const pulseDur=Math.max(0.35,1.4-proximity*1.1);
-                  // Hint color from coin's metal — gives a subtle clue what's there
-                  const m=METALS[huntCoin.metalIdx]||METALS[0];
-                  const pulseColor=m.hl;
-                  return(
-                    <>
-                      {[0,1,2].map(i=>(
-                        <div key={i} style={{
-                          position:"absolute",
-                          left:`${coinFrac.x*100}%`,top:`${coinFrac.y*100}%`,
-                          width:60+i*40,height:60+i*40,
-                          borderRadius:"50%",
-                          border:`2px solid ${pulseColor}`,
-                          transform:"translate(-50%,-50%)",
-                          opacity:proximity*0.55*(1-i*0.18),
-                          animation:`huntPulse ${pulseDur}s ease-out ${i*pulseDur*0.33}s infinite`,
-                          pointerEvents:"none",
-                          boxShadow:`0 0 ${10+i*4}px ${pulseColor}55`,
-                          zIndex:3,
-                        }}/>
-                      ))}
-                      {/* Inner glow at the coin's location, only when very close */}
-                      {proximity>0.55&&(
-                        <div style={{
-                          position:"absolute",
-                          left:`${coinFrac.x*100}%`,top:`${coinFrac.y*100}%`,
-                          width:32,height:32,borderRadius:"50%",
-                          background:`radial-gradient(circle,${pulseColor}88,transparent 70%)`,
-                          transform:"translate(-50%,-50%)",
-                          pointerEvents:"none",
-                          opacity:(proximity-0.55)*2.2,
-                          animation:"huntCoreGlow 1.4s ease-in-out infinite",
-                          zIndex:3,
-                          filter:"blur(4px)",
-                        }}/>
-                      )}
-                    </>
-                  );
-                })()}
+                {/* Drifting ambient particles — pure CSS animation on a single element */}
+                <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,animation:"ambientDrift 18s ease-in-out infinite",opacity:.5}}>
+                  <div style={{position:"absolute",left:"15%",top:"22%",width:2,height:2,borderRadius:"50%",background:isDark?"#a07840":"#5a3818"}}/>
+                  <div style={{position:"absolute",left:"68%",top:"18%",width:1.5,height:1.5,borderRadius:"50%",background:isDark?"#806030":"#4a2814"}}/>
+                  <div style={{position:"absolute",left:"42%",top:"71%",width:2,height:2,borderRadius:"50%",background:isDark?"#a07840":"#3a2814"}}/>
+                  <div style={{position:"absolute",left:"82%",top:"55%",width:1.5,height:1.5,borderRadius:"50%",background:isDark?"#906838":"#503018"}}/>
+                  <div style={{position:"absolute",left:"24%",top:"48%",width:1.2,height:1.2,borderRadius:"50%",background:isDark?"#704830":"#3a2010"}}/>
+                </div>
 
-                {/* Layer 3: ambient scanline */}
-                <div style={{position:"absolute",top:0,height:"100%",width:"3px",background:`linear-gradient(to bottom,transparent,${signalColor}33,transparent)`,animation:"scanline 8s linear infinite",pointerEvents:"none",left:0,zIndex:4}}/>
-
-                {/* Layer 4: detector cursor with bump animation when locked */}
-                <div style={{
+                {/* Buried glyph — at coin's position. Opacity controlled via ref by
+                    onFieldInteract directly so React doesn't re-render on movement. */}
+                <div ref={glyphRef} style={{
                   position:"absolute",
-                  left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,
-                  width:canDig?22:14,height:canDig?22:14,
-                  borderRadius:"50%",
-                  background:canDig?"#50ff90":signalColor,
-                  transform:"translate(-50%,-50%)",
-                  border:`2px solid ${canDig?"#20c060":"#33445a"}`,
-                  boxShadow:canDig?`0 0 22px #50ff90, 0 0 8px #50ff9088`:signal>.5?`0 0 10px ${signalColor}88`:"none",
-                  transition:"all .25s",
-                  pointerEvents:"none",
-                  animation:canDig?"detectorBump .8s ease-in-out infinite":signal>.6?"pulseDot 1.2s ease-in-out infinite":"none",
-                  zIndex:6,
-                }}/>
+                  left:`${coinFrac.x*100}%`,top:`${coinFrac.y*100}%`,
+                  transform:"translate3d(-50%,-50%,0)",
+                  pointerEvents:"none",zIndex:3,
+                  opacity:0,
+                  willChange:"opacity",
+                }}>
+                  <span style={{
+                    fontFamily:"\'Fraunces\',serif",
+                    fontSize:42,fontWeight:700,lineHeight:1,
+                    color:METALS[huntCoin.metalIdx]?.hl||"#d4a060",
+                    textShadow:`0 0 14px ${METALS[huntCoin.metalIdx]?.hl||"#d4a060"}, 0 0 28px ${METALS[huntCoin.metalIdx]?.hl||"#d4a060"}99`,
+                    display:"block",
+                    animation:"lensGlyphFloat 2.4s ease-in-out infinite",
+                  }}>{["☉","⊙","☽","◉","✥","◈","✶","⌬","❋"][huntCoin.metalIdx]||"☉"}</span>
+                </div>
 
-                {/* Layer 5: sense text — italicized line in the field, drifts in based on signal */}
-                {(() => {
-                  const lvl=senseLevel(signal);
-                  if(!lvl)return(
-                    <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:5}}>
-                      <span style={{...mu,fontSize:13,opacity:.45,fontStyle:"italic",letterSpacing:1.5,color:isDark?"#8a8270":"#5a5040"}}>Sweep the field</span>
-                    </div>
-                  );
-                  // Pick a phrase deterministically from coin seed so it doesn't flicker
-                  const phrases=SENSE_PHRASES[lvl];
-                  const phrase=phrases[huntCoin.seed%phrases.length];
-                  return(
-                    <div style={{position:"absolute",bottom:14,left:0,right:0,textAlign:"center",pointerEvents:"none",zIndex:5,animation:"fadein .4s ease"}}>
-                      <span style={{...mu,fontSize:lvl==="locked"?14:12,opacity:lvl==="locked"?.95:.65,fontStyle:"italic",letterSpacing:1.2,color:lvl==="locked"?"#50ff90":isDark?"#c8b89a":"#5a4830",textShadow:lvl==="locked"?"0 0 10px #50ff9066":"0 1px 2px rgba(0,0,0,.5)"}}>{phrase}</span>
-                    </div>
-                  );
-                })()}
+                {/* The lens cursor — position written DIRECTLY via ref by
+                    onFieldInteract, bypassing React. iOS-friendly hot path. */}
+                <div ref={lensRef} style={{
+                  position:"absolute",
+                  left:0,top:0,
+                  transform:"translate3d(0,0,0)",
+                  pointerEvents:"none",zIndex:5,
+                  willChange:"transform",
+                }}>
+                  <div ref={lensRingRef} style={{
+                    width:78,height:78,borderRadius:"50%",
+                    border:`2px solid ${isDark?"#a07840":"#5a3818"}`,
+                    boxSizing:"border-box",
+                    boxShadow:`0 2px 6px rgba(0,0,0,.5), inset 0 0 0 4px rgba(0,0,0,.15), inset 0 0 0 6px ${isDark?"#3a2410":"#a08868"}55`,
+                    transform:"translate(-50%,-50%)",
+                    background:isDark
+                      ? `radial-gradient(circle at 35% 35%,#3a2818,#1a0f06 70%)`
+                      : `radial-gradient(circle at 35% 35%,#d8c0a0,#806848 75%)`,
+                    transition:"border-color .25s, box-shadow .25s",
+                  }}>
+                    <div ref={lensGlowRef} style={{
+                      position:"absolute",inset:4,borderRadius:"50%",
+                      border:"2px solid transparent",
+                      pointerEvents:"none",
+                      transition:"border-color .2s, box-shadow .2s",
+                      boxSizing:"border-box",
+                    }}/>
+                    <div style={{position:"absolute",left:"50%",top:8,bottom:8,width:1,background:isDark?"rgba(160,120,64,.3)":"rgba(58,40,20,.3)",transform:"translateX(-50%)",pointerEvents:"none"}}/>
+                    <div style={{position:"absolute",top:"50%",left:8,right:8,height:1,background:isDark?"rgba(160,120,64,.3)":"rgba(58,40,20,.3)",transform:"translateY(-50%)",pointerEvents:"none"}}/>
+                    <div ref={lensBeadRef} style={{
+                      position:"absolute",left:"50%",top:"50%",
+                      transform:"translate(-50%,-50%)",
+                      width:6,height:6,borderRadius:"50%",
+                      background:isDark?"#a07840":"#5a3818",
+                      transition:"background .2s, box-shadow .2s",
+                    }}/>
+                  </div>
+                </div>
 
-                {/* Layer 6: Hermit reveal — shows the coming coin's rarity tier */}
+                {/* Sense text — re-renders only when level changes (via key prop) */}
+                <div style={{position:"absolute",bottom:14,left:0,right:0,textAlign:"center",pointerEvents:"none",zIndex:6}}>
+                  {(() => {
+                    const lvl=senseLevel(signal);
+                    if(!lvl)return(
+                      <span style={{...mu,fontSize:13,opacity:.4,fontStyle:"italic",letterSpacing:1.5,color:isDark?"#8a7250":"#3a2814"}}>Sweep the field</span>
+                    );
+                    const phrases=SENSE_PHRASES[lvl];
+                    const phrase=phrases[huntCoin.seed%phrases.length];
+                    return(
+                      <span key={lvl} style={{
+                        ...mu,
+                        fontSize:lvl==="locked"?14:12,
+                        opacity:lvl==="locked"?.95:.7,
+                        fontStyle:"italic",
+                        letterSpacing:1.2,
+                        color:lvl==="locked"?(isDark?"#7cffb0":"#207040"):(isDark?"#c8b89a":"#3a2814"),
+                        display:"inline-block",
+                        animation:"senseFadeIn .4s ease-out",
+                      }}>{phrase}</span>
+                    );
+                  })()}
+                </div>
+
+                {/* Hermit reveal badge — solid background (no backdrop-filter for iOS) */}
                 {buff.revealRarity&&(()=>{
-                  // Compute the rarity that *would* roll for this huntCoin (without dig bonuses)
                   const rRng=new RNG(huntCoin.seed^0xfa11);
                   const previewRarity=rollRarity(rRng,level,null,false);
                   const r=RARITIES[previewRarity];
                   return(
-                    <div style={{position:"absolute",top:10,left:10,padding:"5px 11px",borderRadius:7,background:"rgba(0,0,0,.65)",border:`1px solid ${r.color}88`,backdropFilter:"blur(6px)",zIndex:7,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
-                      <span style={{...microLabel,fontSize:8,color:isDark?"#8a8270":"#aaa",letterSpacing:1.5}}>Hermit sees</span>
-                      <span style={{...F,fontSize:11,fontWeight:800,color:r.color,letterSpacing:.5,textShadow:`0 0 6px ${r.color}88`}}>{r.name}</span>
+                    <div style={{position:"absolute",top:10,left:10,padding:"5px 11px",borderRadius:7,background:isDark?"rgba(20,12,4,.92)":"rgba(255,248,232,.92)",border:`1px solid ${r.color}88`,zIndex:7,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
+                      <span style={{...microLabel,fontSize:8,color:isDark?"#8a7250":"#5a4020",letterSpacing:1.5}}>Hermit sees</span>
+                      <span style={{...F,fontSize:11,fontWeight:800,color:r.color,letterSpacing:.5}}>{r.name}</span>
                     </div>
                   );
                 })()}
 
-                {/* Layer 7: Wheel of Fortune streak counter */}
+                {/* Wheel of Fortune streak — solid background */}
                 {buff.guaranteedEvery>0&&(
-                  <div style={{position:"absolute",top:10,right:10,padding:"5px 11px",borderRadius:7,background:"rgba(0,0,0,.65)",border:`1px solid ${RARITY_COLOR.epic}88`,backdropFilter:"blur(6px)",zIndex:7,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
-                    <span style={{...microLabel,fontSize:8,color:isDark?"#8a8270":"#aaa",letterSpacing:1.5}}>Wheel</span>
+                  <div style={{position:"absolute",top:10,right:10,padding:"5px 11px",borderRadius:7,background:isDark?"rgba(20,12,4,.92)":"rgba(255,248,232,.92)",border:`1px solid ${RARITY_COLOR.epic}88`,zIndex:7,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{...microLabel,fontSize:8,color:isDark?"#8a7250":"#5a4020",letterSpacing:1.5}}>Wheel</span>
                     <span style={{...F,fontSize:11,fontWeight:800,color:RARITY_COLOR.epic,letterSpacing:.5,fontVariantNumeric:"tabular-nums"}}>{findStreak%buff.guaranteedEvery}/{buff.guaranteedEvery}</span>
                   </div>
                 )}
