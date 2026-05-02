@@ -1,8 +1,14 @@
 import { json, bad, getAuth } from "../_utils.js";
 
-/* Valid tarot card IDs — kept in lockstep with the client TAROT_CARDS catalog. */
+/* Valid tarot card IDs — kept in lockstep with the client TAROT_CARDS catalog.
+   Three tiers: 3 common, 3 rare, 3 legendary. */
 const VALID_TAROT_IDS = new Set([
-  "magician", "hermit", "hanged_man", "lovers", "wheel_of_fortune", "tower",
+  // common
+  "magician", "lovers", "empress",
+  // rare
+  "hermit", "wheel_of_fortune", "chariot",
+  // legendary
+  "tower", "hanged_man", "sun",
 ]);
 /* Premium frame/banner IDs — only premium ones are validated since standard frames
    are XP-gated and never require ownership tracking. */
