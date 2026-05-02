@@ -43,26 +43,59 @@ button{-webkit-tap-highlight-color:transparent;}
 ::-webkit-scrollbar-thumb:hover{background:rgba(212,160,23,.32)}
 ::selection{background:rgba(212,160,23,.3);color:#fff}
 
+/* ── Core entrance animations ── */
 @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeinSlow{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUpSpring{0%{opacity:0;transform:translateY(60px) scale(.94)}65%{opacity:1;transform:translateY(-6px) scale(1.01)}82%{transform:translateY(3px) scale(.995)}100%{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes flipReveal{0%{transform:scale(0.4) rotateY(180deg);opacity:0}60%{transform:scale(1.15) rotateY(0deg);opacity:1}100%{transform:scale(1) rotateY(0deg);opacity:1}}
 @keyframes scaleIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
-@keyframes ping{0%{transform:translate(-50%,-50%) scale(.8);opacity:.85}100%{transform:translate(-50%,-50%) scale(3.6);opacity:0}}
-@keyframes scanline{0%{transform:translateX(-4%)}100%{transform:translateX(104%)}}
-@keyframes pulseDot{0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 12px currentColor}50%{transform:translate(-50%,-50%) scale(1.15);box-shadow:0 0 22px currentColor}}
+@keyframes scaleInSpring{0%{opacity:0;transform:scale(0.5)}60%{opacity:1;transform:scale(1.08)}80%{transform:scale(0.97)}100%{opacity:1;transform:scale(1)}}
+
+/* ── Signal / detection rings — slow, breath-like, not arcade ── */
+@keyframes ping{0%{transform:translate(-50%,-50%) scale(.8);opacity:.7}100%{transform:translate(-50%,-50%) scale(3.2);opacity:0}}
+@keyframes runeRipple{0%{transform:translate(-50%,-50%) scale(0.5);opacity:.65}100%{transform:translate(-50%,-50%) scale(3.0);opacity:0}}
+@keyframes mistDrift{0%{transform:translateX(-8%) translateY(0);opacity:0}15%{opacity:.45}85%{opacity:.3}100%{transform:translateX(108%) translateY(-4%);opacity:0}}
+@keyframes pulseDot{0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 8px currentColor,0 0 0 0 currentColor}50%{transform:translate(-50%,-50%) scale(1.12);box-shadow:0 0 14px currentColor,0 0 18px currentColor}}
+@keyframes breathe{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:.9;transform:scale(1.04)}}
+@keyframes runeGlow{0%,100%{opacity:.18;text-shadow:none}50%{opacity:.42;text-shadow:0 0 8px currentColor}}
+
+/* ── Coin / brush ── */
 @keyframes gleam{0%{transform:translateX(-60%);opacity:0}10%{opacity:1}60%{opacity:.9}100%{transform:translateX(140%);opacity:0}}
+@keyframes gleamSlow{0%{transform:translateX(-80%) skewX(-8deg);opacity:0}12%{opacity:.75}88%{opacity:.65}100%{transform:translateX(180%) skewX(-8deg);opacity:0}}
+@keyframes coinEmerge{0%{filter:brightness(.2) saturate(0)}60%{filter:brightness(.8) saturate(.7)}100%{filter:brightness(1) saturate(1)}}
+@keyframes revealRing{0%{transform:translate(-50%,-50%) scale(.5);opacity:.7;border-width:2px}100%{transform:translate(-50%,-50%) scale(2.2);opacity:0;border-width:1px}}
 @keyframes flashIn{0%{opacity:0;transform:scale(.7) translateY(14px)}55%{transform:scale(1.06) translateY(-3px)}100%{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes rarityFlash{0%,100%{opacity:1}50%{opacity:.35}}
 @keyframes subtlePulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── Rarity rays — slow emanating ── */
+@keyframes rayPulse{0%,100%{opacity:.18}50%{opacity:.6}}
+
+/* ── Dig pit ── */
 @keyframes digPop{0%{transform:scale(1)}40%{transform:scale(.84) translateY(5px)}100%{transform:scale(1)}}
+@keyframes cellImpact{0%{transform:scale(1)}20%{transform:scale(.88) translateY(4px)}55%{transform:scale(1.02) translateY(-1px)}100%{transform:scale(1)}}
 @keyframes cellReveal{0%{opacity:0;transform:scale(.5)}65%{transform:scale(1.12)}100%{opacity:1;transform:scale(1)}}
-@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}60%{transform:translateX(6px)}}
+@keyframes dirtPuff{0%{opacity:.8;transform:translate(-50%,-50%) scale(0)}70%{opacity:.4}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1) rotate(var(--dr))}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}60%{transform:translateX(5px)}}
+@keyframes shakeHard{0%,100%{transform:translate(0,0)}20%{transform:translate(-6px,1px)}45%{transform:translate(6px,-2px)}65%{transform:translate(-4px,1px)}85%{transform:translate(3px,0)}}
 @keyframes winPop{0%{transform:scale(0) rotate(-15deg)}65%{transform:scale(1.18) rotate(4deg)}100%{transform:scale(1) rotate(0)}}
-@keyframes shinyAuraGlow{0%,100%{box-shadow:0 0 0 1.5px #f0c850,0 0 14px 2px rgba(240,200,80,.45),inset 0 0 10px rgba(240,200,80,.15)}50%{box-shadow:0 0 0 1.5px #ffd870,0 0 22px 3px rgba(255,216,112,.65),inset 0 0 14px rgba(255,216,112,.22)}}
-@keyframes ambientFloat1{0%,100%{transform:translate(0,0);opacity:.0}25%{opacity:.9}50%{transform:translate(10px,-12px);opacity:.5}75%{opacity:.9}}
-@keyframes ambientFloat2{0%,100%{transform:translate(0,0);opacity:.0}30%{opacity:.7}50%{transform:translate(-8px,-10px);opacity:.4}70%{opacity:.7}}
-@keyframes ambientFloat3{0%,100%{transform:translate(0,0);opacity:.0}35%{opacity:.85}50%{transform:translate(6px,-14px);opacity:.45}65%{opacity:.85}}
+@keyframes pickSwing{0%{transform:translate(-50%,-90%) rotate(-55deg) scale(.9);opacity:.95}45%{transform:translate(-50%,-90%) rotate(20deg) scale(1.18);opacity:1}100%{transform:translate(-50%,-90%) rotate(0deg) scale(.7);opacity:0}}
+@keyframes pickSwingCell{0%{transform:rotate(-50deg) scale(.8);opacity:.9}45%{transform:rotate(15deg) scale(1.25);opacity:1}100%{transform:rotate(0) scale(.6);opacity:0}}
+
+/* ── Shiny — warm metal, no rainbow ── */
+@keyframes shinyAuraGlow{
+  0%,100%{box-shadow:0 0 0 1.5px #f0c850,0 0 14px 2px rgba(240,200,80,.4),inset 0 0 10px rgba(240,200,80,.12)}
+  50%{box-shadow:0 0 0 2px #e8b840,0 0 24px 4px rgba(220,180,60,.55),inset 0 0 14px rgba(220,180,60,.18)}}
+@keyframes shinyWarmSweep{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes shinyBloom{0%{opacity:0;transform:scale(.7)}40%{opacity:.9}100%{opacity:1;transform:scale(1)}}
+@keyframes shinyText{0%,100%{color:#f0c850;text-shadow:0 0 8px rgba(240,200,80,.4)}50%{color:#e8b840;text-shadow:0 0 12px rgba(220,180,60,.6)}}
+@keyframes shinyRotate{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+/* ── Ambient particles ── */
+@keyframes ambientFloat1{0%,100%{transform:translate(0,0);opacity:0}25%{opacity:.9}50%{transform:translate(10px,-12px);opacity:.5}75%{opacity:.9}}
+@keyframes ambientFloat2{0%,100%{transform:translate(0,0);opacity:0}30%{opacity:.7}50%{transform:translate(-8px,-10px);opacity:.4}70%{opacity:.7}}
+@keyframes ambientFloat3{0%,100%{transform:translate(0,0);opacity:0}35%{opacity:.85}50%{transform:translate(6px,-14px);opacity:.45}65%{opacity:.85}}
 .ambient-particles{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:2;}
 .ambient-particles>span{position:absolute;width:3px;height:3px;border-radius:50%;display:block;}
 .ambient-particles.eldritch>span{background:#80ffb0;box-shadow:0 0 6px #80ffb0,0 0 10px #5af090aa;}
@@ -70,71 +103,81 @@ button{-webkit-tap-highlight-color:transparent;}
 .ambient-particles>span:nth-child(1){left:18%;top:75%;animation:ambientFloat1 4s ease-in-out infinite;}
 .ambient-particles>span:nth-child(2){left:78%;top:65%;animation:ambientFloat2 5s ease-in-out infinite .8s;}
 .ambient-particles>span:nth-child(3){left:50%;top:82%;animation:ambientFloat3 4.5s ease-in-out infinite 1.6s;}
+
+/* ── Title effects ── */
 @keyframes titleShimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 @keyframes titleVoidPulse{0%,100%{text-shadow:0 0 6px rgba(160,80,232,.6),0 0 12px rgba(160,80,232,.3)}50%{text-shadow:0 0 10px rgba(200,120,255,.9),0 0 20px rgba(160,80,232,.6),0 0 28px rgba(120,40,200,.4)}}
 @keyframes titleAstralGlow{0%,100%{filter:hue-rotate(0deg) brightness(1)}33%{filter:hue-rotate(15deg) brightness(1.15)}66%{filter:hue-rotate(-10deg) brightness(1.05)}}
 .title-shimmer{background:linear-gradient(90deg,#d4a017 0%,#fff8a0 50%,#d4a017 100%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:titleShimmer 3s ease-in-out infinite;font-weight:800;}
 .title-void{color:#c890ff;animation:titleVoidPulse 2.4s ease-in-out infinite;font-weight:800;}
 .title-astral{background:linear-gradient(90deg,#fff8a0,#ffd060,#a8d8ff,#c890ff,#fff8a0);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:titleShimmer 4s linear infinite, titleAstralGlow 5s ease-in-out infinite;font-weight:800;}
+
+/* ── Scrap / marks ── */
 @keyframes scrapFly{0%{transform:translate(0,0) scale(0.4) rotate(0deg);opacity:0}10%{transform:translate(0,-22px) scale(1.5) rotate(40deg);opacity:1}45%{transform:translate(calc(var(--dx)*.4),calc(var(--dy)*.3 - 30px)) scale(1.15) rotate(180deg);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(0.6) rotate(720deg);opacity:0}}
 @keyframes scrapText{0%{opacity:0;transform:translate(-50%,0) scale(.7)}15%{opacity:1;transform:translate(-50%,-12px) scale(1.1)}65%{opacity:1;transform:translate(-50%,-30px) scale(1)}100%{opacity:0;transform:translate(-50%,-50px) scale(.85)}}
 @keyframes marksPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.18);text-shadow:0 0 12px currentColor}}
-@keyframes shinyText{0%,100%{color:#f0c850;text-shadow:0 0 8px rgba(240,200,80,.4)}50%{color:#ffd870;text-shadow:0 0 14px rgba(240,200,80,.8)}}
-@keyframes shinyRotate{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes particleFly{0%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(.4)}}
-@keyframes luckySlam{0%{opacity:0;transform:translateY(-44px) scale(.55)}50%{transform:translateY(5px) scale(1.1)}70%{transform:translateY(-3px) scale(.96)}100%{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes flicker{0%,100%{opacity:1}45%{opacity:.84}55%{opacity:1}}
-@keyframes pickSwing{0%{transform:translate(-50%,-90%) rotate(-55deg) scale(.9);opacity:.95}45%{transform:translate(-50%,-90%) rotate(20deg) scale(1.18);opacity:1}100%{transform:translate(-50%,-90%) rotate(0deg) scale(.7);opacity:0}}
-@keyframes pickSwingCell{0%{transform:rotate(-50deg) scale(.8);opacity:.9}45%{transform:rotate(15deg) scale(1.25);opacity:1}100%{transform:rotate(0) scale(.6);opacity:0}}
-.shiny-card{position:relative;}
-.shiny-aura{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;animation:shinyAuraGlow 2.4s linear infinite;}
-.shiny-card>*:not(.shiny-aura){position:relative;z-index:1;}
-
-/* ── Design handoff: motion polish ──────────────────────────────────── */
-/* Spring entrances — for first-mounts (modals, banners, fanfares). Used sparingly. */
-@keyframes slideUpSpring{0%{opacity:0;transform:translateY(60px) scale(.94)}65%{opacity:1;transform:translateY(-6px) scale(1.01)}82%{transform:translateY(3px) scale(.995)}100%{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes scaleInSpring{0%{opacity:0;transform:scale(0.5)}60%{opacity:1;transform:scale(1.08)}80%{transform:scale(0.97)}100%{opacity:1;transform:scale(1)}}
-@keyframes flashInBig{0%{opacity:0;transform:scale(.55) translateY(24px)}50%{transform:scale(1.12) translateY(-6px)}72%{transform:scale(.97) translateY(2px)}100%{opacity:1;transform:scale(1) translateY(0)}}
-
-/* Hunt screen — proximity-driven ping */
-@keyframes pingRing{0%{transform:translate(-50%,-50%) scale(0.6);opacity:.9}100%{transform:translate(-50%,-50%) scale(4.2);opacity:0}}
-@keyframes breathe{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.035)}}
-
-/* Dig pit — feedback motion */
-@keyframes cellImpact{0%{transform:scale(1)}18%{transform:scale(.82) translateY(6px)}50%{transform:scale(1.04) translateY(-2px)}100%{transform:scale(1) translateY(0)}}
-@keyframes dirtPuff{0%{opacity:1;transform:translate(-50%,-50%) scale(0) rotate(0deg)}60%{opacity:.7}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1) rotate(var(--dr))}}
-@keyframes shakeHard{0%,100%{transform:translate(0,0)}15%{transform:translate(-8px,2px)}30%{transform:translate(8px,-2px)}50%{transform:translate(-5px,3px)}70%{transform:translate(6px,-1px)}85%{transform:translate(-3px,1px)}}
-
-/* Marks counter — tick + flash */
 @keyframes marksFlash{0%{color:inherit}20%{color:#ffe878;text-shadow:0 0 10px rgba(255,232,120,.9)}100%{color:inherit;text-shadow:none}}
 
-/* Lucky fanfare — bigger entrance */
-@keyframes luckySlamBig{0%{opacity:0;transform:translateY(-80px) scale(.35)}45%{opacity:1;transform:translateY(8px) scale(1.18)}65%{transform:translateY(-4px) scale(.97)}80%{transform:translateY(2px) scale(1.01)}100%{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes luckyFlash{0%{opacity:0}8%{opacity:.35}25%{opacity:0}100%{opacity:0}}
-@keyframes luckySubtitle{0%{opacity:0;transform:translateY(10px) scale(.9)}60%{opacity:1;transform:translateY(-2px) scale(1.02)}100%{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes luckyRing{0%{transform:translate(-50%,-50%) scale(0);opacity:.8}100%{transform:translate(-50%,-50%) scale(3.5);opacity:0}}
+/* ── Particles — used for lucky only, not shiny ── */
+@keyframes particleFly{0%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(.3)}}
+@keyframes particleSpin{0%{opacity:1;transform:translate(0,0) rotate(0deg) scale(1)}30%{opacity:1}100%{opacity:0;transform:translate(var(--tx),var(--ty)) rotate(var(--r)) scale(0)}}
 
-/* Nav button feedback */
-@keyframes navPop{0%{transform:scale(1)}40%{transform:scale(1.28)}70%{transform:scale(.92)}100%{transform:scale(1)}}
-@keyframes navBarSlide{from{transform:translateX(-50%) scaleX(.4);opacity:0}to{transform:translateX(-50%) scaleX(1);opacity:1}}
+/* ── Lucky fanfare — calm gold unfurl, no slam ── */
+@keyframes luckyUnfurl{0%{opacity:0;transform:scale(.85);filter:blur(6px)}50%{opacity:1;filter:blur(0)}100%{opacity:1;transform:scale(1);filter:blur(0)}}
+@keyframes luckySubtitle{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes luckyRingExpand{0%{transform:translate(-50%,-50%) scale(0.3);opacity:.6}100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}
+/* Keep luckySlamBig as alias for existing usage */
+@keyframes luckySlamBig{0%{opacity:0;transform:scale(.85);filter:blur(4px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;transform:scale(1)}}
+@keyframes luckyFlash{0%{opacity:0}8%{opacity:.15}25%{opacity:0}100%{opacity:0}}
+@keyframes luckyRing{0%{transform:translate(-50%,-50%) scale(0.3);opacity:.5}100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}
 
-/* Coin reveal banner */
-@keyframes coinEmerge{0%{filter:brightness(.25) saturate(0);transform:scale(.88)}60%{filter:brightness(.85) saturate(.6);transform:scale(1.04)}100%{filter:brightness(1) saturate(1);transform:scale(1)}}
-@keyframes rayExpand{0%{opacity:0;transform:translate(-50%,-100%) scaleY(0);transform-origin:bottom center}30%{opacity:1}100%{opacity:0;transform:translate(-50%,-100%) scaleY(1);transform-origin:bottom center}}
+/* ── Misc ── */
+@keyframes flicker{0%,100%{opacity:1}45%{opacity:.84}55%{opacity:1}}
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes navPop{0%{transform:scale(1)}40%{transform:scale(1.22)}70%{transform:scale(.95)}100%{transform:scale(1)}}
+@keyframes navBarSlide{from{transform:translateX(var(--from,0)) scaleX(.4)}to{transform:translateX(0) scaleX(1)}}
 
-/* Card hover lift — works on coin tiles, tarot cards, anything that wants tactile feedback */
-.coin-card{transition:transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s, border-color .18s;}
+/* ── Shiny / vault cards ── */
+.shiny-card{position:relative;}
+.shiny-aura{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;animation:shinyAuraGlow 3s ease-in-out infinite;}
+.shiny-card>*:not(.shiny-aura){position:relative;z-index:1;}
+.coin-card{transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s,border-color .18s;}
 .coin-card:hover{transform:translateY(-4px) scale(1.02);}
 .coin-card:active{transform:translateY(0) scale(.97);}
 
-/* Bottom nav button feedback */
-.nav-btn{transition:transform .15s cubic-bezier(.34,1.56,.64,1), color .15s;}
-.nav-btn:active{transform:scale(.88) !important;}
+/* ── Noise ── */
+.noise-overlay{position:absolute;inset:0;pointer-events:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/></svg>");mix-blend-mode:overlay}
+
+/* ── Nav ── */
+.tab-active-indicator{position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:2.5px;border-radius:0 0 3px 3px;background:currentColor;box-shadow:0 0 8px currentColor;animation:navBarSlide .25s cubic-bezier(.34,1.56,.64,1) forwards}
+.nav-btn{transition:transform .15s cubic-bezier(.34,1.56,.64,1),color .15s;}
+.nav-btn:active{transform:scale(.88)!important;}
 .nav-icon{transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
 
-.noise-overlay{position:absolute;inset:0;pointer-events:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/></svg>");mix-blend-mode:overlay}
-/* Animated tab indicator on bottom nav (replaces the static one) */
-.tab-active-indicator{position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:2.5px;border-radius:0 0 3px 3px;background:currentColor;box-shadow:0 0 10px currentColor,0 0 20px currentColor;animation:navBarSlide .25s cubic-bezier(.34,1.56,.64,1) forwards;}
+/* ── Button polish ── */
+.btn-primary{transition:transform .12s cubic-bezier(.34,1.56,.64,1),box-shadow .12s,filter .12s;}
+.btn-primary:hover{transform:translateY(-1px);filter:brightness(1.08);}
+.btn-primary:active{transform:scale(.96) translateY(1px);filter:brightness(.96);}
+
+/* ── Input ── */
+input,textarea{transition:border-color .18s,box-shadow .18s;}
+input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(212,160,23,.12);}
+
+/* ── Tarot card ── */
+.tarot-card{transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s;}
+.tarot-card:hover{transform:translateY(-5px) scale(1.03);}
+.tarot-card:active{transform:scale(.97);}
+
+/* ── Banner ── */
+@keyframes bannerEntry{0%{opacity:0}100%{opacity:1}}
+@keyframes coinBannerFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes rarityTitle{0%{opacity:0;transform:translateY(12px);filter:blur(3px)}70%{opacity:1;filter:blur(0)}100%{opacity:1;transform:translateY(0)}}
+@keyframes metalPill{0%{opacity:0;transform:translateY(8px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes runeReveal{0%{opacity:0;letter-spacing:.8em;filter:blur(3px)}70%{opacity:1;filter:blur(0)}100%{opacity:1;letter-spacing:.3em}}
+
+/* ── Shiny banner specific ── */
+@keyframes shinyHaloBloom{0%{opacity:0;transform:scale(.6)}60%{opacity:1}100%{opacity:1;transform:scale(1)}}
+@keyframes shinyArcSweep{0%{transform:rotate(-30deg);opacity:0}20%{opacity:.7}80%{opacity:.5}100%{transform:rotate(30deg);opacity:0}}
 `;
   document.head.appendChild(s);
 }
@@ -298,30 +341,69 @@ function drawCoin(canvas,coin,px){
   if(coin.shiny){c.save();clip();c.clip();const ang=(Date.now()/40)%360;const lg=c.createLinearGradient(0,0,S,S);lg.addColorStop(0,"rgba(255,255,255,0)");lg.addColorStop(.4,`hsla(${ang},100%,75%,.35)`);lg.addColorStop(.5,`hsla(${(ang+60)%360},100%,80%,.5)`);lg.addColorStop(.6,`hsla(${(ang+120)%360},100%,75%,.35)`);lg.addColorStop(1,"rgba(255,255,255,0)");c.fillStyle=lg;c.fillRect(0,0,S,S);c.restore();}
   canvas.width=px;canvas.height=px;const ctx=canvas.getContext("2d");ctx.imageSmoothingEnabled=false;ctx.drawImage(off,0,0,px,px);
 }
-function CoinCanvas({coin,size}){
+function CoinCanvas({coin,size,animate=false}){
   const ref=useRef();
-  useEffect(()=>{if(ref.current)drawCoin(ref.current,coin,size);},[coin.seed,coin.metalIdx,coin.shiny,size]);
-  return <canvas ref={ref} style={{imageRendering:"pixelated",display:"block"}}/>;
+  const rafRef=useRef();
+  useEffect(()=>{
+    if(!ref.current)return;
+    if(coin.shiny||animate){
+      // Animate shiny shimmer via RAF — redraw each frame so the hue-rotate sweep moves
+      let alive=true;
+      const loop=()=>{if(!alive||!ref.current)return;drawCoin(ref.current,coin,size);rafRef.current=requestAnimationFrame(loop);};
+      rafRef.current=requestAnimationFrame(loop);
+      return()=>{alive=false;cancelAnimationFrame(rafRef.current);};
+    }else{
+      drawCoin(ref.current,coin,size);
+    }
+  },[coin.seed,coin.metalIdx,coin.shiny,size,animate]);
+  return <canvas ref={ref} style={{imageRendering:"pixelated",display:"block",borderRadius:coin.shape==="round"||coin.shape==="holed"?"50%":undefined}}/>;
 }
 
 /* ─── PARTICLES ───────────────────────────────────────────────────────── */
 function Particles({active,type,origin}){
   const colors=useMemo(()=>{
-    if(type==="shiny")return Array.from({length:60},(_,i)=>`hsl(${i*6},100%,65%)`);
-    if(type==="lucky")return["#d4a017","#ffe878","#ffffff","#60e880","#d4a017","#eeaa70"];
-    return["#d4a017","#ffffff"];
+    if(type==="shiny")return Array.from({length:36},(_,i)=>`hsl(${i*10},100%,68%)`);
+    if(type==="lucky")return["#d4a017","#ffe878","#ffffff","#60e880","#ffd060","#eeaa70","#fff4b0","#80ffb0"];
+    return["#d4a017","#ffe878","#ffffff"];
   },[type]);
-  const particles=useMemo(()=>Array.from({length:type==="shiny"?72:36},(_,i)=>({
-    id:i,tx:`${(Math.random()-.5)*380}px`,ty:`${-80-Math.random()*320}px`,r:`${(Math.random()-.5)*720}deg`,
-    delay:`${Math.random()*.35}s`,size:type==="shiny"?6+Math.random()*8:5+Math.random()*7,
-    color:colors[Math.floor(Math.random()*colors.length)],shape:Math.random()>.5?"50%":"3px",dur:`${.8+Math.random()*.7}s`,
-  })),[type,colors]);
+
+  const particles=useMemo(()=>{
+    const count=type==="shiny"?88:52;
+    return Array.from({length:count},(_,i)=>{
+      // Physics-arc: initial velocity angle spread, simulate gravity arc
+      const angle=(Math.random()*Math.PI*2);
+      const speed=60+Math.random()*260;
+      const grav=120+Math.random()*180;
+      const tx=(Math.cos(angle)*speed).toFixed(1)+"px";
+      const ty=(Math.sin(angle)*speed - grav).toFixed(1)+"px";
+      return{
+        id:i,
+        tx,ty,
+        r:`${(Math.random()-.5)*900}deg`,
+        delay:`${(i/count)*0.28}s`,
+        size:type==="shiny"?4+Math.random()*9:3+Math.random()*8,
+        color:colors[Math.floor(Math.random()*colors.length)],
+        shape:Math.random()>.35?"50%":Math.random()>.5?"2px":"30%",
+        dur:`${0.7+Math.random()*0.8}s`,
+        anim:Math.random()>.4?"particleSpin":"particleFly",
+      };
+    });
+  },[type,colors]);
+
   if(!active)return null;
   const ox=origin?.x??50,oy=origin?.y??50;
   return(
     <div style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:180,overflow:"hidden"}}>
       {particles.map(p=>(
-        <div key={p.id} style={{position:"absolute",left:`${ox}%`,top:`${oy}%`,width:p.size,height:p.size,borderRadius:p.shape,background:p.color,animation:`particleFly ${p.dur} ease-out ${p.delay} both`,"--tx":p.tx,"--ty":p.ty,"--r":p.r}}/>
+        <div key={p.id} style={{
+          position:"absolute",left:`${ox}%`,top:`${oy}%`,
+          width:p.size,height:p.size,
+          borderRadius:p.shape,
+          background:p.color,
+          boxShadow:type==="shiny"?`0 0 ${p.size*1.5}px ${p.color}`:`0 0 4px ${p.color}66`,
+          animation:`${p.anim} ${p.dur} cubic-bezier(.22,.68,0,1.2) ${p.delay} both`,
+          "--tx":p.tx,"--ty":p.ty,"--r":p.r,
+        }}/>
       ))}
     </div>
   );
@@ -329,30 +411,35 @@ function Particles({active,type,origin}){
 
 /* ─── LUCKY FANFARE ───────────────────────────────────────────────────── */
 function LuckyFanfare({show,onDone}){
-  useEffect(()=>{if(show){const t=setTimeout(onDone,2200);return()=>clearTimeout(t);}},[show,onDone]);
+  useEffect(()=>{if(show){const t=setTimeout(onDone,2800);return()=>clearTimeout(t);}},[show,onDone]);
   if(!show)return null;
   return(
     <div style={{position:"fixed",inset:0,zIndex:170,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      {/* Screen-wide warm flash on entry */}
-      <div style={{position:"absolute",inset:0,background:"rgba(255,232,120,.18)",animation:"luckyFlash .5s ease-out forwards",pointerEvents:"none"}}/>
-      {/* Three concentric expanding rings, staggered. Centered at viewport middle. */}
-      {[0,150,300].map(delay=>(
-        <div key={delay} style={{position:"absolute",left:"50%",top:"50%",width:120,height:120,borderRadius:"50%",border:"2px solid rgba(255,232,120,.7)",animation:`luckyRing 1.2s ease-out ${delay}ms forwards`,pointerEvents:"none"}}/>
+      {/* Very subtle screen tint — not a flash */}
+      <div style={{position:"absolute",inset:0,background:"rgba(212,160,23,.06)",animation:"fadein .8s ease forwards",pointerEvents:"none"}}/>
+      {/* Three slow expanding rings — like a stone dropped in still water */}
+      {[0,400,800].map(delay=>(
+        <div key={delay} style={{
+          position:"absolute",left:"50%",top:"50%",
+          width:80,height:80,borderRadius:"50%",
+          border:"1px solid rgba(212,160,23,.45)",
+          animation:`luckyRingExpand 2s ease-out ${delay}ms forwards`,
+          pointerEvents:"none",
+        }}/>
       ))}
-      <Particles active={show} type="lucky" origin={{x:50,y:52}}/>
       <div style={{textAlign:"center",position:"relative",zIndex:2}}>
         <div style={{
-          fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:82,fontStyle:"italic",
-          color:"#ffe878",letterSpacing:-2,lineHeight:1,
-          textShadow:"0 0 40px rgba(212,160,23,.8),0 0 80px rgba(212,160,23,.4),0 5px 0 #6a3800,0 8px 20px rgba(0,0,0,.5)",
-          animation:"luckySlamBig .6s cubic-bezier(.2,.9,.3,1.15) forwards",
-        }}>Lucky!</div>
+          fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:64,fontStyle:"italic",
+          color:"#d4a017",letterSpacing:-1,lineHeight:1,
+          textShadow:"0 0 30px rgba(212,160,23,.45),0 3px 0 #4a2800,0 6px 14px rgba(0,0,0,.4)",
+          animation:"luckyUnfurl .9s ease-out forwards",
+        }}>Lucky.</div>
         <div style={{
-          fontFamily:"Outfit,sans-serif",fontWeight:800,fontSize:13,color:"#d4a017",
-          letterSpacing:5,marginTop:10,textTransform:"uppercase",
-          animation:"luckySubtitle .4s ease-out .35s both",
-          textShadow:"0 0 12px rgba(212,160,23,.6)",
-        }}>⚡ Rarity Upgraded</div>
+          fontFamily:"'Fraunces',serif",fontStyle:"italic",fontWeight:400,
+          fontSize:14,color:"rgba(212,160,23,.65)",
+          letterSpacing:3,marginTop:10,
+          animation:"luckySubtitle .6s ease-out .5s both",
+        }}>rarity ascends</div>
       </div>
     </div>
   );
@@ -399,11 +486,19 @@ function BrushReveal({coin,brushAlpha=BA,shinyChance=.01,onRevealed,t}){
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,userSelect:"none"}}>
       <div style={{position:"fixed",left:cursor.x,top:cursor.y,pointerEvents:"none",zIndex:999,transform:"translate(-50%,-70%)",fontSize:24}}>🖌️</div>
       <div style={{position:"relative",width:RS,height:RS,borderRadius:"50%",overflow:"hidden",flexShrink:0,cursor:"none",boxShadow:`0 0 0 6px ${t.surface},0 0 0 7px ${t.borderHi},0 18px 40px rgba(0,0,0,.5),inset 0 0 30px rgba(0,0,0,.4)`}}>
-        <canvas ref={coinRef} style={{imageRendering:"pixelated",position:"absolute",top:0,left:0,width:RS,height:RS}}/>
-        <canvas ref={dirtRef} width={RS} height={RS} style={{position:"absolute",top:0,left:0,touchAction:"none"}}
+        <canvas ref={coinRef} style={{imageRendering:"pixelated",position:"absolute",top:0,left:0,width:RS,height:RS,
+          filter:`brightness(${0.25+pct*0.75}) saturate(${pct*1.2})`,
+          transition:"filter .12s ease"}}/>
+        {/* Warm glow ring that intensifies as coin emerges */}
+        <div style={{position:"absolute",inset:0,borderRadius:"50%",boxShadow:`inset 0 0 ${Math.round(pct*32)}px ${Math.round(pct*8)}px ${m.hl}${Math.round(pct*80).toString(16).padStart(2,"0")}`,pointerEvents:"none",transition:"box-shadow .12s ease",zIndex:2}}/>
+        <canvas ref={dirtRef} width={RS} height={RS} style={{position:"absolute",top:0,left:0,touchAction:"none",zIndex:3}}
           onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp} onMouseLeave={onUp} onTouchMove={onMove} onTouchStart={onDown} onTouchEnd={onUp}/>
-        {gleam&&<div style={{position:"absolute",top:0,left:0,width:"60%",height:"100%",background:`linear-gradient(108deg,transparent,${m.hl}dd 50%,transparent)`,animation:"gleam .9s ease-out forwards",pointerEvents:"none",mixBlendMode:"screen"}}/>}
-        <div style={{position:"absolute",inset:0,borderRadius:"50%",border:`2px solid rgba(255,255,255,${pct*.18+.04})`,pointerEvents:"none"}}/>
+        {gleam&&<>
+          <div style={{position:"absolute",top:0,left:0,width:"60%",height:"100%",background:`linear-gradient(108deg,transparent,${m.hl}cc 50%,transparent)`,animation:"gleamSlow 1.1s ease-out forwards",pointerEvents:"none",mixBlendMode:"screen",zIndex:5}}/>
+          {/* single quiet reveal ring */}
+          <div style={{position:"absolute",left:"50%",top:"50%",width:RS,height:RS,borderRadius:"50%",border:`1px solid ${m.hl}88`,animation:"revealRing 1s ease-out forwards",pointerEvents:"none",zIndex:6}}/>
+        </>}
+        <div style={{position:"absolute",inset:0,borderRadius:"50%",border:`2px solid rgba(255,255,255,${pct*.22+.04})`,pointerEvents:"none",zIndex:8}}/>
       </div>
       {pct<1&&<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,width:RS}}>
         <div style={{width:"100%",height:5,background:t.faint,borderRadius:3,overflow:"hidden",border:`1px solid ${t.border}`}}><div style={{width:`${pct*100}%`,height:"100%",background:`linear-gradient(to right,${t.accentDim},${m.hl})`,transition:"width .08s",boxShadow:`0 0 8px ${m.hl}66`}}/></div>
@@ -437,11 +532,9 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,onCellScrap,firstStrikeBonus
   },[coin.seed,shovelLevel]);
 
   const[dug,setDug]=useState({});const[shake,setShake]=useState(null);const[found,setFound]=useState(null);
-  const[touchPick,setTouchPick]=useState(null);  // {x,y} screen coords for touch follower
-  const[swingCell,setSwingCell]=useState(null);  // cell idx currently animating swing
-  // Dirt puff particles — spawned on each dig tap, auto-cleaned after animation.
-  // Each entry: {id, x, y, puffs:[{id, dx, dy, dr, size, dur}]} positioned in fixed coords.
-  const[dirtPuffs,setDirtPuffs]=useState([]);
+  const[touchPick,setTouchPick]=useState(null);
+  const[swingCell,setSwingCell]=useState(null);
+  const[dirtPuffs,setDirtPuffs]=useState([]); // [{id,x,y,particles}]
   const cntRef=useRef(0);
   const puffIdRef=useRef(0);
   // Effective coin cell — defaults to seed-derived but can be overridden by
@@ -450,26 +543,24 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,onCellScrap,firstStrikeBonus
   const effectiveCoinCell=coinCellOverride!=null?coinCellOverride:coinCell;
 
   // Reset when coin changes (per-hunt freshness)
-  useEffect(()=>{setDug({});setShake(null);setFound(null);cntRef.current=0;setTouchPick(null);setSwingCell(null);setCoinCellOverride(null);setDirtPuffs([]);},[coin.seed]);
+  useEffect(()=>{setDug({});setShake(null);setFound(null);cntRef.current=0;setTouchPick(null);setSwingCell(null);setCoinCellOverride(null);},[coin.seed]);
 
   const dig=(idx,e)=>{
     if(dug[idx]||found!==null)return;
-    // Trigger swing animation in the clicked cell (visual feedback for both PC + mobile)
+    // Trigger swing animation + dirt puff
     setSwingCell(idx);setTimeout(()=>setSwingCell(c=>c===idx?null:c),380);
-    // Spawn dirt puff particles at the cell's screen position. 8 puffs radiating
-    // outward in a circle with jitter. Auto-cleaned after 700ms.
-    if(e?.currentTarget?.getBoundingClientRect){
+    // Spawn dirt puff particles at the cell's screen position
+    if(e?.currentTarget){
       const rect=e.currentTarget.getBoundingClientRect();
-      const cx=rect.left+rect.width/2;
-      const cy=rect.top+rect.height/2;
+      const cx=rect.left+rect.width/2;const cy=rect.top+rect.height/2;
       const puffId=++puffIdRef.current;
-      const puffs=Array.from({length:8},(_,i)=>({
+      const puffs=Array.from({length:4},(_,i)=>({
         id:i,
-        dx:`${(Math.cos((i/8)*Math.PI*2)*28+((Math.random()-.5)*18)).toFixed(1)}px`,
-        dy:`${(Math.sin((i/8)*Math.PI*2)*28-10+((Math.random()-.5)*14)).toFixed(1)}px`,
-        dr:`${(Math.random()-.5)*180}deg`,
-        size:4+Math.random()*5,
-        dur:`${(0.35+Math.random()*0.25).toFixed(2)}s`,
+        dx:`${(Math.cos((i/4)*Math.PI*2)*18+((Math.random()-.5)*10)).toFixed(1)}px`,
+        dy:`${(Math.sin((i/4)*Math.PI*2)*16-6+((Math.random()-.5)*8)).toFixed(1)}px`,
+        dr:`${(Math.random()-.5)*90}deg`,
+        size:3+Math.random()*3,
+        dur:`${0.4+Math.random()*0.2}s`,
       }));
       setDirtPuffs(p=>[...p,{id:puffId,x:cx,y:cy,puffs}]);
       setTimeout(()=>setDirtPuffs(p=>p.filter(x=>x.id!==puffId)),700);
@@ -515,18 +606,16 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,onCellScrap,firstStrikeBonus
   const cellSize=64;
   return(
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,position:"relative"}}>
-      {/* Touch-only floating pickaxe so the player can see where they're about to tap */}
+      {/* Touch-only floating pickaxe */}
       {touchPick&&<div style={{position:"fixed",left:touchPick.x,top:touchPick.y,pointerEvents:"none",zIndex:60,fontSize:34,transform:"translate(-50%,-90%) rotate(-25deg)",filter:"drop-shadow(0 2px 4px rgba(0,0,0,.7))"}}>⛏</div>}
-      {/* Dirt puff particles — spawned per dig tap, fixed-positioned at cell center.
-          Each puff radiates outward and rotates, then fades out via dirtPuff keyframe.
-          The CSS vars --dx/--dy/--dr drive the final transform offset. */}
+      {/* Dirt puff particles */}
       {dirtPuffs.map(puff=>(
         <div key={puff.id} style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:65}}>
           {puff.puffs.map(p=>(
             <div key={p.id} style={{
               position:"fixed",left:puff.x,top:puff.y,
               width:p.size,height:p.size,borderRadius:"50%",
-              background:`hsl(${20+(p.id*4)%20},${40+(p.id*7)%20}%,${30+(p.id*5)%20}%)`,
+              background:`hsl(${20+Math.random()*20},${40+Math.random()*20}%,${30+Math.random()*20}%)`,
               animation:`dirtPuff ${p.dur} ease-out forwards`,
               "--dx":p.dx,"--dy":p.dy,"--dr":p.dr,
               pointerEvents:"none",
@@ -642,55 +731,150 @@ function RevealBanner({coin,onDone}){
   const rIdx=coinRarity(coin);
   const r=RARITIES[rIdx];
   const isShiny=coin.shiny;
-  const isHighRarity=rIdx>=4; // Legendary or Mythic
-  const [showParticles,setShowParticles]=useState(isShiny||isHighRarity);
-  useEffect(()=>{const t=setTimeout(onDone,(isShiny||isHighRarity)?4000:3000);return()=>clearTimeout(t);},[onDone,isShiny,isHighRarity]);
-  useEffect(()=>{if(isShiny||isHighRarity){const t=setTimeout(()=>setShowParticles(false),2000);return()=>clearTimeout(t);}},[isShiny,isHighRarity]);
+  const isHighRarity=rIdx>=4;
+  // Phase sequencing: 0=dark 1=coin fades in 2=halo blooms 3=text arrives 4=full
+  const [phase,setPhase]=useState(0);
+  useEffect(()=>{
+    const ts=[
+      setTimeout(()=>setPhase(1),100),
+      setTimeout(()=>setPhase(2),600),
+      setTimeout(()=>setPhase(3),1050),
+      setTimeout(()=>setPhase(4),1450),
+    ];
+    const dur=isShiny||isHighRarity?5000:3800;
+    const done=setTimeout(onDone,dur);
+    return()=>{ts.forEach(clearTimeout);clearTimeout(done);};
+  },[onDone,isShiny,isHighRarity]);
+
+  const rayCount=isHighRarity?10:6;
+
   return(
-    <div style={{position:"fixed",inset:0,zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",background:isShiny?"rgba(0,0,0,.95)":"rgba(8,4,2,.92)",backdropFilter:"blur(14px)",transition:"background .5s"}} onClick={onDone}>
-      {(isShiny||isHighRarity)&&<Particles active={showParticles} type="shiny" origin={{x:50,y:45}}/>}
-      {/* Shiny aura: warm gold radial halo behind the coin — fits the archeology
-          vibe (treasure catching torchlight) instead of arcade rainbow. The
-          rotating sweep below adds a subtle highlight pass, never a full rotation. */}
-      {isShiny&&<div style={{position:"absolute",width:340,height:340,borderRadius:"50%",background:`radial-gradient(circle,${m.hl}55 0%,${m.hl}22 40%,transparent 70%)`,animation:"subtlePulse 2.4s ease-in-out infinite",pointerEvents:"none",filter:"blur(6px)"}}/>}
-      {isShiny&&<div style={{position:"absolute",width:300,height:300,borderRadius:"50%",background:`conic-gradient(from 0deg, transparent 0%, ${m.hl}66 12%, transparent 24%, transparent 100%)`,animation:"shinyRotate 4s linear infinite",pointerEvents:"none",opacity:.55,mixBlendMode:"screen"}}/>}
-      {!isShiny&&isHighRarity&&<div style={{position:"absolute",width:280,height:280,borderRadius:"50%",background:`radial-gradient(circle,${r.color}55,transparent 70%)`,animation:"subtlePulse 2s ease-in-out infinite",pointerEvents:"none",filter:"blur(8px)"}}/>}
-      <div style={{textAlign:"center",animation:"flashIn .5s cubic-bezier(.2,.8,.3,1) forwards",padding:"0 24px",position:"relative",zIndex:1,maxWidth:420}}>
-        {isShiny&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:13,fontWeight:800,letterSpacing:5,marginBottom:14,color:m.hl,textShadow:`0 0 14px ${m.hl}88`}}>✦ SHINY DISCOVERED ✦</div>}
-        {/* Big rarity headline — flashInBig spring entrance for emphasis */}
-        <div style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontStyle:"italic",fontSize:isHighRarity?34:24,letterSpacing:-.5,color:r.color,marginBottom:6,textShadow:isHighRarity?`0 0 24px ${r.glow},0 2px 8px rgba(0,0,0,.6)`:`0 0 12px ${r.glow}`,lineHeight:1,animation:"flashInBig .55s cubic-bezier(.2,.9,.3,1.15) forwards"}}>{r.name}</div>
-        {coin.digBonus==="first"&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:10,fontWeight:800,color:"#ffd060",letterSpacing:4,marginBottom:14,textTransform:"uppercase",textShadow:"0 0 12px rgba(255,208,96,.6)"}}>★ First-try strike</div>}
-        {coin.digBonus==="lucky"&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:10,fontWeight:700,color:"#7ad888",letterSpacing:4,marginBottom:14,textTransform:"uppercase"}}>⚡ Lucky find</div>}
-        {coin.digBonus==="damaged"&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:10,fontWeight:700,color:"#e07050",letterSpacing:4,marginBottom:14,textTransform:"uppercase"}}>✕ Over-excavated</div>}
-        {!coin.digBonus&&<div style={{height:14,marginBottom:8}}/>}
-        <div style={{display:"flex",justifyContent:"center",marginBottom:18,position:"relative"}}>
-          {/* Coin canvas wrapped in a div that applies coinEmerge — saturates up
-              from a desaturated/dark state, like the coin emerging from soil. */}
-          <div style={{animation:"coinEmerge .8s ease-out .15s both"}}>
+    <div style={{
+      position:"fixed",inset:0,zIndex:200,
+      display:"flex",alignItems:"center",justifyContent:"center",
+      background:"rgba(4,2,1,.96)",
+      backdropFilter:"blur(18px)",
+      animation:"bannerEntry .5s ease-out",
+    }} onClick={onDone}>
+
+      {/* Warm halo — blooms slowly behind coin, never arcade */}
+      {phase>=2&&<div style={{
+        position:"absolute",
+        width:isShiny?420:300,height:isShiny?420:300,
+        borderRadius:"50%",
+        background:`radial-gradient(circle, ${m.hl}${isShiny?"44":"2a"} 0%, ${m.hl}0a 50%, transparent 70%)`,
+        animation:"shinyHaloBloom 1.2s ease-out both",
+        pointerEvents:"none",
+        filter:"blur(12px)",
+      }}/>}
+
+      {/* For shiny — slow single warm arc sweep, not rainbow spin */}
+      {isShiny&&phase>=2&&<div style={{
+        position:"absolute",
+        width:260,height:260,
+        borderRadius:"50%",
+        background:`conic-gradient(from -20deg, transparent 0%, ${m.hl}3a 8%, transparent 18%, transparent 100%)`,
+        animation:"shinyWarmSweep 8s linear infinite",
+        pointerEvents:"none",
+        opacity:.6,
+        mixBlendMode:"screen",
+      }}/>}
+
+      {/* High rarity dim glow */}
+      {!isShiny&&isHighRarity&&phase>=2&&<div style={{
+        position:"absolute",width:260,height:260,borderRadius:"50%",
+        background:`radial-gradient(circle,${r.color}33,transparent 68%)`,
+        animation:"subtlePulse 3s ease-in-out infinite",
+        pointerEvents:"none",filter:"blur(10px)",
+      }}/>}
+
+      <div style={{textAlign:"center",padding:"0 28px",position:"relative",zIndex:1,maxWidth:420}}>
+
+        {/* Shiny badge — appears with text, not immediately */}
+        {isShiny&&phase>=3&&<div style={{
+          fontFamily:"Outfit,sans-serif",fontSize:10,fontWeight:700,
+          letterSpacing:5,marginBottom:14,
+          color:m.hl,opacity:.8,
+          animation:"fadein .7s ease both",
+          textTransform:"uppercase",
+        }}>✦ shiny</div>}
+
+        {/* Rarity title — slow fade-up, not a slam */}
+        {phase>=3&&<div style={{
+          fontFamily:"'Fraunces',serif",fontWeight:900,fontStyle:"italic",
+          fontSize:isHighRarity?34:22,
+          letterSpacing:-.5,
+          color:r.color,
+          marginBottom:6,
+          textShadow:isHighRarity?`0 0 20px ${r.glow}88,0 2px 6px rgba(0,0,0,.6)`:`0 0 10px ${r.glow}66`,
+          lineHeight:1,
+          animation:"rarityTitle .8s ease-out both",
+        }}>{r.name}</div>}
+
+        {/* Dig bonus — small quiet line */}
+        {coin.digBonus==="first"&&phase>=3&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:9,fontWeight:700,color:DARK.accent,letterSpacing:3,marginBottom:12,textTransform:"uppercase",opacity:.7,animation:"fadein .5s ease .2s both"}}>★ first strike</div>}
+        {coin.digBonus==="lucky"&&phase>=3&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:9,fontWeight:700,color:"#7ad888",letterSpacing:3,marginBottom:12,textTransform:"uppercase",opacity:.7,animation:"fadein .5s ease .2s both"}}>⚡ lucky find</div>}
+        {coin.digBonus==="damaged"&&phase>=3&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:9,fontWeight:600,color:"#e07050",letterSpacing:3,marginBottom:12,textTransform:"uppercase",opacity:.6,animation:"fadein .5s ease .2s both"}}>✕ over-excavated</div>}
+        {!coin.digBonus&&<div style={{height:12,marginBottom:6}}/>}
+
+        {/* Coin — quiet float, rays are subtle */}
+        <div style={{display:"flex",justifyContent:"center",marginBottom:18,position:"relative",
+          opacity:phase>=1?1:0,transition:"opacity .6s ease",
+        }}>
+          {/* Rays — only show at phase 3+, slow pulse */}
+          {phase>=3&&Array.from({length:rayCount},(_,i)=>{
+            const deg=(i/rayCount)*360;
+            const len=isHighRarity?60:isShiny?70:45;
+            return(
+              <div key={i} style={{
+                position:"absolute",top:"50%",left:"50%",
+                width:1,height:len,
+                background:`linear-gradient(to top,transparent,${isShiny?m.hl:r.color}66)`,
+                transform:`translate(-50%,-100%) rotate(${deg}deg)`,
+                transformOrigin:"bottom center",
+                animation:`rayPulse ${2.4+i*.18}s ease-in-out ${i*.12}s infinite`,
+              }}/>
+            );
+          })}
+          <div style={{
+            animation:phase>=2?"coinBannerFloat 4s ease-in-out infinite":"none",
+            position:"relative",zIndex:2,
+          }}>
             <CoinCanvas coin={coin} size={180}/>
           </div>
-          {/* Rays from the coin — for shiny use warm metal hue, not rainbow.
-              For high-rarity finds, use the rarity color. */}
-          {[0,60,120,180,240,300].map(deg=>(
-            <div key={deg} style={{position:"absolute",top:"50%",left:"50%",width:2,height:isShiny?78:58,background:`linear-gradient(to top,transparent,${isShiny?m.hl:r.color}aa)`,transform:`translate(-50%,-100%) rotate(${deg}deg)`,transformOrigin:"bottom center",animation:"subtlePulse 1.4s ease-in-out infinite",animationDelay:`${deg/300*.4}s`}}/>
-          ))}
         </div>
-        {/* Metal pill — secondary descriptor (the type, not the rarity) */}
-        <div style={{display:"inline-flex",alignItems:"center",gap:10,padding:"5px 16px",background:m.flash,border:`1px solid ${m.accent}66`,borderRadius:3,marginBottom:14,fontFamily:"Outfit,sans-serif",fontSize:11,fontWeight:800,color:m.hl,letterSpacing:4,textTransform:"uppercase",animation:`rarityFlash .9s ease-in-out ${isShiny?0:3}`}}>
-          <span style={{width:5,height:5,borderRadius:"50%",background:m.hl,boxShadow:`0 0 6px ${m.hl}`}}/>
+
+        {/* Metal pill */}
+        {phase>=4&&<div style={{
+          display:"inline-flex",alignItems:"center",gap:9,
+          padding:"5px 16px",
+          background:m.flash,border:`1px solid ${m.accent}55`,borderRadius:3,
+          marginBottom:14,
+          fontFamily:"Outfit,sans-serif",fontSize:10,fontWeight:700,
+          color:m.hl,letterSpacing:3.5,textTransform:"uppercase",
+          animation:"metalPill .5s ease-out both",
+        }}>
+          <span style={{width:5,height:5,borderRadius:"50%",background:m.hl,opacity:.7}}/>
           {m.name} · {SHAPE_NAMES[coin.shape]||coin.shape}{isShiny?" ✦":""}
-          <span style={{width:5,height:5,borderRadius:"50%",background:m.hl,boxShadow:`0 0 6px ${m.hl}`}}/>
-        </div>
-        <div style={{fontFamily:"VT323,monospace",fontSize:isShiny?56:50,letterSpacing:6,lineHeight:1,marginBottom:6,color:isShiny?m.hl:m.hl,textShadow:isShiny?`0 0 12px ${m.hl}66`:undefined}}>{coin.runes}</div>
-        <div style={{fontFamily:"'Fraunces',serif",fontStyle:"italic",fontWeight:600,fontSize:18,color:"#b8a890",letterSpacing:3,marginBottom:6}}>{coin.raw}</div>
-        <div style={{fontFamily:"'Fraunces',serif",fontStyle:"italic",fontSize:12,color:"#5a4a38",letterSpacing:.5}}>{coin.era}</div>
-        {coin.scrapEarned>0&&(
-          <div style={{marginTop:14,padding:"7px 14px",display:"inline-flex",alignItems:"center",gap:8,background:"rgba(212,160,23,.08)",border:"1px solid rgba(212,160,23,.22)",borderRadius:6,fontFamily:"Outfit,sans-serif",fontSize:11,fontWeight:700,color:"#d4a017",letterSpacing:1.5,animation:"flashIn .5s ease-out .3s backwards"}}>
-            <span style={{fontSize:13}}>⚙</span>
-            Bonus scrap · ◈ {coin.scrapEarned}
+          <span style={{width:5,height:5,borderRadius:"50%",background:m.hl,opacity:.7}}/>
+        </div>}
+
+        {/* Runes */}
+        {phase>=4&&<div style={{
+          fontFamily:"VT323,monospace",fontSize:50,letterSpacing:6,lineHeight:1,
+          marginBottom:5,color:m.hl,
+          textShadow:isShiny?`0 0 10px ${m.hl}55`:undefined,
+          animation:"runeReveal .7s ease-out both",
+        }}>{coin.runes}</div>}
+        {phase>=4&&<div style={{fontFamily:"'Fraunces',serif",fontStyle:"italic",fontWeight:600,fontSize:16,color:"#9a8878",letterSpacing:2.5,marginBottom:5,animation:"fadein .5s ease .1s both"}}>{coin.raw}</div>}
+        {phase>=4&&<div style={{fontFamily:"'Fraunces',serif",fontStyle:"italic",fontSize:11,color:"#4a3c2e",letterSpacing:.4,animation:"fadein .5s ease .2s both"}}>{coin.era}</div>}
+
+        {coin.scrapEarned>0&&phase>=4&&(
+          <div style={{marginTop:12,padding:"6px 14px",display:"inline-flex",alignItems:"center",gap:8,background:"rgba(212,160,23,.07)",border:"1px solid rgba(212,160,23,.18)",borderRadius:6,fontFamily:"Outfit,sans-serif",fontSize:10,fontWeight:700,color:"#c49014",letterSpacing:1.5,animation:"fadein .4s ease .4s both"}}>
+            <span style={{fontSize:12}}>⚙</span>bonus · ◈ {coin.scrapEarned}
           </div>
         )}
-        <div style={{fontFamily:"Outfit,sans-serif",fontSize:10,color:"#3a3024",marginTop:18,letterSpacing:3,textTransform:"uppercase"}}>tap to continue</div>
+        {phase>=4&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:9,color:"#3a3024",marginTop:18,letterSpacing:3,textTransform:"uppercase",animation:"fadein .4s ease .5s both",opacity:.6}}>tap to continue</div>}
       </div>
     </div>
   );
@@ -735,13 +919,13 @@ function CoinModal({coin,onClose,onToggleLock,onSell,t,isDark}){
   const hue=((rot.y+rot.x)*2.5+360)%360;
   const F={fontFamily:"Outfit,sans-serif"};const VT={fontFamily:"VT323,monospace"};const FR={fontFamily:"'Fraunces',serif"};
   return(
-    <div style={{position:"fixed",inset:0,zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",animation:"fadeinSlow .25s ease"}} onClick={onClose}>
-      <div style={{position:"absolute",inset:0,backdropFilter:"blur(28px)",background:"rgba(8,4,2,.78)"}}/>
-      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:18,padding:"28px 22px",maxWidth:360,width:"100%",animation:"scaleIn .3s cubic-bezier(.2,.9,.3,1.1)"}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",inset:0,zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",animation:"fadeinSlow .22s ease"}} onClick={onClose}>
+      <div style={{position:"absolute",inset:0,backdropFilter:"blur(28px)",background:"rgba(6,3,1,.84)"}}/>
+      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:18,padding:"28px 22px",maxWidth:360,width:"100%",animation:"slideUpSpring .45s cubic-bezier(.34,1.56,.64,1)"}} onClick={e=>e.stopPropagation()}>
         <div style={{cursor:"grab",userSelect:"none",touchAction:"none"}}
           onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
           onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}>
-          <div style={{transform:`perspective(560px) rotateY(${rot.y}deg) rotateX(${-rot.x}deg)`,position:"relative",display:"inline-block",filter:`drop-shadow(0 ${14+rot.x*.2}px ${32+Math.abs(rot.y)*.2}px ${m.flash})`}}>
+          <div style={{transform:`perspective(560px) rotateY(${rot.y}deg) rotateX(${-rot.x}deg)`,position:"relative",display:"inline-block",filter:`drop-shadow(0 ${14+rot.x*.2}px ${32+Math.abs(rot.y)*.2}px ${m.flash})`,animation:coin.shiny?"floatY 3s ease-in-out infinite":"none"}}>
             <canvas ref={cvRef} style={{imageRendering:"pixelated",display:"block",width:220,height:220}}/>
             <div style={{position:"absolute",inset:0,borderRadius:coin.shape==="round"?"50%":coin.shape==="oval"?"50%":"8px",background:`radial-gradient(circle at ${hlX}% ${hlY}%, rgba(255,255,255,${.24+tiltMag*.12}), rgba(255,255,255,.03) 55%, transparent 80%)`,pointerEvents:"none",mixBlendMode:"screen"}}/>
             {coin.shiny&&<div style={{position:"absolute",inset:0,borderRadius:coin.shape==="round"?"50%":coin.shape==="oval"?"50%":"8px",background:`linear-gradient(${glintAngle}deg, transparent 25%, ${m.hl}cc 50%, transparent 75%)`,opacity:glintOpacity,pointerEvents:"none",mixBlendMode:"screen",transition:"opacity .15s"}}/>}
@@ -1131,20 +1315,17 @@ function TarotCard({card,owned=true,equipped=false,onClick,size="md",t}){
   // without art (e.g. The Tower, which wasn't in the original 12).
   const [imgFailed,setImgFailed]=useState(false);
   return(
-    <div onClick={onClick} style={{
+    <div onClick={onClick} className={onClick?"tarot-card":""} style={{
       width:dims.w,
       cursor:onClick?"pointer":"default",
       borderRadius:9,
       overflow:"hidden",
       border:`2px solid ${equipped?rarColor:owned?rarColor+"88":"rgba(255,255,255,.08)"}`,
       background:"#15100d",
-      boxShadow:equipped?`0 0 18px ${rarColor}55,0 4px 14px rgba(0,0,0,.5)`:`0 4px 12px rgba(0,0,0,.4)`,
-      transition:"transform .18s, border-color .18s, box-shadow .18s",
+      boxShadow:equipped?`0 0 22px ${rarColor}66,0 0 44px ${rarColor}22,0 4px 16px rgba(0,0,0,.5)`:`0 4px 12px rgba(0,0,0,.4)`,
       filter:owned?"none":"grayscale(.85) brightness(.55)",
       position:"relative",
-    }}
-    onMouseEnter={e=>{if(onClick){e.currentTarget.style.transform="translateY(-3px)";}}}
-    onMouseLeave={e=>{if(onClick){e.currentTarget.style.transform="";}}}>
+    }}>
       <div style={{position:"relative",aspectRatio:"241 / 495",overflow:"hidden",background:imgFailed?`linear-gradient(165deg,${rarColor}22,#0a0604 60%)`:"#0a0604"}}>
         {!imgFailed?(
           <img src={`/tarot/${card.id}.webp`} alt={card.title} loading="lazy" onError={()=>setImgFailed(true)} style={{width:"100%",height:"100%",objectFit:"cover",display:"block"}}/>
@@ -1177,10 +1358,30 @@ function TarotCard({card,owned=true,equipped=false,onClick,size="md",t}){
 /* Sense text — single italicized line that drifts in based on signal strength.
    Cycles through phrases for atmosphere. Uses the coin's metal index as a hint. */
 const SENSE_PHRASES={
-  faint:["a faint hum, far below","something stirs in the depths","an old presence, just barely"],
-  moderate:["the soil grows warmer","you sense weight, near","ancient echoes rise"],
-  strong:["close — the air thickens","metal-bright, calling","beneath your feet"],
-  locked:["here. dig.","the soil answers","this is the place"],
+  faint:[
+    "something old sleeps below",
+    "the earth holds its breath",
+    "a presence, dim and distant",
+    "old iron, deep in the dark",
+  ],
+  moderate:[
+    "the soil is restless here",
+    "a weight stirs beneath you",
+    "echoes of a forgotten reign",
+    "the ground remembers",
+  ],
+  strong:[
+    "close — the air has changed",
+    "it calls without a voice",
+    "the dark knows you are near",
+    "your hands begin to tremble",
+  ],
+  locked:[
+    "here. now. dig.",
+    "the seal is beneath you",
+    "it waited. you found it.",
+    "the earth yields.",
+  ],
 };
 function senseLevel(signal){
   if(signal<.04)return null;
@@ -1222,12 +1423,11 @@ function PickaxeIcon({level=1,size=44}){
 /* ─── BOTTOM NAV ──────────────────────────────────────────────────────── */
 function BottomNav({tab,setTab,huntActive,t}){
   const items=[["profile","☉","Profile"],["social","♟","Social"],["vault","◈","Vault"],["hunt","⛏","Hunt"],["forge","⚒","Forge"],["shrine","✧","Shrine"],["tavern","♢","Tavern"]];
-  // Track which tab was JUST switched to so we can play navPop on its icon once.
-  // animKey is a Date.now stamp keyed by tab id — it changes on each switch,
-  // forcing React to rerun the animation by remounting the keyed indicator div.
+  const prevTabRef=useRef(tab);
   const [animKey,setAnimKey]=useState({});
   const handleTab=(id)=>{
     if(id===tab)return;
+    prevTabRef.current=tab;
     setAnimKey(k=>({...k,[id]:Date.now()}));
     setTab(id);
   };
@@ -1237,9 +1437,8 @@ function BottomNav({tab,setTab,huntActive,t}){
         const active=tab===id;
         return(
           <button key={id} onClick={()=>handleTab(id)} className="nav-btn" style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 6px 6px",border:"none",cursor:"pointer",background:"transparent",minWidth:48,flex:1,maxWidth:80,color:active?t.accent:t.muted,transform:active?"scale(1.04)":"scale(1)"}}>
-            {/* Keyed by animKey so a new switch remounts the indicator and replays navBarSlide */}
             {active&&<div key={animKey[id]||id} className="tab-active-indicator" style={{color:t.accent}}/>}
-            {/* Soft active backdrop pill for stronger visual anchor */}
+            {/* Active backdrop glow pill */}
             {active&&<div style={{position:"absolute",inset:"4px 2px",borderRadius:10,background:`${t.accent}0d`,pointerEvents:"none"}}/>}
             <span className="nav-icon" style={{fontSize:active?21:18,lineHeight:1,fontFamily:"'Fraunces',serif",fontWeight:active?900:600,position:"relative",animation:animKey[id]?"navPop .35s cubic-bezier(.34,1.56,.64,1) forwards":undefined}}>
               {icon}
@@ -1250,37 +1449,6 @@ function BottomNav({tab,setTab,huntActive,t}){
         );
       })}
     </nav>
-  );
-}
-
-/* ─── MARKS COUNTER ───────────────────────────────────────────────────
-   Tick-animated marks display. Detects changes vs previous render and
-   plays marksFlash. The marksCounterRef is forwarded so the scrap-flyer
-   animation can target it (the `+◈` arc lands on the live counter). */
-function MarksCounter({marks,marksCounterRef,t,F}){
-  const prevRef=useRef(marks);
-  const [flash,setFlash]=useState(false);
-  const [animKey,setAnimKey]=useState(0);
-  useEffect(()=>{
-    if(marks!==prevRef.current){
-      prevRef.current=marks;
-      setFlash(true);
-      setAnimKey(k=>k+1);
-      const tm=setTimeout(()=>setFlash(false),700);
-      return()=>clearTimeout(tm);
-    }
-  },[marks]);
-  return(
-    <span ref={marksCounterRef} key={animKey} style={{
-      ...F,fontSize:11,fontWeight:800,color:flash?t.accentHi:t.accent,
-      letterSpacing:.5,fontVariantNumeric:"tabular-nums",
-      display:"flex",alignItems:"center",gap:3,
-      transition:"color .3s",
-      animation:flash?"marksFlash .6s ease-out":"none",
-    }}>
-      <span style={{fontSize:11,opacity:.85}}>◈</span>
-      {marks.toLocaleString()}
-    </span>
   );
 }
 
@@ -1383,6 +1551,34 @@ function AuthScreen({onAuthed}){
 /* ─── DEBOUNCE HOOK ───────────────────────────────────────────────────── */
 function useDebouncedEffect(fn,deps,delay){
   useEffect(()=>{const t=setTimeout(fn,delay);return()=>clearTimeout(t);},deps); // eslint-disable-line
+}
+
+/* ─── MARKS COUNTER ───────────────────────────────────────────────────── */
+function MarksCounter({marks,marksCounterRef,t,F}){
+  const prevRef=useRef(marks);
+  const [flash,setFlash]=useState(false);
+  const [animKey,setAnimKey]=useState(0);
+  useEffect(()=>{
+    if(marks!==prevRef.current){
+      prevRef.current=marks;
+      setFlash(true);
+      setAnimKey(k=>k+1);
+      const tm=setTimeout(()=>setFlash(false),700);
+      return()=>clearTimeout(tm);
+    }
+  },[marks]);
+  return(
+    <span ref={marksCounterRef} style={{
+      ...F,fontSize:11,fontWeight:800,color:flash?t.accentHi:t.accent,
+      letterSpacing:.5,fontVariantNumeric:"tabular-nums",
+      display:"flex",alignItems:"center",gap:3,
+      transition:"color .3s",
+      animation:flash?`marksFlash .6s ease-out ${animKey}`:"none",
+    }}>
+      <span style={{fontSize:11,opacity:.85}}>◈</span>
+      {marks.toLocaleString()}
+    </span>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -2204,11 +2400,11 @@ export default function MintForge(){
             <div style={{display:"flex",alignItems:"center",gap:7,justifyContent:"flex-end",marginBottom:4}}>
               <MarksCounter marks={marks} marksCounterRef={marksCounterRef} t={t} F={F}/>
               <span style={{...F,fontSize:10,color:t.textDim,fontWeight:600,letterSpacing:1,textTransform:"uppercase",opacity:.55}}>·</span>
-              <span style={{background:`linear-gradient(135deg,${t.accentHi},${t.accent})`,color:t.accentInk,fontWeight:900,fontSize:10,padding:"2px 8px",borderRadius:4,letterSpacing:1,boxShadow:"0 1px 2px rgba(0,0,0,.2)"}}>LV {level}</span>
+              <span style={{background:`linear-gradient(135deg,${t.accentHi},${t.accent})`,color:t.accentInk,fontWeight:900,fontSize:10,padding:"2px 8px",borderRadius:4,letterSpacing:1,boxShadow:"0 1px 2px rgba(0,0,0,.2)",transition:"transform .2s",display:"inline-block"}}>LV {level}</span>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <div style={{width:104,height:5,background:t.faint,borderRadius:3,overflow:"hidden",border:`1px solid ${t.border}`}}>
-                <div style={{width:`${xpPct}%`,height:"100%",background:`linear-gradient(to right,${t.accentDim},${t.accent},${t.accentHi})`,transition:"width .6s",boxShadow:`0 0 6px ${t.accent}66`}}/>
+                <div style={{width:`${xpPct}%`,height:"100%",background:`linear-gradient(to right,${t.accentDim},${t.accent},${t.accentHi})`,transition:"width .8s cubic-bezier(.4,0,.2,1)",boxShadow:`0 0 6px ${t.accent}66`}}/>
               </div>
               <span style={{...F,fontSize:9,color:t.muted,fontWeight:600,letterSpacing:.5,fontVariantNumeric:"tabular-nums"}}>{xpIn}/{xpRange}</span>
             </div>
@@ -2227,7 +2423,7 @@ export default function MintForge(){
 
         {/* ─── PROFILE ─── */}
         {tab==="profile"&&(
-          <div style={{animation:"fadein .35s ease"}}>
+          <div style={{animation:"fadein .28s cubic-bezier(.4,0,.2,1)"}}>
             <div style={{height:130,borderRadius:"0 0 20px 20px",...bannerStyle(frame),position:"relative",overflow:"hidden",marginTop:-18,marginLeft:-14,marginRight:-14,border:`1px solid ${t.border}`,borderTop:"none"}}>
               <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 30% 60%,rgba(255,255,255,.06),transparent 65%)"}}/>
               <div style={{position:"absolute",inset:0,background:"radial-gradient(ellipse at 70% 30%,rgba(212,160,23,.08),transparent 60%)"}}/>
@@ -2388,7 +2584,7 @@ export default function MintForge(){
 
         {/* ─── SOCIAL ─── */}
         {tab==="social"&&(
-          <div style={{animation:"fadein .35s ease"}}>
+          <div style={{animation:"fadein .28s cubic-bezier(.4,0,.2,1)"}}>
             {!viewingProfile?(<>
               <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14,padding:"0 2px"}}>
                 <div style={sectionTitle}>Social</div>
@@ -2480,7 +2676,7 @@ export default function MintForge(){
               )}
             </>):(
               /* ── Profile detail view ── */
-              <div style={{animation:"fadein .25s ease"}}>
+              <div style={{animation:"fadein .22s cubic-bezier(.4,0,.2,1)"}}>
                 <button onClick={()=>{setViewingProfile(null);setProfileData(null);setProfileErr(null);}} style={{...F,fontSize:12,fontWeight:700,color:t.muted,background:"transparent",border:"none",padding:"4px 0",marginBottom:14,cursor:"pointer",letterSpacing:1.5,textTransform:"uppercase"}}>← Back</button>
                 {profileLoading&&<div style={{...mu,textAlign:"center",padding:"60px 0",fontStyle:"italic"}}>Opening their vault…</div>}
                 {profileErr&&<div style={{...card,padding:"24px 16px",textAlign:"center",borderColor:t.danger}}><div style={{...F,color:t.danger,fontWeight:600}}>⚠ {profileErr}</div></div>}
@@ -2561,7 +2757,7 @@ export default function MintForge(){
 
         {/* ─── VAULT ─── */}
         {tab==="vault"&&(
-          <div style={{animation:"fadein .35s ease"}}>
+          <div style={{animation:"fadein .28s cubic-bezier(.4,0,.2,1)"}}>
             <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:14,padding:"0 2px",gap:8}}>
               <div style={sectionTitle}>The Vault</div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -2586,9 +2782,7 @@ export default function MintForge(){
                 <div style={{...mu,fontSize:11,marginBottom:10,fontStyle:"italic"}}>Tap to inspect · double-tap to pin</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:9}}>
                   {visCoins.map(coin=>{const m=METALS[coin.metalIdx];const r=RARITIES[coinRarity(coin)];const pinned=pinnedIds?pinnedIds.includes(coin.id):autoTop.some(c=>c.id===coin.id);const isSel=selectedIds.has(coin.id);return(
-                    <div key={coin.id} className={coin.shiny?"shiny-card":""} style={{...card,padding:"13px 8px 10px",textAlign:"center",cursor:"pointer",border:`1px solid ${isSel?t.accent:pinned?m.eng+"66":t.border}`,borderTop:`2px solid ${isSel?t.accent:r.color}`,background:isSel?`${t.accent}11`:pinned?(isDark?`linear-gradient(160deg,${m.dark}30,${t.surface})`:t.surface):t.surface,transition:"transform .18s, border-color .18s, background .15s",position:"relative",boxShadow:isSel?`0 0 0 2px ${t.accent}55`:r.id>=3?`0 0 0 1px ${r.color}33`:"none",opacity:selectMode&&coin.locked?0.45:1}}
-                      onMouseEnter={e=>{if(!selectMode){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=m.eng;e.currentTarget.style.borderTopColor=r.color;}}}
-                      onMouseLeave={e=>{if(!selectMode){e.currentTarget.style.transform="";e.currentTarget.style.borderColor=pinned?m.eng+"66":t.border;e.currentTarget.style.borderTopColor=r.color;}}}
+                    <div key={coin.id} className={`${coin.shiny?"shiny-card ":""}${selectMode?"":"coin-card"}`} style={{...card,padding:"13px 8px 10px",textAlign:"center",cursor:"pointer",border:`1px solid ${isSel?t.accent:pinned?m.eng+"66":t.border}`,borderTop:`2px solid ${isSel?t.accent:r.color}`,background:isSel?`${t.accent}11`:pinned?(isDark?`linear-gradient(160deg,${m.dark}30,${t.surface})`:t.surface):t.surface,position:"relative",boxShadow:isSel?`0 0 0 2px ${t.accent}55`:r.id>=3?`0 0 0 1px ${r.color}33`:"none",opacity:selectMode&&coin.locked?0.45:1}}
                       onClick={e=>{
                         // Select mode: toggle selection (skips locked coins)
                         if(selectMode){
@@ -2648,7 +2842,7 @@ export default function MintForge(){
 
         {/* ─── HUNT ─── */}
         {tab==="hunt"&&(
-          <div style={{animation:"fadein .35s ease"}}>
+          <div style={{animation:"fadein .28s cubic-bezier(.4,0,.2,1)"}}>
             {phase==="hunt"&&(<>
               <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between",marginBottom:12,padding:"0 2px"}}>
                 <div style={sectionTitle}>The Field</div>
@@ -2663,18 +2857,30 @@ export default function MintForge(){
                   </div>
                 </div>
               </div>
-              <div style={{...mu,fontSize:13,marginBottom:14,padding:"0 2px",fontStyle:"italic",color:t.textDim}}>Sweep across the soil. When the signal locks, dig.</div>
+              <div style={{...mu,fontSize:13,marginBottom:14,padding:"0 2px",fontStyle:"italic",color:t.muted,letterSpacing:.3}}>Move across the soil. When it stirs — dig.</div>
               <div style={{...card,padding:"12px 16px",marginBottom:12,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                 <div style={{flex:1,minWidth:140}}>
                   <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,alignItems:"baseline"}}>
-                    <span style={{...microLabel,fontSize:9}}>Signal</span>
-                    <span style={{...VT,fontSize:18,color:signalColor,letterSpacing:1.5,textShadow:`0 0 8px ${signalColor}55`}}>{signal<.04?"NO SIGNAL":signal<.28?"FAINT":signal<.58?"MODERATE":signal<.84?"STRONG":"LOCKED ON"}</span>
+                    <span style={{...microLabel,fontSize:9}}>Resonance</span>
+                    <span style={{...VT,fontSize:16,
+                      color:canDig?t.accentHi:signal>.55?t.accent:signal>.28?"#9a7848":t.muted,
+                      letterSpacing:1.5,
+                      textShadow:canDig?`0 0 10px ${t.accent}88`:"none",
+                      transition:"color .4s",
+                    }}>{signal<.04?"silence":signal<.28?"whisper":signal<.58?"murmur":signal<.84?"calling":"here"}</span>
                   </div>
-                  <div style={{height:6,background:t.faint,borderRadius:3,overflow:"hidden",border:`1px solid ${t.border}`}}><div style={{width:`${signal*100}%`,height:"100%",borderRadius:3,background:`linear-gradient(to right,#2a3850,${signalColor})`,transition:"width .08s",boxShadow:`0 0 8px ${signalColor}55`}}/></div>
+                  <div style={{height:5,background:t.faint,borderRadius:3,overflow:"hidden",border:`1px solid ${t.border}`}}>
+                    <div style={{
+                      width:`${signal*100}%`,height:"100%",borderRadius:3,
+                      background:`linear-gradient(to right,${t.accentDim},${t.accent})`,
+                      transition:"width .12s ease",
+                      boxShadow:canDig?`0 0 8px ${t.accent}55`:"none",
+                    }}/>
+                  </div>
                 </div>
-                {canDig&&shovelDur>0&&<button onClick={onDig} style={{padding:"11px 26px",borderRadius:11,border:`1px solid ${t.success}`,cursor:"pointer",background:isDark?"linear-gradient(135deg,#0e2810,#1e4820)":"linear-gradient(135deg,#e8f8ee,#bce8ca)",...F,fontWeight:800,fontSize:14,color:t.success,flexShrink:0,letterSpacing:2,textTransform:"uppercase",boxShadow:`0 4px 12px ${t.success}33`,animation:"flicker 1.4s linear infinite",display:"flex",alignItems:"center",gap:8}}>
+                {canDig&&shovelDur>0&&<button onClick={onDig} style={{padding:"11px 26px",borderRadius:11,border:`1px solid ${t.accent}88`,cursor:"pointer",background:isDark?"linear-gradient(135deg,#2a1808,#4a2c10)":"linear-gradient(135deg,#f8f0dc,#e8d8a0)",...F,fontWeight:800,fontSize:14,color:t.accent,flexShrink:0,letterSpacing:2,textTransform:"uppercase",boxShadow:`0 4px 14px rgba(212,160,23,.22)`,animation:"breathe 2.2s ease-in-out infinite",display:"flex",alignItems:"center",gap:8}}>
                   <span>⛏ Dig</span>
-                  <kbd style={{...F,fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"rgba(0,0,0,.25)",color:t.success,letterSpacing:.5,opacity:.85,border:`1px solid ${t.success}55`}}>↵</kbd>
+                  <kbd style={{...F,fontSize:9,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"rgba(0,0,0,.25)",color:t.accentHi,letterSpacing:.5,opacity:.75,border:`1px solid ${t.accent}44`}}>↵</kbd>
                 </button>}
                 {shovelDur<=0&&<button onClick={()=>{setTab("tavern");setTavernView("repair");}} style={{padding:"11px 22px",borderRadius:11,border:`1px solid ${t.danger}`,cursor:"pointer",background:isDark?"linear-gradient(135deg,#2a0808,#481010)":"linear-gradient(135deg,#fbe8e8,#f0c4c4)",...F,fontWeight:800,fontSize:13,color:t.danger,flexShrink:0,letterSpacing:1.5,textTransform:"uppercase"}}>⚒ Repair Pickaxe</button>}
               </div>
@@ -2695,77 +2901,125 @@ export default function MintForge(){
                   boxShadow:`inset 0 0 60px rgba(0,0,0,.45)`,
                   WebkitTapHighlightColor:"transparent",
                 }}>
-                {/* Soil grain pattern — static SVG, paints once */}
-                <svg width="100%" height="100%" style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,opacity:isDark?.55:.5}}>
+                {/* Soil grain pattern — richer, more rune-marked */}
+                <svg width="100%" height="100%" style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,opacity:isDark?.65:.55}}>
                   <defs>
-                    <pattern id="soilGrain" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
-                      <circle cx="4" cy="6" r="0.7" fill={isDark?"#5a3818":"#3a2814"}/>
-                      <circle cx="11" cy="20" r="0.5" fill={isDark?"#704020":"#403018"}/>
-                      <circle cx="20" cy="9" r="0.8" fill={isDark?"#4a2810":"#5a4020"}/>
-                      <circle cx="24" cy="24" r="0.4" fill={isDark?"#604020":"#3e2c18"}/>
-                      <circle cx="14" cy="14" r="0.55" fill={isDark?"#503010":"#4a3418"}/>
+                    <pattern id="soilGrain" x="0" y="0" width="36" height="36" patternUnits="userSpaceOnUse">
+                      <circle cx="4" cy="6" r="0.8" fill={isDark?"#5a3818":"#3a2814"} opacity=".7"/>
+                      <circle cx="14" cy="22" r="0.55" fill={isDark?"#704020":"#403018"} opacity=".6"/>
+                      <circle cx="22" cy="10" r="0.9" fill={isDark?"#4a2810":"#5a4020"} opacity=".5"/>
+                      <circle cx="30" cy="28" r="0.45" fill={isDark?"#604020":"#3e2c18"} opacity=".55"/>
+                      <circle cx="18" cy="18" r="0.6" fill={isDark?"#503010":"#4a3418"} opacity=".45"/>
+                      <circle cx="8" cy="30" r="0.5" fill={isDark?"#6a3c18":"#4a3018"} opacity=".4"/>
+                      <circle cx="28" cy="6" r="0.7" fill={isDark?"#4a2c10":"#3e2810"} opacity=".5"/>
+                    </pattern>
+                    {/* Rune marks — scattered faint glyphs in the soil */}
+                    <pattern id="runeMarks" x="0" y="0" width="120" height="90" patternUnits="userSpaceOnUse">
+                      <text x="12" y="24" fontSize="9" fill={isDark?"#5a3818":"#7a5030"} opacity=".22" fontFamily="serif">ᚠ</text>
+                      <text x="68" y="55" fontSize="7" fill={isDark?"#4a2810":"#6a4020"} opacity=".18" fontFamily="serif">ᛏ</text>
+                      <text x="98" y="18" fontSize="8" fill={isDark?"#5a3018":"#704028"} opacity=".14" fontFamily="serif">ᚱ</text>
+                      <text x="38" y="78" fontSize="6" fill={isDark?"#4a2c10":"#604020"} opacity=".2" fontFamily="serif">ᛟ</text>
+                      <text x="82" y="82" fontSize="9" fill={isDark?"#5a3818":"#6a4828"} opacity=".16" fontFamily="serif">ᚨ</text>
                     </pattern>
                   </defs>
                   <rect width="100%" height="100%" fill="url(#soilGrain)"/>
+                  <rect width="100%" height="100%" fill="url(#runeMarks)"/>
                 </svg>
-                {/* Scanline */}
-                <div style={{position:"absolute",top:0,height:"100%",width:"3px",background:`linear-gradient(to bottom,transparent,${signalColor}33,transparent)`,animation:"scanline 8s linear infinite",pointerEvents:"none",left:0,zIndex:2}}/>
-                {/* Soft signal halo around cursor */}
-                <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at ${detFrac.x*100}% ${detFrac.y*100}%, ${signalColor}22 0%, transparent 30%)`,pointerEvents:"none",transition:"background .15s",zIndex:2}}/>
-                {/* Concentric pings — proximity-driven speed makes the field feel
-                    more responsive. Faster pulses = closer = higher tension. */}
+
+                {/* Slow drifting mist — replaces arcade scanline */}
+                {[0,1,2].map(i=>(
+                  <div key={i} style={{
+                    position:"absolute",top:`${20+i*28}%`,left:0,right:0,
+                    height:"2px",
+                    background:`linear-gradient(to right, transparent 0%, ${isDark?"rgba(180,130,60,.18)":"rgba(100,60,20,.12)"} 30%, ${isDark?"rgba(180,130,60,.22)":"rgba(100,60,20,.15)"} 50%, ${isDark?"rgba(180,130,60,.18)":"rgba(100,60,20,.12)"} 70%, transparent 100%)`,
+                    animation:`mistDrift ${14+i*6}s linear ${i*4}s infinite`,
+                    pointerEvents:"none",zIndex:2,
+                    filter:"blur(1px)",
+                  }}/>
+                ))}
+
+                {/* Soft amber halo where detector points */}
+                <div style={{
+                  position:"absolute",inset:0,
+                  background:`radial-gradient(circle at ${detFrac.x*100}% ${detFrac.y*100}%, ${
+                    canDig ? "rgba(180,140,60,.18)" : signal>.55 ? "rgba(160,120,50,.12)" : "rgba(120,90,40,.07)"
+                  } 0%, transparent ${canDig?"28%":"22%"})`,
+                  pointerEvents:"none",transition:"background .3s",zIndex:2,
+                }}/>
+
+                {/* Detector rings — slow breath-like ripples in amber/ochre */}
                 {(()=>{
                   const m=METALS[huntCoin.metalIdx]||METALS[0];
-                  const ringColor=signal>0.55?(canDig?"#7cffb0":m.hl):signalColor;
-                  // Ring duration shortens as signal climbs — locked is fastest.
-                  const ringDur=canDig?0.7:signal>0.55?1.0:signal>0.28?1.3:1.8;
-                  return [0,1,2,3].map(i=>{const visible=signal>(i*.22);return(
-                    <div key={i} style={{
-                      position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,
-                      width:50+i*32,height:50+i*32,borderRadius:"50%",
-                      border:`${canDig?2:1.5}px solid ${ringColor}`,
-                      transform:"translate(-50%,-50%)",
-                      animation:`pingRing ${ringDur}s ease-out ${i*(ringDur*0.22)}s infinite`,
-                      opacity:visible?1:0,
-                      transition:"opacity .35s, border-color .25s, width .2s, height .2s",
-                      pointerEvents:"none",zIndex:3,
-                      boxShadow:canDig?`0 0 8px ${ringColor}44`:undefined,
-                    }}/>
-                  );});
+                  // Color: amber at low signal → metal hue at high → pale gold on lock
+                  const ringColor=canDig
+                    ? `rgba(212,180,80,.6)`
+                    : signal>0.55 ? m.hl+"88"
+                    : signal>0.28 ? `rgba(160,120,50,.5)`
+                    : `rgba(120,90,40,.35)`;
+                  const ringDur=canDig?2.8:signal>0.55?3.5:signal>0.28?4.5:6;
+                  return [0,1,2].map(i=>{
+                    const visible=signal>(i*.28);
+                    return(
+                      <div key={i} style={{
+                        position:"absolute",
+                        left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,
+                        width:44+i*36,height:44+i*36,
+                        borderRadius:"50%",
+                        border:`1px solid ${ringColor}`,
+                        transform:"translate(-50%,-50%)",
+                        animation:`runeRipple ${ringDur}s ease-out ${i*(ringDur*.28)}s infinite`,
+                        opacity:visible?1:0,
+                        transition:"opacity .5s, border-color .4s",
+                        pointerEvents:"none",zIndex:3,
+                      }}/>
+                    );
+                  });
                 })()}
-                {/* Cursor — radial-gradient fill + breathe pulse on signal,
-                    pulseDot when locked. Larger, glowier, more tactile. */}
+
+                {/* Detector cursor — small amber ember, no neon green */}
                 <div style={{
-                  position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,
-                  width:canDig?20:signal>0.55?14:10,
-                  height:canDig?20:signal>0.55?14:10,
+                  position:"absolute",
+                  left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,
+                  width:canDig?14:signal>0.55?10:7,
+                  height:canDig?14:signal>0.55?10:7,
                   borderRadius:"50%",
                   background:canDig
-                    ? `radial-gradient(circle,#a0ffcc,#50e890)`
-                    : `radial-gradient(circle,${signalColor},${signalColor}88)`,
+                    ? `radial-gradient(circle,#ffe8a0,#d4a017)`
+                    : signal>0.55
+                    ? `radial-gradient(circle,${METALS[huntCoin.metalIdx]?.hl||"#c8a060"},rgba(180,130,60,.6))`
+                    : `radial-gradient(circle,rgba(160,120,50,.8),rgba(120,90,40,.4))`,
                   transform:"translate(-50%,-50%)",
-                  border:`2px solid ${canDig?"rgba(80,255,144,.6)":signalColor+"66"}`,
+                  border:`1px solid ${canDig?"rgba(212,180,80,.5)":"rgba(160,120,50,.3)"}`,
                   boxShadow:canDig
-                    ? `0 0 0 4px rgba(80,255,144,.15),0 0 20px #50ff9088`
-                    : signal>.5?`0 0 10px ${signalColor}66`:"none",
-                  transition:"all .2s cubic-bezier(.34,1.56,.64,1)",
+                    ? `0 0 0 3px rgba(212,180,80,.12),0 0 14px rgba(212,160,23,.45)`
+                    : signal>.5 ? `0 0 8px rgba(160,120,50,.4)` : "none",
+                  transition:"all .3s ease",
                   pointerEvents:"none",
-                  animation:canDig
-                    ? "pulseDot .9s ease-in-out infinite"
-                    : signal>0.55?"breathe 1.4s ease-in-out infinite":"none",
-                  color:canDig?"#50ff90":signalColor,zIndex:4,
+                  animation:canDig?"pulseDot 2s ease-in-out infinite":signal>0.55?"breathe 2.2s ease-in-out infinite":"none",
+                  zIndex:4,
                 }}/>
-                {/* Sense text / idle hint — single position, content varies by signal level */}
+                {/* Sense text / idle hint */}
                 <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:5}}>
                   {(()=>{
                     const lvl=senseLevel(signal);
                     if(!lvl)return(
-                      <span style={{...mu,fontSize:13,opacity:.5,fontStyle:"italic",letterSpacing:1,color:isDark?"#8a7560":"#3a2814"}}>Sweep to scan</span>
+                      <span style={{...mu,fontSize:12,opacity:.38,fontStyle:"italic",letterSpacing:1.5,color:isDark?"#7a6248":"#4a3420"}}>sweep to seek</span>
                     );
                     const phrases=SENSE_PHRASES[lvl];
                     const phrase=phrases[huntCoin.seed%phrases.length];
+                    const lockedColor=isDark?"#d4b880":"#8a6030";
                     return(
-                      <span key={lvl} style={{...mu,fontSize:lvl==="locked"?14:13,opacity:lvl==="locked"?.95:.7,fontStyle:"italic",letterSpacing:1,color:lvl==="locked"?"#50ff90":isDark?"#c8b89a":"#3a2814",textShadow:lvl==="locked"?"0 0 10px #50ff9066":"none",animation:"fadein .4s ease"}}>{phrase}</span>
+                      <span key={lvl} style={{
+                        ...mu,
+                        fontSize:lvl==="locked"?13:12,
+                        opacity:lvl==="locked"?0.88:lvl==="strong"?0.65:0.5,
+                        fontStyle:"italic",
+                        letterSpacing:1.2,
+                        color:lvl==="locked"?lockedColor:isDark?"#9a8468":"#5a4428",
+                        textShadow:lvl==="locked"?`0 0 12px rgba(212,160,23,.35)`:"none",
+                        animation:"fadein .6s ease",
+                        textTransform:"lowercase",
+                      }}>{phrase}</span>
                     );
                   })()}
                 </div>
@@ -2797,7 +3051,7 @@ export default function MintForge(){
               )}
             </>)}
             {phase==="dig"&&foundCoin&&(
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16,animation:"fadein .35s ease"}}>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16,animation:"fadein .28s cubic-bezier(.4,0,.2,1)"}}>
                 <div style={{...sectionTitle,textAlign:"center"}}>Excavate</div>
                 <div style={{display:"flex",gap:8,flexWrap:"wrap",justifyContent:"center"}}>
                   <div style={{...microLabel,fontSize:10,padding:"5px 11px",background:isDark?"#0e2010":"#e8f5ec",border:`1px solid ${isDark?"#1e3820":"#aadaba"}`,borderRadius:6,color:t.success}}>⚡ 1–2 digs · rarity up</div>
@@ -2840,7 +3094,7 @@ export default function MintForge(){
 
         {/* ─── FORGE ─── */}
         {tab==="forge"&&(
-          <div style={{animation:"fadein .35s ease"}}>
+          <div style={{animation:"fadein .28s cubic-bezier(.4,0,.2,1)"}}>
             <div style={{margin:"-18px -14px 16px",padding:"36px 22px 20px",background:isDark?"linear-gradient(to bottom,#0a0402 0%,#1a0a04 40%,transparent 100%)":"linear-gradient(to bottom,#f0d8a0 0%,#e8c890 40%,transparent 100%)",position:"relative",overflow:"hidden",borderBottom:`1px solid ${isDark?"rgba(200,80,10,.18)":"rgba(180,80,20,.2)"}`}}>
               <div style={{position:"absolute",bottom:-12,left:"50%",width:280,height:70,borderRadius:"50%",background:`radial-gradient(ellipse,${isDark?"rgba(255,90,10,.28)":"rgba(220,80,10,.28)"},transparent 70%)`,transform:"translateX(-50%)",pointerEvents:"none",filter:"blur(2px)"}}/>
               <div style={{position:"absolute",bottom:0,left:"22%",width:90,height:50,borderRadius:"50%",background:`radial-gradient(ellipse,${isDark?"rgba(255,60,5,.18)":"rgba(220,60,10,.2)"},transparent 70%)`,pointerEvents:"none"}}/>
@@ -2922,7 +3176,7 @@ export default function MintForge(){
         {/* ─── TAVERN ─── */}
         {/* ─── SHRINE ─── */}
         {tab==="shrine"&&(
-          <div style={{animation:"fadein .35s ease"}}>
+          <div style={{animation:"fadein .28s cubic-bezier(.4,0,.2,1)"}}>
             <div style={{margin:"-18px -14px 16px",padding:"36px 22px 20px",background:isDark?"linear-gradient(to bottom,#020a14 0%,#04101e 50%,transparent 100%)":"linear-gradient(to bottom,#d8dde8 0%,#c8d2e0 50%,transparent 100%)",position:"relative",overflow:"hidden",borderBottom:`1px solid ${isDark?"rgba(120,140,200,.18)":"rgba(120,140,200,.2)"}`}}>
               <div style={{position:"absolute",top:"30%",left:"20%",width:140,height:140,borderRadius:"50%",background:`radial-gradient(circle,${isDark?"rgba(180,200,255,.12)":"rgba(180,200,255,.15)"},transparent 70%)`,pointerEvents:"none",filter:"blur(4px)",animation:"flicker 4s linear infinite"}}/>
               <div style={{position:"absolute",top:"40%",right:"15%",width:90,height:90,borderRadius:"50%",background:`radial-gradient(circle,${isDark?"rgba(200,160,255,.16)":"rgba(200,160,255,.18)"},transparent 70%)`,pointerEvents:"none",filter:"blur(4px)",animation:"flicker 3.2s linear infinite"}}/>
@@ -2953,7 +3207,7 @@ export default function MintForge(){
               }
               const metalsWithEnough=Object.entries(grouped).filter(([,arr])=>arr.length>=5).map(([m])=>+m);
               return(
-                <div style={{animation:"fadein .25s ease"}}>
+                <div style={{animation:"fadein .22s cubic-bezier(.4,0,.2,1)"}}>
                   <div style={{...mu,fontSize:12,marginBottom:12,fontStyle:"italic",padding:"0 2px"}}>Combine 5 coins of the same metal to forge an artefact. Higher rarity coins yield finer grades.</div>
                   {coins.filter(c=>!c.locked).length<5?(
                     <div style={{...card,padding:"24px 18px",textAlign:"center"}}>
@@ -2999,7 +3253,7 @@ export default function MintForge(){
             })()}
 
             {shrineView==="collection"&&(
-              <div style={{animation:"fadein .25s ease"}}>
+              <div style={{animation:"fadein .22s cubic-bezier(.4,0,.2,1)"}}>
                 <div style={{...mu,fontSize:12,marginBottom:12,fontStyle:"italic",padding:"0 2px"}}>Forged artefacts. Future updates will let these grant passive effects, unlock avatars, or summon companions.</div>
                 {artefacts.length===0?(
                   <div style={{...card,padding:"32px 18px",textAlign:"center"}}>
@@ -3037,7 +3291,7 @@ export default function MintForge(){
 
         {/* ─── TAVERN ─── */}
         {tab==="tavern"&&(
-          <div style={{animation:"fadein .35s ease"}}>
+          <div style={{animation:"fadein .28s cubic-bezier(.4,0,.2,1)"}}>
             <div style={{margin:"-18px -14px 16px",padding:"36px 22px 20px",background:isDark?"linear-gradient(to bottom,#0e0604 0%,#1a0a04 40%,transparent 100%)":"linear-gradient(to bottom,#f0d8a8 0%,#e8c898 40%,transparent 100%)",position:"relative",overflow:"hidden",borderBottom:`1px solid ${isDark?"rgba(180,80,20,.18)":"rgba(180,80,20,.2)"}`}}>
               <div style={{position:"absolute",bottom:0,left:"15%",width:90,height:90,borderRadius:"50%",background:`radial-gradient(circle,${isDark?"rgba(220,90,15,.32)":"rgba(220,90,15,.3)"},transparent 70%)`,pointerEvents:"none",filter:"blur(2px)",animation:"flicker 2s linear infinite"}}/>
               <div style={{position:"absolute",bottom:0,right:"18%",width:70,height:70,borderRadius:"50%",background:`radial-gradient(circle,${isDark?"rgba(220,90,15,.26)":"rgba(220,90,15,.24)"},transparent 70%)`,pointerEvents:"none",filter:"blur(2px)",animation:"flicker 1.6s linear infinite"}}/>
@@ -3063,7 +3317,7 @@ export default function MintForge(){
 
             {/* ── SHOP VIEW ── */}
             {tavernView==="shop"&&(
-              <div style={{animation:"fadein .25s ease"}}>
+              <div style={{animation:"fadein .22s cubic-bezier(.4,0,.2,1)"}}>
                 {/* Shop sub-tab picker */}
                 <div style={{display:"flex",gap:5,marginBottom:12,padding:3,borderRadius:9,background:t.surfaceHi,border:`1px solid ${t.border}`}}>
                   {[["tarot","🃏","Tarot"],["banners","🖼","Banners"],["titles","✦","Titles"]].map(([id,ic,lbl])=>{const active=shopTab===id;return(
@@ -3174,7 +3428,7 @@ export default function MintForge(){
               const canRepair=missing>0&&marks>=cost;
               const durPct=Math.round((shovelDur/maxDur)*100);
               return(
-                <div style={{animation:"fadein .25s ease",display:"flex",flexDirection:"column",gap:14}}>
+                <div style={{animation:"fadein .22s cubic-bezier(.4,0,.2,1)",display:"flex",flexDirection:"column",gap:14}}>
                   <div style={{...card,padding:"18px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:14}}>
                       <div style={{width:54,height:54,background:`linear-gradient(135deg,${t.surfaceHi},${t.surface})`,borderRadius:11,display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${t.borderHi}`}}><ShovelIcon level={shovelLevel} size={40}/></div>
@@ -3218,7 +3472,7 @@ export default function MintForge(){
                 between this player and friends. The actual challenge button
                 lives on friend profiles (Social tab) — this is the inbox. */}
             {tavernView==="duels"&&(
-              <div style={{animation:"fadein .25s ease"}}>
+              <div style={{animation:"fadein .22s cubic-bezier(.4,0,.2,1)"}}>
                 <div style={{padding:"4px 4px 14px",...mu,fontSize:12,fontStyle:"italic",lineHeight:1.55}}>
                   Stake a coin against a friend\'s. Best of three flips. Winner takes both.
                   <br/><span style={{opacity:.7}}>Visit a friend\'s profile to send a challenge.</span>
@@ -3306,7 +3560,7 @@ export default function MintForge(){
         const close=()=>setDuelStakeIntent(null);
         return(
           <div onClick={close} style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.78)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"fadein .18s ease",padding:"20px 12px"}}>
-            <div onClick={e=>e.stopPropagation()} style={{...card,width:"100%",maxWidth:480,maxHeight:"80vh",overflowY:"auto",padding:"16px 14px",display:"flex",flexDirection:"column",gap:12,animation:"slideUp .22s ease",borderColor:t.borderHi}}>
+            <div onClick={e=>e.stopPropagation()} style={{...card,width:"100%",maxWidth:480,maxHeight:"80vh",overflowY:"auto",padding:"16px 14px",display:"flex",flexDirection:"column",gap:12,animation:"slideUpSpring .38s cubic-bezier(.34,1.56,.64,1)",borderColor:t.borderHi}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{...sectionTitle,fontSize:16}}>{duelStakeIntent.kind==="create"?"Stake a Coin":"Match Their Stake"}</div>
                 <button onClick={close} style={{padding:"4px 10px",borderRadius:6,border:"none",background:"transparent",cursor:"pointer",...F,fontSize:18,color:t.muted,lineHeight:1}}>✕</button>
@@ -3340,7 +3594,7 @@ export default function MintForge(){
         const close=()=>setDuelResult(null);
         const {flips,won,winnerUsername,duel}=duelResult;
         return(
-          <div onClick={close} style={{position:"fixed",inset:0,zIndex:210,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",animation:"fadein .25s ease",padding:"20px 16px"}}>
+          <div onClick={close} style={{position:"fixed",inset:0,zIndex:210,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",animation:"fadein .22s cubic-bezier(.4,0,.2,1)",padding:"20px 16px"}}>
             <div onClick={e=>e.stopPropagation()} style={{...card,width:"100%",maxWidth:420,padding:"22px 18px",display:"flex",flexDirection:"column",alignItems:"center",gap:18,borderColor:won?t.success:t.danger,boxShadow:`0 0 30px ${won?t.success:t.danger}33`}}>
               <div style={{...sectionTitle,fontSize:20,letterSpacing:2,color:won?t.success:t.danger,textShadow:`0 0 14px ${won?t.success:t.danger}55`,animation:"fadein .4s ease .8s both"}}>
                 {won?"⚔ VICTORY":"⚔ DEFEAT"}
@@ -3407,7 +3661,7 @@ export default function MintForge(){
           Shows all coins, tapping one assigns it to the slot. */}
       {pickerSlot!==null&&(
         <div onClick={()=>setPickerSlot(null)} style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.7)",backdropFilter:"blur(8px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"fadein .18s ease",padding:"24px 12px"}}>
-          <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,maxHeight:"80vh",background:t.surface,border:`1px solid ${t.borderHi}`,borderRadius:16,boxShadow:"0 -12px 40px rgba(0,0,0,.6)",display:"flex",flexDirection:"column",animation:"slideUp .25s cubic-bezier(.2,.8,.3,1)"}}>
+          <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,maxHeight:"80vh",background:t.surface,border:`1px solid ${t.borderHi}`,borderRadius:16,boxShadow:"0 -12px 40px rgba(0,0,0,.6)",display:"flex",flexDirection:"column",animation:"slideUpSpring .38s cubic-bezier(.34,1.56,.64,1)"}}>
             <div style={{padding:"16px 18px 12px",borderBottom:`1px solid ${t.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
               <div>
                 <div style={{...FR,fontWeight:800,fontSize:16,letterSpacing:-.2,color:t.text}}>Choose a coin</div>
@@ -3454,7 +3708,7 @@ export default function MintForge(){
         const ready=shrineSelection.length===5&&marks>=cost;
         return(
           <div onClick={close} style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.78)",backdropFilter:"blur(8px)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"fadein .18s ease",padding:"20px 12px"}}>
-            <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,maxHeight:"85vh",background:t.surface,border:`1px solid ${m.eng}88`,borderRadius:16,boxShadow:"0 -12px 40px rgba(0,0,0,.6)",display:"flex",flexDirection:"column",animation:"slideUp .25s cubic-bezier(.2,.8,.3,1)"}}>
+            <div onClick={e=>e.stopPropagation()} style={{width:"100%",maxWidth:520,maxHeight:"85vh",background:t.surface,border:`1px solid ${m.eng}88`,borderRadius:16,boxShadow:"0 -12px 40px rgba(0,0,0,.6)",display:"flex",flexDirection:"column",animation:"slideUpSpring .38s cubic-bezier(.34,1.56,.64,1)"}}>
               <div style={{padding:"16px 18px 12px",borderBottom:`1px solid ${t.border}`,display:"flex",alignItems:"center",gap:12}}>
                 <div style={{width:46,height:46,borderRadius:11,background:isDark?`linear-gradient(135deg,${m.dark},${m.mid})`:`linear-gradient(135deg,${m.mid},${m.base})`,border:`1px solid ${m.eng}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:m.hl,fontFamily:"'Fraunces',serif",flexShrink:0,overflow:"hidden"}}>{def.art?<img src={`/artefacts/${def.art}.webp`} alt={def.name} loading="lazy" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:def.icon}</div>
                 <div style={{flex:1,minWidth:0}}>
