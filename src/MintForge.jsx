@@ -89,8 +89,52 @@ button{-webkit-tap-highlight-color:transparent;}
 .shiny-card{position:relative;}
 .shiny-aura{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:0;animation:shinyAuraGlow 2.4s linear infinite;}
 .shiny-card>*:not(.shiny-aura){position:relative;z-index:1;}
+
+/* ── Design handoff: motion polish ──────────────────────────────────── */
+/* Spring entrances — for first-mounts (modals, banners, fanfares). Used sparingly. */
+@keyframes slideUpSpring{0%{opacity:0;transform:translateY(60px) scale(.94)}65%{opacity:1;transform:translateY(-6px) scale(1.01)}82%{transform:translateY(3px) scale(.995)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes scaleInSpring{0%{opacity:0;transform:scale(0.5)}60%{opacity:1;transform:scale(1.08)}80%{transform:scale(0.97)}100%{opacity:1;transform:scale(1)}}
+@keyframes flashInBig{0%{opacity:0;transform:scale(.55) translateY(24px)}50%{transform:scale(1.12) translateY(-6px)}72%{transform:scale(.97) translateY(2px)}100%{opacity:1;transform:scale(1) translateY(0)}}
+
+/* Hunt screen — proximity-driven ping */
+@keyframes pingRing{0%{transform:translate(-50%,-50%) scale(0.6);opacity:.9}100%{transform:translate(-50%,-50%) scale(4.2);opacity:0}}
+@keyframes breathe{0%,100%{opacity:.7;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.035)}}
+
+/* Dig pit — feedback motion */
+@keyframes cellImpact{0%{transform:scale(1)}18%{transform:scale(.82) translateY(6px)}50%{transform:scale(1.04) translateY(-2px)}100%{transform:scale(1) translateY(0)}}
+@keyframes dirtPuff{0%{opacity:1;transform:translate(-50%,-50%) scale(0) rotate(0deg)}60%{opacity:.7}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1) rotate(var(--dr))}}
+@keyframes shakeHard{0%,100%{transform:translate(0,0)}15%{transform:translate(-8px,2px)}30%{transform:translate(8px,-2px)}50%{transform:translate(-5px,3px)}70%{transform:translate(6px,-1px)}85%{transform:translate(-3px,1px)}}
+
+/* Marks counter — tick + flash */
+@keyframes marksFlash{0%{color:inherit}20%{color:#ffe878;text-shadow:0 0 10px rgba(255,232,120,.9)}100%{color:inherit;text-shadow:none}}
+
+/* Lucky fanfare — bigger entrance */
+@keyframes luckySlamBig{0%{opacity:0;transform:translateY(-80px) scale(.35)}45%{opacity:1;transform:translateY(8px) scale(1.18)}65%{transform:translateY(-4px) scale(.97)}80%{transform:translateY(2px) scale(1.01)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes luckyFlash{0%{opacity:0}8%{opacity:.35}25%{opacity:0}100%{opacity:0}}
+@keyframes luckySubtitle{0%{opacity:0;transform:translateY(10px) scale(.9)}60%{opacity:1;transform:translateY(-2px) scale(1.02)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes luckyRing{0%{transform:translate(-50%,-50%) scale(0);opacity:.8}100%{transform:translate(-50%,-50%) scale(3.5);opacity:0}}
+
+/* Nav button feedback */
+@keyframes navPop{0%{transform:scale(1)}40%{transform:scale(1.28)}70%{transform:scale(.92)}100%{transform:scale(1)}}
+@keyframes navBarSlide{from{transform:translateX(-50%) scaleX(.4);opacity:0}to{transform:translateX(-50%) scaleX(1);opacity:1}}
+
+/* Coin reveal banner */
+@keyframes coinEmerge{0%{filter:brightness(.25) saturate(0);transform:scale(.88)}60%{filter:brightness(.85) saturate(.6);transform:scale(1.04)}100%{filter:brightness(1) saturate(1);transform:scale(1)}}
+@keyframes rayExpand{0%{opacity:0;transform:translate(-50%,-100%) scaleY(0);transform-origin:bottom center}30%{opacity:1}100%{opacity:0;transform:translate(-50%,-100%) scaleY(1);transform-origin:bottom center}}
+
+/* Card hover lift — works on coin tiles, tarot cards, anything that wants tactile feedback */
+.coin-card{transition:transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s, border-color .18s;}
+.coin-card:hover{transform:translateY(-4px) scale(1.02);}
+.coin-card:active{transform:translateY(0) scale(.97);}
+
+/* Bottom nav button feedback */
+.nav-btn{transition:transform .15s cubic-bezier(.34,1.56,.64,1), color .15s;}
+.nav-btn:active{transform:scale(.88) !important;}
+.nav-icon{transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
+
 .noise-overlay{position:absolute;inset:0;pointer-events:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/></svg>");mix-blend-mode:overlay}
-.tab-active-indicator{position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:2px;border-radius:0 0 2px 2px;background:currentColor;box-shadow:0 0 8px currentColor}
+/* Animated tab indicator on bottom nav (replaces the static one) */
+.tab-active-indicator{position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:2.5px;border-radius:0 0 3px 3px;background:currentColor;box-shadow:0 0 10px currentColor,0 0 20px currentColor;animation:navBarSlide .25s cubic-bezier(.34,1.56,.64,1) forwards;}
 `;
   document.head.appendChild(s);
 }
@@ -285,14 +329,30 @@ function Particles({active,type,origin}){
 
 /* ─── LUCKY FANFARE ───────────────────────────────────────────────────── */
 function LuckyFanfare({show,onDone}){
-  useEffect(()=>{if(show){const t=setTimeout(onDone,2000);return()=>clearTimeout(t);}},[show,onDone]);
+  useEffect(()=>{if(show){const t=setTimeout(onDone,2200);return()=>clearTimeout(t);}},[show,onDone]);
   if(!show)return null;
   return(
     <div style={{position:"fixed",inset:0,zIndex:170,pointerEvents:"none",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <Particles active={show} type="lucky" origin={{x:50,y:55}}/>
-      <div style={{textAlign:"center",animation:"luckySlam .55s cubic-bezier(.2,.9,.3,1.1) forwards"}}>
-        <div style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:74,fontStyle:"italic",color:"#ffe878",letterSpacing:-1,lineHeight:1,textShadow:"0 0 30px rgba(212,160,23,.6),0 4px 0 #6a3800,0 6px 12px rgba(0,0,0,.4)"}}>Lucky!</div>
-        <div style={{fontFamily:"Outfit,sans-serif",fontWeight:800,fontSize:14,color:"#d4a017",letterSpacing:4,marginTop:6,textTransform:"uppercase"}}>⚡ Rarity Upgraded</div>
+      {/* Screen-wide warm flash on entry */}
+      <div style={{position:"absolute",inset:0,background:"rgba(255,232,120,.18)",animation:"luckyFlash .5s ease-out forwards",pointerEvents:"none"}}/>
+      {/* Three concentric expanding rings, staggered. Centered at viewport middle. */}
+      {[0,150,300].map(delay=>(
+        <div key={delay} style={{position:"absolute",left:"50%",top:"50%",width:120,height:120,borderRadius:"50%",border:"2px solid rgba(255,232,120,.7)",animation:`luckyRing 1.2s ease-out ${delay}ms forwards`,pointerEvents:"none"}}/>
+      ))}
+      <Particles active={show} type="lucky" origin={{x:50,y:52}}/>
+      <div style={{textAlign:"center",position:"relative",zIndex:2}}>
+        <div style={{
+          fontFamily:"'Fraunces',serif",fontWeight:900,fontSize:82,fontStyle:"italic",
+          color:"#ffe878",letterSpacing:-2,lineHeight:1,
+          textShadow:"0 0 40px rgba(212,160,23,.8),0 0 80px rgba(212,160,23,.4),0 5px 0 #6a3800,0 8px 20px rgba(0,0,0,.5)",
+          animation:"luckySlamBig .6s cubic-bezier(.2,.9,.3,1.15) forwards",
+        }}>Lucky!</div>
+        <div style={{
+          fontFamily:"Outfit,sans-serif",fontWeight:800,fontSize:13,color:"#d4a017",
+          letterSpacing:5,marginTop:10,textTransform:"uppercase",
+          animation:"luckySubtitle .4s ease-out .35s both",
+          textShadow:"0 0 12px rgba(212,160,23,.6)",
+        }}>⚡ Rarity Upgraded</div>
       </div>
     </div>
   );
@@ -379,19 +439,41 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,onCellScrap,firstStrikeBonus
   const[dug,setDug]=useState({});const[shake,setShake]=useState(null);const[found,setFound]=useState(null);
   const[touchPick,setTouchPick]=useState(null);  // {x,y} screen coords for touch follower
   const[swingCell,setSwingCell]=useState(null);  // cell idx currently animating swing
+  // Dirt puff particles — spawned on each dig tap, auto-cleaned after animation.
+  // Each entry: {id, x, y, puffs:[{id, dx, dy, dr, size, dur}]} positioned in fixed coords.
+  const[dirtPuffs,setDirtPuffs]=useState([]);
   const cntRef=useRef(0);
+  const puffIdRef=useRef(0);
   // Effective coin cell — defaults to seed-derived but can be overridden by
   // The Chariot's firstStrikeBonus on the first tap (see dig handler below).
   const[coinCellOverride,setCoinCellOverride]=useState(null);
   const effectiveCoinCell=coinCellOverride!=null?coinCellOverride:coinCell;
 
   // Reset when coin changes (per-hunt freshness)
-  useEffect(()=>{setDug({});setShake(null);setFound(null);cntRef.current=0;setTouchPick(null);setSwingCell(null);setCoinCellOverride(null);},[coin.seed]);
+  useEffect(()=>{setDug({});setShake(null);setFound(null);cntRef.current=0;setTouchPick(null);setSwingCell(null);setCoinCellOverride(null);setDirtPuffs([]);},[coin.seed]);
 
   const dig=(idx,e)=>{
     if(dug[idx]||found!==null)return;
     // Trigger swing animation in the clicked cell (visual feedback for both PC + mobile)
     setSwingCell(idx);setTimeout(()=>setSwingCell(c=>c===idx?null:c),380);
+    // Spawn dirt puff particles at the cell's screen position. 8 puffs radiating
+    // outward in a circle with jitter. Auto-cleaned after 700ms.
+    if(e?.currentTarget?.getBoundingClientRect){
+      const rect=e.currentTarget.getBoundingClientRect();
+      const cx=rect.left+rect.width/2;
+      const cy=rect.top+rect.height/2;
+      const puffId=++puffIdRef.current;
+      const puffs=Array.from({length:8},(_,i)=>({
+        id:i,
+        dx:`${(Math.cos((i/8)*Math.PI*2)*28+((Math.random()-.5)*18)).toFixed(1)}px`,
+        dy:`${(Math.sin((i/8)*Math.PI*2)*28-10+((Math.random()-.5)*14)).toFixed(1)}px`,
+        dr:`${(Math.random()-.5)*180}deg`,
+        size:4+Math.random()*5,
+        dur:`${(0.35+Math.random()*0.25).toFixed(2)}s`,
+      }));
+      setDirtPuffs(p=>[...p,{id:puffId,x:cx,y:cy,puffs}]);
+      setTimeout(()=>setDirtPuffs(p=>p.filter(x=>x.id!==puffId)),700);
+    }
     // The Chariot tarot: on the player's FIRST tap of this dig, with probability
     // firstStrikeBonus, the coin teleports to the tapped cell (instant find).
     // The roll is deterministic per coin so refreshing doesn't change outcomes.
@@ -435,6 +517,23 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,onCellScrap,firstStrikeBonus
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14,position:"relative"}}>
       {/* Touch-only floating pickaxe so the player can see where they're about to tap */}
       {touchPick&&<div style={{position:"fixed",left:touchPick.x,top:touchPick.y,pointerEvents:"none",zIndex:60,fontSize:34,transform:"translate(-50%,-90%) rotate(-25deg)",filter:"drop-shadow(0 2px 4px rgba(0,0,0,.7))"}}>⛏</div>}
+      {/* Dirt puff particles — spawned per dig tap, fixed-positioned at cell center.
+          Each puff radiates outward and rotates, then fades out via dirtPuff keyframe.
+          The CSS vars --dx/--dy/--dr drive the final transform offset. */}
+      {dirtPuffs.map(puff=>(
+        <div key={puff.id} style={{position:"fixed",inset:0,pointerEvents:"none",zIndex:65}}>
+          {puff.puffs.map(p=>(
+            <div key={p.id} style={{
+              position:"fixed",left:puff.x,top:puff.y,
+              width:p.size,height:p.size,borderRadius:"50%",
+              background:`hsl(${20+(p.id*4)%20},${40+(p.id*7)%20}%,${30+(p.id*5)%20}%)`,
+              animation:`dirtPuff ${p.dur} ease-out forwards`,
+              "--dx":p.dx,"--dy":p.dy,"--dr":p.dr,
+              pointerEvents:"none",
+            }}/>
+          ))}
+        </div>
+      ))}
       <div style={{padding:12,paddingTop:18,background:isDark?"linear-gradient(to bottom,#231408,#170c04)":"linear-gradient(to bottom,#6a4218,#3a240c)",border:`3px solid ${isDark?"#5a3c18":"#8a5828"}`,borderRadius:16,boxShadow:`inset 0 6px 24px rgba(0,0,0,.7),0 8px 24px rgba(0,0,0,.4)`,position:"relative"}}
         onPointerMove={trackPointer} onPointerDown={trackPointer} onPointerLeave={()=>setTouchPick(null)}>
         <div style={{position:"absolute",top:0,left:0,right:0,height:14,background:"linear-gradient(to bottom,#8a5a28,#4a2c10)",borderRadius:"13px 13px 0 0",borderBottom:"1px solid #2a1808"}}/>
@@ -446,7 +545,7 @@ function DigPit({coin,shovelLevel,onFound,onTooDeep,onCellScrap,firstStrikeBonus
             const cr=new RNG(coin.seed^idx^0xba5e);
             const sc=["#c8a460","#c09858","#bfa066","#c8aa70","#d0b070"][cr.int(0,4)];
             return(
-              <div key={idx} onPointerDown={(e)=>dig(idx,e)} style={{width:cellSize,height:cellSize,borderRadius:9,position:"relative",overflow:"hidden",border:`1.5px solid ${isDug?"#3a2410":"#6a4220"}`,cursor:isDug?"default":"pointer",animation:isShaking?"shake .4s ease-out":isFound?"cellReveal .5s ease-out":"none",background:isDug?(isFound?"#1a2810":tooDeep?"#2a1408":"#3a2210"):"transparent",transition:"background .15s,border-color .15s",touchAction:"manipulation"}}
+              <div key={idx} onPointerDown={(e)=>dig(idx,e)} style={{width:cellSize,height:cellSize,borderRadius:9,position:"relative",overflow:"hidden",border:`1.5px solid ${isDug?"#3a2410":isSwinging?"#d4a01788":"#6a4220"}`,cursor:isDug?"default":"pointer",animation:isShaking?"shakeHard .4s ease-out":isFound?"scaleInSpring .45s cubic-bezier(.34,1.56,.64,1)":isDug?"cellImpact .3s ease-out":"none",background:isDug?(isFound?"#1a2810":tooDeep?"#2a1408":"#3a2210"):"transparent",transition:"background .15s,border-color .15s",touchAction:"manipulation"}}
                 onMouseEnter={e=>{if(!isDug){e.currentTarget.style.borderColor="#d4a017";const h=e.currentTarget.querySelector(".hl");if(h)h.style.opacity="1";}}}
                 onMouseLeave={e=>{if(!isDug){e.currentTarget.style.borderColor="#6a4220";const h=e.currentTarget.querySelector(".hl");if(h)h.style.opacity="0";}}}>
                 {!isDug&&<>
@@ -558,14 +657,18 @@ function RevealBanner({coin,onDone}){
       {!isShiny&&isHighRarity&&<div style={{position:"absolute",width:280,height:280,borderRadius:"50%",background:`radial-gradient(circle,${r.color}55,transparent 70%)`,animation:"subtlePulse 2s ease-in-out infinite",pointerEvents:"none",filter:"blur(8px)"}}/>}
       <div style={{textAlign:"center",animation:"flashIn .5s cubic-bezier(.2,.8,.3,1) forwards",padding:"0 24px",position:"relative",zIndex:1,maxWidth:420}}>
         {isShiny&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:13,fontWeight:800,letterSpacing:5,marginBottom:14,color:m.hl,textShadow:`0 0 14px ${m.hl}88`}}>✦ SHINY DISCOVERED ✦</div>}
-        {/* Big rarity headline — this is the dominant signal now */}
-        <div style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontStyle:"italic",fontSize:isHighRarity?34:24,letterSpacing:-.5,color:r.color,marginBottom:6,textShadow:isHighRarity?`0 0 24px ${r.glow},0 2px 8px rgba(0,0,0,.6)`:`0 0 12px ${r.glow}`,lineHeight:1}}>{r.name}</div>
+        {/* Big rarity headline — flashInBig spring entrance for emphasis */}
+        <div style={{fontFamily:"'Fraunces',serif",fontWeight:900,fontStyle:"italic",fontSize:isHighRarity?34:24,letterSpacing:-.5,color:r.color,marginBottom:6,textShadow:isHighRarity?`0 0 24px ${r.glow},0 2px 8px rgba(0,0,0,.6)`:`0 0 12px ${r.glow}`,lineHeight:1,animation:"flashInBig .55s cubic-bezier(.2,.9,.3,1.15) forwards"}}>{r.name}</div>
         {coin.digBonus==="first"&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:10,fontWeight:800,color:"#ffd060",letterSpacing:4,marginBottom:14,textTransform:"uppercase",textShadow:"0 0 12px rgba(255,208,96,.6)"}}>★ First-try strike</div>}
         {coin.digBonus==="lucky"&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:10,fontWeight:700,color:"#7ad888",letterSpacing:4,marginBottom:14,textTransform:"uppercase"}}>⚡ Lucky find</div>}
         {coin.digBonus==="damaged"&&<div style={{fontFamily:"Outfit,sans-serif",fontSize:10,fontWeight:700,color:"#e07050",letterSpacing:4,marginBottom:14,textTransform:"uppercase"}}>✕ Over-excavated</div>}
         {!coin.digBonus&&<div style={{height:14,marginBottom:8}}/>}
         <div style={{display:"flex",justifyContent:"center",marginBottom:18,position:"relative"}}>
-          <CoinCanvas coin={coin} size={180}/>
+          {/* Coin canvas wrapped in a div that applies coinEmerge — saturates up
+              from a desaturated/dark state, like the coin emerging from soil. */}
+          <div style={{animation:"coinEmerge .8s ease-out .15s both"}}>
+            <CoinCanvas coin={coin} size={180}/>
+          </div>
           {/* Rays from the coin — for shiny use warm metal hue, not rainbow.
               For high-rarity finds, use the rarity color. */}
           {[0,60,120,180,240,300].map(deg=>(
@@ -1119,22 +1222,65 @@ function PickaxeIcon({level=1,size=44}){
 /* ─── BOTTOM NAV ──────────────────────────────────────────────────────── */
 function BottomNav({tab,setTab,huntActive,t}){
   const items=[["profile","☉","Profile"],["social","♟","Social"],["vault","◈","Vault"],["hunt","⛏","Hunt"],["forge","⚒","Forge"],["shrine","✧","Shrine"],["tavern","♢","Tavern"]];
+  // Track which tab was JUST switched to so we can play navPop on its icon once.
+  // animKey is a Date.now stamp keyed by tab id — it changes on each switch,
+  // forcing React to rerun the animation by remounting the keyed indicator div.
+  const [animKey,setAnimKey]=useState({});
+  const handleTab=(id)=>{
+    if(id===tab)return;
+    setAnimKey(k=>({...k,[id]:Date.now()}));
+    setTab(id);
+  };
   return(
     <nav style={{position:"fixed",bottom:0,left:0,right:0,zIndex:90,background:t.nav,borderTop:`1px solid ${t.border}`,backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",display:"flex",justifyContent:"space-around",padding:"4px 2px 8px",paddingBottom:`calc(8px + env(safe-area-inset-bottom,0px))`}}>
       {items.map(([id,icon,lbl])=>{
         const active=tab===id;
         return(
-          <button key={id} onClick={()=>setTab(id)} style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 6px 6px",border:"none",cursor:"pointer",background:"transparent",minWidth:48,flex:1,maxWidth:80,transition:"all .18s",color:active?t.accent:t.muted}}>
-            {active&&<div className="tab-active-indicator"/>}
-            <span style={{fontSize:19,lineHeight:1,fontFamily:"'Fraunces',serif",fontWeight:active?900:600,transition:"transform .18s",transform:active?"scale(1.05)":"scale(1)",position:"relative"}}>
+          <button key={id} onClick={()=>handleTab(id)} className="nav-btn" style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"10px 6px 6px",border:"none",cursor:"pointer",background:"transparent",minWidth:48,flex:1,maxWidth:80,color:active?t.accent:t.muted,transform:active?"scale(1.04)":"scale(1)"}}>
+            {/* Keyed by animKey so a new switch remounts the indicator and replays navBarSlide */}
+            {active&&<div key={animKey[id]||id} className="tab-active-indicator" style={{color:t.accent}}/>}
+            {/* Soft active backdrop pill for stronger visual anchor */}
+            {active&&<div style={{position:"absolute",inset:"4px 2px",borderRadius:10,background:`${t.accent}0d`,pointerEvents:"none"}}/>}
+            <span className="nav-icon" style={{fontSize:active?21:18,lineHeight:1,fontFamily:"'Fraunces',serif",fontWeight:active?900:600,position:"relative",animation:animKey[id]?"navPop .35s cubic-bezier(.34,1.56,.64,1) forwards":undefined}}>
               {icon}
               {id==="hunt"&&huntActive&&<span style={{position:"absolute",top:-2,right:-6,width:6,height:6,borderRadius:"50%",background:t.success,boxShadow:`0 0 8px ${t.success}`,animation:"flicker 1.4s linear infinite"}}/>}
             </span>
-            <span style={{fontFamily:"Outfit,sans-serif",fontSize:8.5,fontWeight:active?800:600,letterSpacing:1.2,textTransform:"uppercase"}}>{lbl}</span>
+            <span style={{fontFamily:"Outfit,sans-serif",fontSize:active?9:8.5,fontWeight:active?800:600,letterSpacing:1.2,textTransform:"uppercase",transition:"font-size .15s"}}>{lbl}</span>
           </button>
         );
       })}
     </nav>
+  );
+}
+
+/* ─── MARKS COUNTER ───────────────────────────────────────────────────
+   Tick-animated marks display. Detects changes vs previous render and
+   plays marksFlash. The marksCounterRef is forwarded so the scrap-flyer
+   animation can target it (the `+◈` arc lands on the live counter). */
+function MarksCounter({marks,marksCounterRef,t,F}){
+  const prevRef=useRef(marks);
+  const [flash,setFlash]=useState(false);
+  const [animKey,setAnimKey]=useState(0);
+  useEffect(()=>{
+    if(marks!==prevRef.current){
+      prevRef.current=marks;
+      setFlash(true);
+      setAnimKey(k=>k+1);
+      const tm=setTimeout(()=>setFlash(false),700);
+      return()=>clearTimeout(tm);
+    }
+  },[marks]);
+  return(
+    <span ref={marksCounterRef} key={animKey} style={{
+      ...F,fontSize:11,fontWeight:800,color:flash?t.accentHi:t.accent,
+      letterSpacing:.5,fontVariantNumeric:"tabular-nums",
+      display:"flex",alignItems:"center",gap:3,
+      transition:"color .3s",
+      animation:flash?"marksFlash .6s ease-out":"none",
+    }}>
+      <span style={{fontSize:11,opacity:.85}}>◈</span>
+      {marks.toLocaleString()}
+    </span>
   );
 }
 
@@ -2056,7 +2202,7 @@ export default function MintForge(){
         <div style={{display:"flex",alignItems:"center",gap:10}}>
           <div style={{textAlign:"right"}}>
             <div style={{display:"flex",alignItems:"center",gap:7,justifyContent:"flex-end",marginBottom:4}}>
-              <span ref={marksCounterRef} style={{...F,fontSize:11,fontWeight:800,color:t.accent,letterSpacing:.5,fontVariantNumeric:"tabular-nums",display:"flex",alignItems:"center",gap:3}}><span style={{fontSize:11,opacity:.85}}>◈</span>{marks.toLocaleString()}</span>
+              <MarksCounter marks={marks} marksCounterRef={marksCounterRef} t={t} F={F}/>
               <span style={{...F,fontSize:10,color:t.textDim,fontWeight:600,letterSpacing:1,textTransform:"uppercase",opacity:.55}}>·</span>
               <span style={{background:`linear-gradient(135deg,${t.accentHi},${t.accent})`,color:t.accentInk,fontWeight:900,fontSize:10,padding:"2px 8px",borderRadius:4,letterSpacing:1,boxShadow:"0 1px 2px rgba(0,0,0,.2)"}}>LV {level}</span>
             </div>
@@ -2566,18 +2712,49 @@ export default function MintForge(){
                 <div style={{position:"absolute",top:0,height:"100%",width:"3px",background:`linear-gradient(to bottom,transparent,${signalColor}33,transparent)`,animation:"scanline 8s linear infinite",pointerEvents:"none",left:0,zIndex:2}}/>
                 {/* Soft signal halo around cursor */}
                 <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at ${detFrac.x*100}% ${detFrac.y*100}%, ${signalColor}22 0%, transparent 30%)`,pointerEvents:"none",transition:"background .15s",zIndex:2}}/>
-                {/* Concentric pings — same as original. Color shifts from cyan->metal hue->green on lock */}
+                {/* Concentric pings — proximity-driven speed makes the field feel
+                    more responsive. Faster pulses = closer = higher tension. */}
                 {(()=>{
                   const m=METALS[huntCoin.metalIdx]||METALS[0];
-                  // Use metal hue as the ring color when proximity is high; signalColor when distant.
-                  // Locked uses bright green from signalColor (which already turns green on canDig).
                   const ringColor=signal>0.55?(canDig?"#7cffb0":m.hl):signalColor;
+                  // Ring duration shortens as signal climbs — locked is fastest.
+                  const ringDur=canDig?0.7:signal>0.55?1.0:signal>0.28?1.3:1.8;
                   return [0,1,2,3].map(i=>{const visible=signal>(i*.22);return(
-                    <div key={i} style={{position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,width:54+i*28,height:54+i*28,borderRadius:"50%",border:`1.5px solid ${ringColor}`,transform:"translate(-50%,-50%)",animation:`ping 1.4s ease-out ${i*.28}s infinite`,opacity:visible?.85:0,transition:"opacity .4s, border-color .3s",pointerEvents:"none",zIndex:3}}/>
+                    <div key={i} style={{
+                      position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,
+                      width:50+i*32,height:50+i*32,borderRadius:"50%",
+                      border:`${canDig?2:1.5}px solid ${ringColor}`,
+                      transform:"translate(-50%,-50%)",
+                      animation:`pingRing ${ringDur}s ease-out ${i*(ringDur*0.22)}s infinite`,
+                      opacity:visible?1:0,
+                      transition:"opacity .35s, border-color .25s, width .2s, height .2s",
+                      pointerEvents:"none",zIndex:3,
+                      boxShadow:canDig?`0 0 8px ${ringColor}44`:undefined,
+                    }}/>
                   );});
                 })()}
-                {/* Cursor dot */}
-                <div style={{position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,width:canDig?18:11,height:canDig?18:11,borderRadius:"50%",background:canDig?"#50ff90":signalColor,transform:"translate(-50%,-50%)",border:`2px solid ${canDig?"#20c060":"#33445a"}`,boxShadow:canDig?`0 0 16px #50ff90`:signal>.5?`0 0 8px ${signalColor}66`:"none",transition:"all .25s",pointerEvents:"none",animation:canDig?"pulseDot 1.2s ease-in-out infinite":"none",color:canDig?"#50ff90":signalColor,zIndex:4}}/>
+                {/* Cursor — radial-gradient fill + breathe pulse on signal,
+                    pulseDot when locked. Larger, glowier, more tactile. */}
+                <div style={{
+                  position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,
+                  width:canDig?20:signal>0.55?14:10,
+                  height:canDig?20:signal>0.55?14:10,
+                  borderRadius:"50%",
+                  background:canDig
+                    ? `radial-gradient(circle,#a0ffcc,#50e890)`
+                    : `radial-gradient(circle,${signalColor},${signalColor}88)`,
+                  transform:"translate(-50%,-50%)",
+                  border:`2px solid ${canDig?"rgba(80,255,144,.6)":signalColor+"66"}`,
+                  boxShadow:canDig
+                    ? `0 0 0 4px rgba(80,255,144,.15),0 0 20px #50ff9088`
+                    : signal>.5?`0 0 10px ${signalColor}66`:"none",
+                  transition:"all .2s cubic-bezier(.34,1.56,.64,1)",
+                  pointerEvents:"none",
+                  animation:canDig
+                    ? "pulseDot .9s ease-in-out infinite"
+                    : signal>0.55?"breathe 1.4s ease-in-out infinite":"none",
+                  color:canDig?"#50ff90":signalColor,zIndex:4,
+                }}/>
                 {/* Sense text / idle hint — single position, content varies by signal level */}
                 <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:5}}>
                   {(()=>{
