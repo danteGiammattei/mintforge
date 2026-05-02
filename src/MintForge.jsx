@@ -45,15 +45,12 @@ button{-webkit-tap-highlight-color:transparent;}
 
 @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeinSlow{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:translateY(0)}}
+@keyframes flipReveal{0%{transform:scale(0.4) rotateY(180deg);opacity:0}60%{transform:scale(1.15) rotateY(0deg);opacity:1}100%{transform:scale(1) rotateY(0deg);opacity:1}}
 @keyframes scaleIn{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 @keyframes ping{0%{transform:translate(-50%,-50%) scale(.8);opacity:.85}100%{transform:translate(-50%,-50%) scale(3.6);opacity:0}}
 @keyframes scanline{0%{transform:translateX(-4%)}100%{transform:translateX(104%)}}
 @keyframes pulseDot{0%,100%{transform:translate(-50%,-50%) scale(1);box-shadow:0 0 12px currentColor}50%{transform:translate(-50%,-50%) scale(1.15);box-shadow:0 0 22px currentColor}}
-@keyframes lensRingPulse{0%,100%{transform:scale(1);opacity:.55}50%{transform:scale(1.06);opacity:.9}}
-@keyframes lensGlyphFloat{0%,100%{transform:translate(-50%,-50%) translateY(0)}50%{transform:translate(-50%,-50%) translateY(-2px)}}
-@keyframes lensFoundPulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
-@keyframes senseFadeIn{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:translateY(0)}}
-@keyframes ambientDrift{0%,100%{transform:translateX(0)}50%{transform:translateX(8px)}}
 @keyframes gleam{0%{transform:translateX(-60%);opacity:0}10%{opacity:1}60%{opacity:.9}100%{transform:translateX(140%);opacity:0}}
 @keyframes flashIn{0%{opacity:0;transform:scale(.7) translateY(14px)}55%{transform:scale(1.06) translateY(-3px)}100%{opacity:1;transform:scale(1) translateY(0)}}
 @keyframes rarityFlash{0%,100%{opacity:1}50%{opacity:.35}}
@@ -1110,6 +1107,12 @@ function apiClient(token){
     listFriends:()=>call("/api/friends","GET"),
     addFriend:(username)=>call("/api/friends","POST",{username}),
     removeFriend:(username)=>call("/api/friends","DELETE",{username}),
+    // Duels — friend coin battles
+    listDuels:()=>call("/api/duels","GET"),
+    createDuel:(friendUsername,coinId)=>call("/api/duels","POST",{action:"create",friendUsername,coinId}),
+    acceptDuel:(duelId,coinId)=>call("/api/duels","POST",{action:"accept",duelId,coinId}),
+    declineDuel:(duelId)=>call("/api/duels","POST",{action:"decline",duelId}),
+    flipDuel:(duelId)=>call("/api/duels","POST",{action:"flip",duelId}),
   };
 }
 
@@ -1255,47 +1258,14 @@ export default function MintForge(){
 
   const [huntCoin,setHuntCoin]=useState(()=>mkCoin(newSeed(),1,null,1));
   const [coinFrac,setCoinFrac]=useState(()=>({x:.2+Math.random()*.6,y:.2+Math.random()*.6}));
-  // Mirror refs — read in onFieldInteract (the hot path) without triggering useCallback
-  // re-creation on every state change. Updated in a sync useEffect below.
-  const huntCoinRef=useRef(null);
-  const coinFracRef=useRef({x:.5,y:.5});
-  // Keep refs in sync with state on every render. Cheap.
-  huntCoinRef.current=huntCoin;
-  coinFracRef.current=coinFrac;
-  // Initialize lens DOM transform once the field is mounted and on each new hunt.
-  // Without this, the lens sits at translate3d(0,0,0) until the player moves.
-  useEffect(()=>{
-    if(phase!=="hunt"||!fieldRef.current||!lensRef.current)return;
-    const rect=fieldRef.current.getBoundingClientRect();
-    if(rect.width===0)return;
-    const x=detFracRef.current.x*rect.width;
-    const y=detFracRef.current.y*rect.height;
-    lensRef.current.style.transform=`translate3d(${x}px,${y}px,0)`;
-    if(glyphRef.current)glyphRef.current.style.opacity="0";
-  },[phase,huntCoin.seed]);
   const [detFrac,setDetFrac]=useState({x:.5,y:.5});
-  // Always-current detector position — updated synchronously on every input event
-  // so the canvas (which animates via requestAnimationFrame) reads the freshest
-  // position without forcing React to re-render at input rate.
-  const detFracRef=useRef({x:.5,y:.5});
-  // Throttle React state updates to one per animation frame at most.
-  const detRafRef=useRef(0);
   const [phase,setPhase]=useState("hunt");
   const [foundCoin,setFoundCoin]=useState(null);
   const fieldRef=useRef();
-  // Refs to DOM nodes that update on every input event without going through
-  // React. iOS-critical: writing transform/opacity directly to a DOM node
-  // bypasses React's reconciliation entirely. The hot path is just ref reads
-  // and style assignments.
-  const lensRef=useRef();         // outer wrapper — gets transform: translate3d
-  const lensRingRef=useRef();     // ring element — border-color, box-shadow change
-  const lensGlowRef=useRef();     // inner glow ring — appears on signal
-  const lensBeadRef=useRef();     // center bead — color shifts
-  const glyphRef=useRef();        // buried glyph — opacity ramps with proximity
   const [showLucky,setShowLucky]=useState(false);
 
   const [gambMode,setGambMode]=useState("toss");
-  const [tavernView,setTavernView]=useState("shop"); // shop · wager · repair
+  const [tavernView,setTavernView]=useState("shop"); // shop · duels · repair
   const [shopTab,setShopTab]=useState("tarot");      // tarot · banners · titles
   const [betIds,setBetIds]=useState([]);
   const [gambPhase,setGambPhase]=useState("select");
@@ -1310,6 +1280,16 @@ export default function MintForge(){
   const [searching,setSearching]=useState(false);
   const [friendsList,setFriendsList]=useState([]);
   const [followersList,setFollowersList]=useState([]);
+  // Duels — pending+ready coin battles between this player and friends.
+  // Refreshed when entering the Tavern · Duels tab and after any action.
+  const [duelsList,setDuelsList]=useState([]);
+  // When the player taps "Challenge" or "Accept", we open a coin picker modal
+  // that filters their vault to legal stakes. duelStakeIntent describes what
+  // the picker is for: {kind:"create",friendUsername} or {kind:"accept",duelId,opposingMetalIdx}
+  const [duelStakeIntent,setDuelStakeIntent]=useState(null);
+  // Result modal — shown after a flip resolves, displays the three flip coins
+  // and the winner. {duelId, flips, winnerId, won:bool}
+  const [duelResult,setDuelResult]=useState(null);
   const [viewingProfile,setViewingProfile]=useState(null); // username string or null
   const [profileData,setProfileData]=useState(null);
   const [profileLoading,setProfileLoading]=useState(false);
@@ -1382,6 +1362,7 @@ export default function MintForge(){
     setFrame("stone");setBio("");setSelectedTitle(TITLES[0]);setPinnedIds(null);
     setMarks(0);setShovelDur(40);setOwnedTarots([]);setEquippedTarots([]);
     setOwnedFrames([]);setOwnedTitles([]);setArtefacts([]);
+    setDuelsList([]);setDuelStakeIntent(null);setDuelResult(null);
     setPhase("hunt");setFoundCoin(null);setTooDeepMsg(null);setTab("hunt");
     setLoadedFromServer(false);setAuthReady(true);
   },[api]);
@@ -1398,6 +1379,17 @@ export default function MintForge(){
     if(tab!=="social")return;
     api.listFriends().then(r=>{setFriendsList(r.friends||[]);setFollowersList(r.followers||[]);}).catch(()=>{});
   },[tab,token,loadedFromServer]); // eslint-disable-line
+
+  /* ── duels: refresh when entering Tavern (any sub-tab) ───────────
+     Cheap query and the count badge updates regardless of which sub-tab
+     is selected, so the player can see "1 incoming duel" wherever they are. */
+  const refreshDuels=useCallback(()=>{
+    if(!token||!loadedFromServer)return;
+    api.listDuels().then(r=>setDuelsList(r.duels||[])).catch(()=>{});
+  },[api,token,loadedFromServer]);
+  useEffect(()=>{
+    if(tab==="tavern")refreshDuels();
+  },[tab,refreshDuels]);
 
   /* ── debounced user search ──────────────────────────────────── */
   useDebouncedEffect(()=>{
@@ -1428,6 +1420,62 @@ export default function MintForge(){
     }catch{}
   },[api,viewingProfile]);
 
+  /* ── duel actions ────────────────────────────────────────────── */
+  // Open the stake-picker modal for creating a new duel against a friend.
+  const promptCreateDuel=useCallback((friendUsername)=>{
+    setDuelStakeIntent({kind:"create",friendUsername});
+  },[]);
+  // Open the stake-picker modal for accepting an incoming duel.
+  // The opposingMetalIdx is passed so we can filter the player's coin list to
+  // only those within the legal tier gap.
+  const promptAcceptDuel=useCallback((duel)=>{
+    if(!duel?.challengerCoin)return;
+    setDuelStakeIntent({kind:"accept",duelId:duel.id,opposingMetalIdx:duel.challengerCoin.metalIdx});
+  },[]);
+  // Submit a stake from the picker — runs create or accept depending on intent.
+  const submitStake=useCallback(async(coinId)=>{
+    if(!duelStakeIntent)return;
+    try{
+      if(duelStakeIntent.kind==="create"){
+        await api.createDuel(duelStakeIntent.friendUsername,coinId);
+      }else if(duelStakeIntent.kind==="accept"){
+        await api.acceptDuel(duelStakeIntent.duelId,coinId);
+      }
+      setDuelStakeIntent(null);
+      refreshDuels();
+    }catch(e){
+      // Show server error message inline to the picker so the player knows why
+      // — typical cases: tier gap, locked coin, friend's coin gone stale.
+      setDuelStakeIntent(prev=>prev?{...prev,error:e.message||"Could not stake coin"}:prev);
+    }
+  },[api,duelStakeIntent,refreshDuels]);
+  const declineDuel=useCallback(async(duelId)=>{
+    try{await api.declineDuel(duelId);refreshDuels();}catch{}
+  },[api,refreshDuels]);
+  // Flip — runs the duel resolution server-side and shows the result modal.
+  // After the modal closes, we refresh the vault (because coins changed hands)
+  // and the duels list.
+  const flipDuel=useCallback(async(duel)=>{
+    try{
+      const r=await api.flipDuel(duel.id);
+      if(!r?.ok)return;
+      const won=r.winnerUsername===player?.username;
+      setDuelResult({duelId:duel.id,flips:r.flips,winnerUsername:r.winnerUsername,won,duel});
+      // Refresh in the background so when the modal closes data is fresh
+      api.getVault().then(v=>{
+        if(Array.isArray(v.coins)){
+          setCoins(v.coins.map(row=>{
+            const base=mkCoin(row.seed,1,row.metalIdx);
+            base.id=row.id;base.shiny=!!row.shiny;base.locked=!!row.locked;
+            if(typeof row.rarity==="number")base.rarity=row.rarity;
+            return base;
+          }));
+        }
+      }).catch(()=>{});
+      refreshDuels();
+    }catch{}
+  },[api,player,refreshDuels]);
+
   const xpPct=Math.min(100,Math.round(xpIn/xpRange*100));
   const fr=FRAMES[frame];
   const brushData=BRUSH_UPS[brushLevel];
@@ -1451,16 +1499,6 @@ export default function MintForge(){
   const signal=Math.max(0,1-dist/.55);const canDig=dist<.09;
   const signalColor=signal>.75?"#50e890":signal>.4?"#f0c850":"#7088a8";
 
-  // Direct-write field interaction — iOS-critical perf path.
-  //
-  // Each input event:
-  //  1. Computes cursor position in field-local fraction (0..1).
-  //  2. Writes that to detFracRef (sync — anything reading the ref sees it).
-  //  3. Writes transform/opacity DIRECTLY to lens + glyph DOM nodes via refs.
-  //     React is NOT involved on this hot path. No re-render. No reconciliation.
-  //  4. Coalesces a *single* React state update per animation frame so consumers
-  //     that need to react (signal bar, sense text level) update eventually but
-  //     not at input-event rate.
   const onFieldInteract=useCallback((e)=>{
     if(!fieldRef.current||phase!=="hunt")return;
     e.preventDefault();
@@ -1469,71 +1507,8 @@ export default function MintForge(){
     const cy2=e.touches?e.touches[0].clientY:e.clientY;
     const x=Math.max(0,Math.min(1,(cx2-rect.left)/rect.width));
     const y=Math.max(0,Math.min(1,(cy2-rect.top)/rect.height));
-    detFracRef.current={x,y};
-
-    // ── Direct DOM writes — runs on every input event, no React render ──
-    // Lens cursor position (translate3d for GPU compositing)
-    if(lensRef.current){
-      lensRef.current.style.transform=`translate3d(${x*rect.width}px,${y*rect.height}px,0)`;
-    }
-    // Compute proximity once
-    const dx=coinFracRef.current.x-x;
-    const dy=coinFracRef.current.y-y;
-    const dist=Math.hypot(dx,dy);
-    const proximity=Math.max(0,Math.min(1,1-dist*1.9)); // 0..1, peaks near coin
-    const locked=dist<.09;
-    // Buried glyph opacity ramps in as you approach
-    if(glyphRef.current){
-      glyphRef.current.style.opacity=String(Math.pow(proximity,1.6)*0.85);
-    }
-    // Lens ring color/glow reflects signal strength (locked = green, hot = metal hue)
-    const m=METALS[huntCoinRef.current?.metalIdx??0];
-    if(lensRingRef.current){
-      const r=lensRingRef.current;
-      if(locked){
-        r.style.borderColor="#7cffb0";
-        r.style.boxShadow=`0 0 24px #7cffb088, 0 2px 6px rgba(0,0,0,.5), inset 0 0 0 4px rgba(124,255,176,.15), inset 0 0 0 6px #7cffb066`;
-      }else if(proximity>0.4){
-        const hue=m?.hl||"#d4a060";
-        r.style.borderColor=hue;
-        r.style.boxShadow=`0 0 ${Math.round(8+proximity*16)}px ${hue}66, 0 2px 6px rgba(0,0,0,.5), inset 0 0 0 4px rgba(0,0,0,.15), inset 0 0 0 6px ${hue}55`;
-      }else{
-        r.style.borderColor=isDark?"#a07840":"#5a3818";
-        r.style.boxShadow=`0 2px 6px rgba(0,0,0,.5), inset 0 0 0 4px rgba(0,0,0,.15), inset 0 0 0 6px ${isDark?"#3a2410":"#a08868"}55`;
-      }
-    }
-    // Inner glow ring
-    if(lensGlowRef.current){
-      const g=lensGlowRef.current;
-      if(proximity>0.15){
-        const hue=locked?"#7cffb0":(m?.hl||"#d4a060");
-        g.style.borderColor=`${hue}${Math.round(proximity*255).toString(16).padStart(2,"0")}`;
-        g.style.boxShadow=`inset 0 0 ${Math.round(proximity*16)}px ${hue}66`;
-      }else{
-        g.style.borderColor="transparent";
-        g.style.boxShadow="none";
-      }
-    }
-    // Center bead glows when active
-    if(lensBeadRef.current){
-      const b=lensBeadRef.current;
-      const hue=locked?"#7cffb0":proximity>0.5?(m?.hl||"#d4a060"):isDark?"#a07840":"#5a3818";
-      b.style.background=hue;
-      b.style.boxShadow=proximity>0.5?`0 0 8px ${hue}`:"none";
-    }
-    // Apply lensRingPulse animation on lock — handled by adding/removing className
-    if(lensRingRef.current){
-      if(locked){lensRingRef.current.style.animation="lensRingPulse 1s ease-in-out infinite";}
-      else{lensRingRef.current.style.animation="none";}
-    }
-
-    // ── Throttled React state update — for consumers that need to render ──
-    if(detRafRef.current)return;
-    detRafRef.current=requestAnimationFrame(()=>{
-      detRafRef.current=0;
-      setDetFrac(detFracRef.current);
-    });
-  },[phase,isDark]);
+    setDetFrac({x,y});
+  },[phase]);
 
   const onDig=()=>{
     if(!canDig||phase!=="hunt")return;
@@ -2300,7 +2275,10 @@ export default function MintForge(){
                       </div>
                       {!pd.isSelf&&(
                         pd.isFriend?
-                          <button onClick={()=>handleRemoveFriend(pd.username)} style={{padding:"9px 16px",borderRadius:10,border:`1px solid ${t.border}`,background:t.surfaceHi,cursor:"pointer",...F,fontSize:11,fontWeight:700,color:t.muted,letterSpacing:1.5,textTransform:"uppercase",transition:"all .15s"}}>✓ Friends</button>
+                          <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                            <button onClick={()=>{promptCreateDuel(pd.username);setTab("tavern");setTavernView("duels");}} title="Challenge to a coin duel" style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${t.danger}`,background:isDark?"linear-gradient(135deg,#2a0808,#481010)":"linear-gradient(135deg,#fbe8e8,#f0c4c4)",cursor:"pointer",...F,fontSize:11,fontWeight:800,color:t.danger,letterSpacing:1.5,textTransform:"uppercase"}}>⚔ Duel</button>
+                            <button onClick={()=>handleRemoveFriend(pd.username)} style={{padding:"9px 14px",borderRadius:10,border:`1px solid ${t.border}`,background:t.surfaceHi,cursor:"pointer",...F,fontSize:11,fontWeight:700,color:t.muted,letterSpacing:1.5,textTransform:"uppercase",transition:"all .15s"}}>✓ Friends</button>
+                          </div>
                         :<button onClick={()=>handleAddFriend(pd.username)} style={{padding:"9px 16px",borderRadius:10,border:"none",background:`linear-gradient(135deg,${t.accentHi},${t.accent})`,cursor:"pointer",...F,fontSize:11,fontWeight:800,color:t.accentInk,letterSpacing:1.5,textTransform:"uppercase",boxShadow:`0 4px 10px ${t.accent}33`}}>+ Add Friend</button>
                       )}
                     </div>
@@ -2477,156 +2455,81 @@ export default function MintForge(){
                 </button>}
                 {shovelDur<=0&&<button onClick={()=>{setTab("tavern");setTavernView("repair");}} style={{padding:"11px 22px",borderRadius:11,border:`1px solid ${t.danger}`,cursor:"pointer",background:isDark?"linear-gradient(135deg,#2a0808,#481010)":"linear-gradient(135deg,#fbe8e8,#f0c4c4)",...F,fontWeight:800,fontSize:13,color:t.danger,flexShrink:0,letterSpacing:1.5,textTransform:"uppercase"}}>⚒ Repair Pickaxe</button>}
               </div>
-              {/* Hunt field — buried-cross-section design.
-                  iOS-optimized:
-                  - Cursor + glyph positions written DIRECTLY to DOM via refs in
-                    onFieldInteract, bypassing React render entirely on the hot path.
-                  - All animated properties are transform/opacity only (GPU compositor).
-                  - No canvas, no mask-image, no mix-blend-mode, no backdrop-filter,
-                    no filter:drop-shadow on hot-path elements.
-                  - Static SVG patterns for soil texture (browser caches once). */}
+              {/* Hunt field — metal-detector view with concentric pings.
+                  Faithful to the original working design; just polished:
+                  - Warm soil texture (SVG dot pattern) instead of flat grid
+                  - Pings shift toward the buried coin's metal hue at high signal
+                  - Sense text replaces the idle hint as proximity rises
+                  - Hermit/Wheel badges in the corners when those tarots are equipped */}
               <div ref={fieldRef} onMouseMove={onFieldInteract} onTouchMove={onFieldInteract} onClick={onFieldInteract}
                 style={{
-                  position:"relative",height:300,borderRadius:16,overflow:"hidden",
+                  position:"relative",height:280,borderRadius:16,overflow:"hidden",
                   cursor:"crosshair",userSelect:"none",touchAction:"none",
-                  border:`1px solid ${isDark?"#3a2812":"#a08868"}`,
                   background:isDark
-                    ? `linear-gradient(180deg,#1a0f06 0%,#241608 18%,#1c1006 32%,#2a1a0a 48%,#1e1208 65%,#160d05 82%,#0e0703 100%)`
-                    : `linear-gradient(180deg,#c8b090 0%,#b8a080 18%,#a89070 32%,#9a8260 48%,#8a7050 65%,#705840 82%,#5a4630 100%)`,
-                  boxShadow:`inset 0 4px 12px rgba(0,0,0,.5), inset 0 -4px 12px rgba(0,0,0,.6)`,
+                    ? `radial-gradient(ellipse at 30% 20%,#1a1208 0%,transparent 60%),radial-gradient(ellipse at 70% 80%,#100a04 0%,transparent 60%),linear-gradient(180deg,#100a06,#0a0604)`
+                    : `radial-gradient(ellipse at 30% 20%,#c8b090 0%,transparent 60%),radial-gradient(ellipse at 70% 80%,#a89070 0%,transparent 60%),linear-gradient(180deg,#b89878,#988868)`,
+                  border:`1px solid ${isDark?"#2a1a0a":"#a08868"}`,
+                  boxShadow:`inset 0 0 60px rgba(0,0,0,.45)`,
                   WebkitTapHighlightColor:"transparent",
                 }}>
-
-                {/* Soil texture — static SVG pattern. Browser paints once and caches. */}
-                <svg width="100%" height="100%" style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,opacity:isDark?.4:.55}}>
+                {/* Soil grain pattern — static SVG, paints once */}
+                <svg width="100%" height="100%" style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,opacity:isDark?.55:.5}}>
                   <defs>
-                    <pattern id="soilGrain" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
-                      <circle cx="4" cy="6" r="0.6" fill={isDark?"#5a3818":"#3a2814"}/>
-                      <circle cx="11" cy="22" r="0.4" fill={isDark?"#704020":"#403018"}/>
-                      <circle cx="22" cy="9" r="0.7" fill={isDark?"#4a2810":"#5a4020"}/>
-                      <circle cx="27" cy="26" r="0.4" fill={isDark?"#604020":"#3e2c18"}/>
-                      <circle cx="16" cy="15" r="0.5" fill={isDark?"#503010":"#4a3418"}/>
-                    </pattern>
-                    <pattern id="soilDots" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
-                      <circle cx="2" cy="2" r="0.3" fill={isDark?"#7a4a20":"#2a1c0c"} opacity="0.6"/>
-                      <circle cx="6" cy="5" r="0.2" fill={isDark?"#5a3818":"#3a280f"} opacity="0.4"/>
+                    <pattern id="soilGrain" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+                      <circle cx="4" cy="6" r="0.7" fill={isDark?"#5a3818":"#3a2814"}/>
+                      <circle cx="11" cy="20" r="0.5" fill={isDark?"#704020":"#403018"}/>
+                      <circle cx="20" cy="9" r="0.8" fill={isDark?"#4a2810":"#5a4020"}/>
+                      <circle cx="24" cy="24" r="0.4" fill={isDark?"#604020":"#3e2c18"}/>
+                      <circle cx="14" cy="14" r="0.55" fill={isDark?"#503010":"#4a3418"}/>
                     </pattern>
                   </defs>
                   <rect width="100%" height="100%" fill="url(#soilGrain)"/>
-                  <rect width="100%" height="100%" fill="url(#soilDots)"/>
-                  <line x1="0" y1="32%" x2="100%" y2="33%" stroke={isDark?"#3a2412":"#5a4020"} strokeWidth="0.5" opacity="0.4"/>
-                  <line x1="0" y1="58%" x2="100%" y2="60%" stroke={isDark?"#2a1a08":"#4a3418"} strokeWidth="0.5" opacity="0.5"/>
-                  <line x1="0" y1="82%" x2="100%" y2="83%" stroke={isDark?"#1a0e04":"#2a1c0c"} strokeWidth="0.5" opacity="0.5"/>
                 </svg>
-
-                {/* Drifting ambient particles — pure CSS animation on a single element */}
-                <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:1,animation:"ambientDrift 18s ease-in-out infinite",opacity:.5}}>
-                  <div style={{position:"absolute",left:"15%",top:"22%",width:2,height:2,borderRadius:"50%",background:isDark?"#a07840":"#5a3818"}}/>
-                  <div style={{position:"absolute",left:"68%",top:"18%",width:1.5,height:1.5,borderRadius:"50%",background:isDark?"#806030":"#4a2814"}}/>
-                  <div style={{position:"absolute",left:"42%",top:"71%",width:2,height:2,borderRadius:"50%",background:isDark?"#a07840":"#3a2814"}}/>
-                  <div style={{position:"absolute",left:"82%",top:"55%",width:1.5,height:1.5,borderRadius:"50%",background:isDark?"#906838":"#503018"}}/>
-                  <div style={{position:"absolute",left:"24%",top:"48%",width:1.2,height:1.2,borderRadius:"50%",background:isDark?"#704830":"#3a2010"}}/>
-                </div>
-
-                {/* Buried glyph — at coin's position. Opacity controlled via ref by
-                    onFieldInteract directly so React doesn't re-render on movement. */}
-                <div ref={glyphRef} style={{
-                  position:"absolute",
-                  left:`${coinFrac.x*100}%`,top:`${coinFrac.y*100}%`,
-                  transform:"translate3d(-50%,-50%,0)",
-                  pointerEvents:"none",zIndex:3,
-                  opacity:0,
-                  willChange:"opacity",
-                }}>
-                  <span style={{
-                    fontFamily:"\'Fraunces\',serif",
-                    fontSize:42,fontWeight:700,lineHeight:1,
-                    color:METALS[huntCoin.metalIdx]?.hl||"#d4a060",
-                    textShadow:`0 0 14px ${METALS[huntCoin.metalIdx]?.hl||"#d4a060"}, 0 0 28px ${METALS[huntCoin.metalIdx]?.hl||"#d4a060"}99`,
-                    display:"block",
-                    animation:"lensGlyphFloat 2.4s ease-in-out infinite",
-                  }}>{["☉","⊙","☽","◉","✥","◈","✶","⌬","❋"][huntCoin.metalIdx]||"☉"}</span>
-                </div>
-
-                {/* The lens cursor — position written DIRECTLY via ref by
-                    onFieldInteract, bypassing React. iOS-friendly hot path. */}
-                <div ref={lensRef} style={{
-                  position:"absolute",
-                  left:0,top:0,
-                  transform:"translate3d(0,0,0)",
-                  pointerEvents:"none",zIndex:5,
-                  willChange:"transform",
-                }}>
-                  <div ref={lensRingRef} style={{
-                    width:78,height:78,borderRadius:"50%",
-                    border:`2px solid ${isDark?"#a07840":"#5a3818"}`,
-                    boxSizing:"border-box",
-                    boxShadow:`0 2px 6px rgba(0,0,0,.5), inset 0 0 0 4px rgba(0,0,0,.15), inset 0 0 0 6px ${isDark?"#3a2410":"#a08868"}55`,
-                    transform:"translate(-50%,-50%)",
-                    background:isDark
-                      ? `radial-gradient(circle at 35% 35%,#3a2818,#1a0f06 70%)`
-                      : `radial-gradient(circle at 35% 35%,#d8c0a0,#806848 75%)`,
-                    transition:"border-color .25s, box-shadow .25s",
-                  }}>
-                    <div ref={lensGlowRef} style={{
-                      position:"absolute",inset:4,borderRadius:"50%",
-                      border:"2px solid transparent",
-                      pointerEvents:"none",
-                      transition:"border-color .2s, box-shadow .2s",
-                      boxSizing:"border-box",
-                    }}/>
-                    <div style={{position:"absolute",left:"50%",top:8,bottom:8,width:1,background:isDark?"rgba(160,120,64,.3)":"rgba(58,40,20,.3)",transform:"translateX(-50%)",pointerEvents:"none"}}/>
-                    <div style={{position:"absolute",top:"50%",left:8,right:8,height:1,background:isDark?"rgba(160,120,64,.3)":"rgba(58,40,20,.3)",transform:"translateY(-50%)",pointerEvents:"none"}}/>
-                    <div ref={lensBeadRef} style={{
-                      position:"absolute",left:"50%",top:"50%",
-                      transform:"translate(-50%,-50%)",
-                      width:6,height:6,borderRadius:"50%",
-                      background:isDark?"#a07840":"#5a3818",
-                      transition:"background .2s, box-shadow .2s",
-                    }}/>
-                  </div>
-                </div>
-
-                {/* Sense text — re-renders only when level changes (via key prop) */}
-                <div style={{position:"absolute",bottom:14,left:0,right:0,textAlign:"center",pointerEvents:"none",zIndex:6}}>
-                  {(() => {
+                {/* Scanline */}
+                <div style={{position:"absolute",top:0,height:"100%",width:"3px",background:`linear-gradient(to bottom,transparent,${signalColor}33,transparent)`,animation:"scanline 8s linear infinite",pointerEvents:"none",left:0,zIndex:2}}/>
+                {/* Soft signal halo around cursor */}
+                <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at ${detFrac.x*100}% ${detFrac.y*100}%, ${signalColor}22 0%, transparent 30%)`,pointerEvents:"none",transition:"background .15s",zIndex:2}}/>
+                {/* Concentric pings — same as original. Color shifts from cyan->metal hue->green on lock */}
+                {(()=>{
+                  const m=METALS[huntCoin.metalIdx]||METALS[0];
+                  // Use metal hue as the ring color when proximity is high; signalColor when distant.
+                  // Locked uses bright green from signalColor (which already turns green on canDig).
+                  const ringColor=signal>0.55?(canDig?"#7cffb0":m.hl):signalColor;
+                  return [0,1,2,3].map(i=>{const visible=signal>(i*.22);return(
+                    <div key={i} style={{position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,width:54+i*28,height:54+i*28,borderRadius:"50%",border:`1.5px solid ${ringColor}`,transform:"translate(-50%,-50%)",animation:`ping 1.4s ease-out ${i*.28}s infinite`,opacity:visible?.85:0,transition:"opacity .4s, border-color .3s",pointerEvents:"none",zIndex:3}}/>
+                  );});
+                })()}
+                {/* Cursor dot */}
+                <div style={{position:"absolute",left:`${detFrac.x*100}%`,top:`${detFrac.y*100}%`,width:canDig?18:11,height:canDig?18:11,borderRadius:"50%",background:canDig?"#50ff90":signalColor,transform:"translate(-50%,-50%)",border:`2px solid ${canDig?"#20c060":"#33445a"}`,boxShadow:canDig?`0 0 16px #50ff90`:signal>.5?`0 0 8px ${signalColor}66`:"none",transition:"all .25s",pointerEvents:"none",animation:canDig?"pulseDot 1.2s ease-in-out infinite":"none",color:canDig?"#50ff90":signalColor,zIndex:4}}/>
+                {/* Sense text / idle hint — single position, content varies by signal level */}
+                <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",pointerEvents:"none",zIndex:5}}>
+                  {(()=>{
                     const lvl=senseLevel(signal);
                     if(!lvl)return(
-                      <span style={{...mu,fontSize:13,opacity:.4,fontStyle:"italic",letterSpacing:1.5,color:isDark?"#8a7250":"#3a2814"}}>Sweep the field</span>
+                      <span style={{...mu,fontSize:13,opacity:.5,fontStyle:"italic",letterSpacing:1,color:isDark?"#8a7560":"#3a2814"}}>Sweep to scan</span>
                     );
                     const phrases=SENSE_PHRASES[lvl];
                     const phrase=phrases[huntCoin.seed%phrases.length];
                     return(
-                      <span key={lvl} style={{
-                        ...mu,
-                        fontSize:lvl==="locked"?14:12,
-                        opacity:lvl==="locked"?.95:.7,
-                        fontStyle:"italic",
-                        letterSpacing:1.2,
-                        color:lvl==="locked"?(isDark?"#7cffb0":"#207040"):(isDark?"#c8b89a":"#3a2814"),
-                        display:"inline-block",
-                        animation:"senseFadeIn .4s ease-out",
-                      }}>{phrase}</span>
+                      <span key={lvl} style={{...mu,fontSize:lvl==="locked"?14:13,opacity:lvl==="locked"?.95:.7,fontStyle:"italic",letterSpacing:1,color:lvl==="locked"?"#50ff90":isDark?"#c8b89a":"#3a2814",textShadow:lvl==="locked"?"0 0 10px #50ff9066":"none",animation:"fadein .4s ease"}}>{phrase}</span>
                     );
                   })()}
                 </div>
-
-                {/* Hermit reveal badge — solid background (no backdrop-filter for iOS) */}
+                {/* Hermit reveal badge — solid background, no backdrop-filter */}
                 {buff.revealRarity&&(()=>{
                   const rRng=new RNG(huntCoin.seed^0xfa11);
                   const previewRarity=rollRarity(rRng,level,null,false);
                   const r=RARITIES[previewRarity];
                   return(
-                    <div style={{position:"absolute",top:10,left:10,padding:"5px 11px",borderRadius:7,background:isDark?"rgba(20,12,4,.92)":"rgba(255,248,232,.92)",border:`1px solid ${r.color}88`,zIndex:7,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{position:"absolute",top:10,left:10,padding:"5px 11px",borderRadius:7,background:isDark?"rgba(20,12,4,.92)":"rgba(255,248,232,.92)",border:`1px solid ${r.color}88`,zIndex:6,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
                       <span style={{...microLabel,fontSize:8,color:isDark?"#8a7250":"#5a4020",letterSpacing:1.5}}>Hermit sees</span>
                       <span style={{...F,fontSize:11,fontWeight:800,color:r.color,letterSpacing:.5}}>{r.name}</span>
                     </div>
                   );
                 })()}
-
-                {/* Wheel of Fortune streak — solid background */}
+                {/* Wheel of Fortune streak counter */}
                 {buff.guaranteedEvery>0&&(
-                  <div style={{position:"absolute",top:10,right:10,padding:"5px 11px",borderRadius:7,background:isDark?"rgba(20,12,4,.92)":"rgba(255,248,232,.92)",border:`1px solid ${RARITY_COLOR.epic}88`,zIndex:7,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
+                  <div style={{position:"absolute",top:10,right:10,padding:"5px 11px",borderRadius:7,background:isDark?"rgba(20,12,4,.92)":"rgba(255,248,232,.92)",border:`1px solid ${RARITY_COLOR.epic}88`,zIndex:6,pointerEvents:"none",display:"flex",alignItems:"center",gap:6}}>
                     <span style={{...microLabel,fontSize:8,color:isDark?"#8a7250":"#5a4020",letterSpacing:1.5}}>Wheel</span>
                     <span style={{...F,fontSize:11,fontWeight:800,color:RARITY_COLOR.epic,letterSpacing:.5,fontVariantNumeric:"tabular-nums"}}>{findStreak%buff.guaranteedEvery}/{buff.guaranteedEvery}</span>
                   </div>
@@ -2890,8 +2793,11 @@ export default function MintForge(){
 
             {/* Top-level view switcher */}
             <div style={{display:"flex",gap:6,marginBottom:14,padding:4,borderRadius:11,background:t.surface,border:`1px solid ${t.border}`}}>
-              {[["shop","◈","Shop"],["wager","🎲","Wager"],["repair","⚒","Repair"]].map(([id,ic,lbl])=>{const active=tavernView===id;return(
-                <button key={id} onClick={()=>setTavernView(id)} style={{flex:1,padding:"9px 0",borderRadius:8,border:"none",background:active?`linear-gradient(135deg,${t.accentHi},${t.accent})`:"transparent",cursor:"pointer",...F,fontSize:11,fontWeight:800,color:active?t.accentInk:t.muted,letterSpacing:1.5,textTransform:"uppercase",transition:"all .18s",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}><span style={{fontSize:13}}>{ic}</span>{lbl}</button>
+              {[["shop","◈","Shop"],["duels","⚔","Duels"],["repair","⚒","Repair"]].map(([id,ic,lbl])=>{const active=tavernView===id;
+                // Count pending+ready duels involving this player; show as badge on the Duels tab
+                const duelCount=id==="duels"?duelsList.length:0;
+                return(
+                <button key={id} onClick={()=>setTavernView(id)} style={{flex:1,padding:"9px 0",borderRadius:8,border:"none",background:active?`linear-gradient(135deg,${t.accentHi},${t.accent})`:"transparent",cursor:"pointer",...F,fontSize:11,fontWeight:800,color:active?t.accentInk:t.muted,letterSpacing:1.5,textTransform:"uppercase",transition:"all .18s",display:"flex",alignItems:"center",justifyContent:"center",gap:5,position:"relative"}}><span style={{fontSize:13}}>{ic}</span>{lbl}{duelCount>0&&<span style={{position:"absolute",top:2,right:6,minWidth:14,height:14,padding:"0 4px",borderRadius:7,background:t.danger,color:"#fff",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",letterSpacing:0,fontVariantNumeric:"tabular-nums"}}>{duelCount}</span>}</button>
               );})}
             </div>
 
@@ -3042,93 +2948,78 @@ export default function MintForge(){
             })()}
 
             {/* ── WAGER VIEW (existing UI) ── */}
-            {tavernView==="wager"&&(<>
-            <div style={{display:"flex",gap:6,marginBottom:14,overflowX:"auto",paddingBottom:2}}>
-              {[["toss","🪙","Coin Toss"],["roulette","🎰","Roulette"]].map(([id,ic,lbl])=>{const active=gambMode===id;return(
-                <button key={id} onClick={()=>{setGambMode(id);resetGamble();resetRoulette();}} style={{padding:"9px 15px",borderRadius:10,border:`1px solid ${active?t.oxbloodHi:t.border}`,background:active?(isDark?"linear-gradient(135deg,#1a0810,#2a1018)":"linear-gradient(135deg,#f8eef3,#f0d8e0)"):"transparent",...F,fontSize:12,fontWeight:700,color:active?t.oxbloodHi:t.muted,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0,letterSpacing:.5,display:"flex",alignItems:"center",gap:6,transition:"all .15s"}}><span style={{fontSize:14}}>{ic}</span>{lbl}</button>
-              );})}
-            </div>
-
-            {(gambMode==="toss")&&(()=>{
-              const gDef=GAMBLES.find(g=>g.id===gambMode);
-              return(<>
-                <div style={{...card,padding:"13px 16px",marginBottom:12,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
-                  <div style={{flex:1,minWidth:120}}>
-                    <div style={{...FR,fontWeight:700,fontSize:15,marginBottom:3,letterSpacing:-.3}}>{gDef.label}</div>
-                    <div style={{...mu,fontSize:12,fontStyle:"italic"}}>{gDef.desc}</div>
-                  </div>
-                  <div style={{...VT,fontSize:22,color:t.oxbloodHi,letterSpacing:1,textShadow:`0 0 8px ${t.oxbloodHi}44`}}>{gDef.odds}</div>
+            {/* ── DUELS VIEW ── friend coin battles ─────────────────────
+                Replaces the old solo Wager tab. Shows pending+ready duels
+                between this player and friends. The actual challenge button
+                lives on friend profiles (Social tab) — this is the inbox. */}
+            {tavernView==="duels"&&(
+              <div style={{animation:"fadein .25s ease"}}>
+                <div style={{padding:"4px 4px 14px",...mu,fontSize:12,fontStyle:"italic",lineHeight:1.55}}>
+                  Stake a coin against a friend\'s. Best of three flips. Winner takes both.
+                  <br/><span style={{opacity:.7}}>Visit a friend\'s profile to send a challenge.</span>
                 </div>
-                {gambPhase==="result"&&gambResult&&(
-                  <div style={{...card,marginBottom:12,padding:"15px 17px",background:gambResult.won?(isDark?"#0a1e0a":"#f0faf0"):(isDark?"#1a0808":"#fff5f5"),border:`1px solid ${gambResult.won?t.success:t.danger}`,animation:"fadein .35s ease"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                      {gambResult.add[0]&&<div style={{animation:"winPop .55s ease-out"}}><CoinCanvas coin={gambResult.add[0]} size={68}/></div>}
-                      <div style={{flex:1,minWidth:120}}>
-                        <div style={{...VT,fontSize:24,color:gambResult.won?t.success:t.danger,letterSpacing:2,lineHeight:1,marginBottom:5,textShadow:`0 0 10px ${gambResult.won?t.success:t.danger}44`}}>{gambResult.msg}</div>
-                        {gambResult.add[0]&&<div style={{...mu,fontSize:12,color:METALS[gambResult.add[0].metalIdx].hl,fontWeight:600}}>{METALS[gambResult.add[0].metalIdx].name} · {gambResult.add[0].runes}</div>}
-                      </div>
-                      <button onClick={resetGamble} style={{padding:"8px 16px",borderRadius:9,border:`1px solid ${t.borderHi}`,background:t.surfaceHi,cursor:"pointer",...F,fontSize:11,fontWeight:700,color:t.textDim,letterSpacing:1.5,textTransform:"uppercase"}}>Again</button>
-                    </div>
+                {duelsList.length===0?(
+                  <div style={{textAlign:"center",padding:"32px 18px",...card,borderStyle:"dashed"}}>
+                    <div style={{fontSize:36,marginBottom:8,opacity:.4}}>⚔</div>
+                    <div style={{...mu,fontSize:13,maxWidth:280,margin:"0 auto",lineHeight:1.55}}>No active duels. Find a friend in the Social tab and challenge them to a coin battle.</div>
+                    <button onClick={()=>setTab("social")} style={{marginTop:14,padding:"8px 18px",borderRadius:9,border:`1px solid ${t.borderHi}`,background:`${t.accent}1a`,cursor:"pointer",...F,fontWeight:700,fontSize:11,color:t.accent,letterSpacing:2,textTransform:"uppercase"}}>Find Friend →</button>
                   </div>
-                )}
-                {gambPhase==="spinning"&&<div style={{...card,padding:"28px",textAlign:"center",marginBottom:12}}>
-                  <div style={{display:"flex",justifyContent:"center",gap:14,marginBottom:14}}>{betCoins.map(c=><CoinCanvas key={c.id} coin={c} size={62}/>)}</div>
-                  <div style={{...VT,fontSize:22,color:t.oxbloodHi,animation:"rarityFlash .6s ease-in-out infinite",letterSpacing:2,textShadow:`0 0 10px ${t.oxbloodHi}44`}}>THE FATES DECIDE…</div>
-                </div>}
-                {gambPhase==="select"&&(<>
-                  <div style={{...mu,fontSize:12,marginBottom:11,fontStyle:"italic"}}>Select {gDef.count} coin{gDef.count>1?"s":""}{gDef.same?" (same tier)":""} · <span style={{color:t.text,fontWeight:600,fontStyle:"normal"}}>{betIds.length} / {gDef.count}</span></div>
-                  {coins.length===0?<div style={{...card,padding:"32px 20px",textAlign:"center"}}><div style={{fontSize:40,marginBottom:10,opacity:.4}}>🪙</div><div style={{...mu}}>No coins to bet — visit the Hunt first.</div></div>:(
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:7,marginBottom:14}}>
-                      {coins.map(coin=>{const m=METALS[coin.metalIdx];const sel=betIds.includes(coin.id);const lk=coin.locked;return(
-                        <div key={coin.id} onClick={()=>!lk&&toggleBet(coin.id)} style={{...card,padding:"9px 6px 7px",textAlign:"center",cursor:lk?"not-allowed":"pointer",border:`1.5px solid ${sel?m.hl:t.border}`,background:sel?`${m.dark}40`:t.surface,transition:"all .12s",opacity:lk?.4:1,position:"relative"}} onMouseEnter={e=>{if(!lk)e.currentTarget.style.borderColor=m.eng;}} onMouseLeave={e=>e.currentTarget.style.borderColor=sel?m.hl:t.border}>
-                          <div style={{display:"flex",justifyContent:"center",marginBottom:5}}><CoinCanvas coin={coin} size={52}/></div>
-                          <div style={{...VT,fontSize:12,color:m.hl,letterSpacing:1.5}}>{coin.runes.slice(0,4)}</div>
-                          {lk&&<div style={{position:"absolute",top:4,right:5,fontSize:10}}>🔒</div>}
+                ):(
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    {duelsList.map(d=>{
+                      const isChallenger=d.role==="challenger";
+                      const myCoin=isChallenger?d.challengerCoin:d.challengedCoin;
+                      const theirCoin=isChallenger?d.challengedCoin:d.challengerCoin;
+                      const theirName=isChallenger?d.challengedUsername:d.challengerUsername;
+                      const theirFrame=isChallenger?d.challengedFrame:d.challengerFrame;
+                      // What the player can do right now
+                      const needsMyStake=d.status==="pending"&&!isChallenger;       // they\'re the challenged, must accept
+                      const awaitingTheirStake=d.status==="pending"&&isChallenger;  // they\'re challenger, waiting
+                      const readyToFlip=d.status==="ready";
+                      // Time remaining (rounded to hours)
+                      const hoursLeft=Math.max(0,Math.ceil((d.expiresAt-Date.now())/(60*60*1000)));
+                      return(
+                        <div key={d.id} style={{...card,padding:13,display:"flex",flexDirection:"column",gap:11,borderColor:readyToFlip?t.success+"66":needsMyStake?t.accent+"66":t.border}}>
+                          {/* Header: friend\'s identity + status pill */}
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                              <span style={{...microLabel,fontSize:9,color:t.muted}}>{isChallenger?"You vs":"Challenged by"}</span>
+                              <span style={{...F,fontSize:13,fontWeight:800,color:t.text,letterSpacing:.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{theirName}</span>
+                            </div>
+                            <span style={{...microLabel,fontSize:8,padding:"3px 8px",borderRadius:6,background:readyToFlip?(isDark?"#0e2810":"#e8f8ee"):needsMyStake?(isDark?"#1a1408":"#fff5e8"):(isDark?"#1a1408":"#f4ebd8"),color:readyToFlip?t.success:needsMyStake?t.accent:t.muted,letterSpacing:1.5}}>{readyToFlip?"Ready":needsMyStake?"Your move":"Pending"}</span>
+                          </div>
+                          {/* Stakes — your coin vs theirs */}
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:14,padding:"6px 0"}}>
+                            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+                              <span style={{...microLabel,fontSize:8,color:t.muted}}>YOU STAKE</span>
+                              {myCoin?<CoinCanvas coin={myCoin} size={56}/>:<div style={{width:56,height:56,borderRadius:"50%",border:`2px dashed ${t.border}`,display:"flex",alignItems:"center",justifyContent:"center",color:t.muted,fontSize:18}}>?</div>}
+                            </div>
+                            <span style={{fontSize:18,opacity:.5,...F,fontWeight:700,color:t.muted}}>vs</span>
+                            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5}}>
+                              <span style={{...microLabel,fontSize:8,color:t.muted}}>THEY STAKE</span>
+                              {theirCoin?<CoinCanvas coin={theirCoin} size={56}/>:<div style={{width:56,height:56,borderRadius:"50%",border:`2px dashed ${t.border}`,display:"flex",alignItems:"center",justifyContent:"center",color:t.muted,fontSize:18}}>?</div>}
+                            </div>
+                          </div>
+                          {/* Action row */}
+                          <div style={{display:"flex",gap:7,alignItems:"center"}}>
+                            {needsMyStake&&(
+                              <button onClick={()=>promptAcceptDuel(d)} style={{flex:1,padding:"9px 0",borderRadius:8,border:`1px solid ${t.accent}`,background:`linear-gradient(135deg,${t.accentHi},${t.accent})`,cursor:"pointer",...F,fontSize:11,fontWeight:800,color:t.accentInk,letterSpacing:1.5,textTransform:"uppercase"}}>Accept · Set Stake</button>
+                            )}
+                            {readyToFlip&&(
+                              <button onClick={()=>flipDuel(d)} style={{flex:1,padding:"9px 0",borderRadius:8,border:`1px solid ${t.success}`,background:isDark?"linear-gradient(135deg,#0e3818,#1e6028)":"linear-gradient(135deg,#d8f5e0,#a8e8c0)",cursor:"pointer",...F,fontSize:11,fontWeight:800,color:t.success,letterSpacing:1.5,textTransform:"uppercase"}}>⚔ Flip the Coins</button>
+                            )}
+                            {awaitingTheirStake&&(
+                              <div style={{flex:1,padding:"9px 0",textAlign:"center",...microLabel,fontSize:9,color:t.muted,letterSpacing:1.5}}>Awaiting their stake · {hoursLeft}h left</div>
+                            )}
+                            <button onClick={()=>{if(confirm("Decline this duel?"))declineDuel(d.id);}} style={{padding:"9px 14px",borderRadius:8,border:`1px solid ${t.border}`,background:"transparent",cursor:"pointer",...F,fontSize:10,fontWeight:700,color:t.muted,letterSpacing:1.5,textTransform:"uppercase"}}>Decline</button>
+                          </div>
                         </div>
-                      );})}
-                    </div>
-                  )}
-                  <button onClick={doGamble} disabled={!gambOk} style={{width:"100%",padding:"13px 0",borderRadius:11,border:`1px solid ${gambOk?t.oxblood:t.border}`,cursor:gambOk?"pointer":"not-allowed",background:gambOk?"linear-gradient(135deg,#2a0818,#7a1838)":t.surfaceHi,...F,fontWeight:800,fontSize:14,color:gambOk?"#f0a0c0":t.muted,letterSpacing:3,textTransform:"uppercase",boxShadow:gambOk?"0 6px 18px rgba(122,24,56,.3)":"none"}}>{gambOk?"🎲 Wager":"Select coins"}</button>
-                </>)}
-              </>);
-            })()}
-
-            {gambMode==="roulette"&&(
-              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
-                <div style={{...card,padding:"11px 14px",width:"100%"}}>
-                  <div style={{...microLabel,fontSize:9,marginBottom:7}}>Outcome Table</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {WSECTORS.map(s=><div key={s.outcome} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 9px",borderRadius:5,background:`${s.color}cc`,border:`1px solid ${s.text}33`}}><span style={{...F,fontSize:10,color:s.text,fontWeight:700,letterSpacing:.5}}>{s.label} · {s.weight}%</span></div>)}
-                  </div>
-                </div>
-                {roulResult&&(
-                  <div style={{...card,padding:"15px 17px",width:"100%",background:roulResult.won?(isDark?"#0a1e0a":"#f0faf0"):(isDark?"#1a0808":"#fff5f5"),border:`1px solid ${roulResult.won?t.success:t.danger}`,animation:"fadein .35s ease"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                      {roulResult.add.map((c,i)=><div key={i} style={{animation:"winPop .55s ease-out"}}><CoinCanvas coin={c} size={64}/></div>)}
-                      <div style={{flex:1,minWidth:120}}>
-                        <div style={{...VT,fontSize:22,color:roulResult.won?t.success:t.danger,letterSpacing:2,lineHeight:1,marginBottom:5,textShadow:`0 0 10px ${roulResult.won?t.success:t.danger}44`}}>{roulResult.msg}</div>
-                        {roulResult.add.map((c,i)=><div key={i} style={{...mu,fontSize:12,color:METALS[c.metalIdx].hl,fontWeight:600}}>{METALS[c.metalIdx].name} · {c.runes}</div>)}
-                      </div>
-                      <button onClick={resetRoulette} style={{padding:"8px 14px",borderRadius:9,border:`1px solid ${t.borderHi}`,background:t.surfaceHi,cursor:"pointer",...F,fontSize:11,fontWeight:700,color:t.textDim,letterSpacing:1.5,textTransform:"uppercase"}}>Again</button>
-                    </div>
+                      );
+                    })}
                   </div>
                 )}
-                <div style={{width:"100%"}}>
-                  <div style={{...mu,fontSize:12,marginBottom:9,fontStyle:"italic"}}>Select 1 coin to bet:</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
-                    {coins.slice(0,20).map(coin=>{const m=METALS[coin.metalIdx];const sel=roulBetId===coin.id;const lk=coin.locked;return(
-                      <div key={coin.id} onClick={()=>{if(lk)return;setRoulBetId(sel?null:coin.id);}} style={{padding:"5px",borderRadius:7,border:`1.5px solid ${sel?m.hl:t.border}`,background:sel?`${m.dark}40`:t.surface,cursor:lk?"not-allowed":"pointer",transition:"all .12s",opacity:lk?.4:1,position:"relative"}}>
-                        <CoinCanvas coin={coin} size={44}/>
-                        {lk&&<div style={{position:"absolute",top:1,right:2,fontSize:9}}>🔒</div>}
-                      </div>
-                    );})}
-                    {coins.length===0&&<div style={{...mu,fontSize:12,fontStyle:"italic"}}>No coins — go hunt first!</div>}
-                  </div>
-                </div>
-                <RouletteWheel betCoin={roulBetCoin} onResult={onRoulResult} disabled={roulDone} t={t}/>
               </div>
             )}
-            </>)}
           </div>
         )}
       </div>
@@ -3136,6 +3027,98 @@ export default function MintForge(){
       <BottomNav tab={tab} setTab={setTab} huntActive={phase==="dig"||phase==="brush"} t={t}/>
 
       <LuckyFanfare show={showLucky} onDone={()=>setShowLucky(false)}/>
+
+      {/* Duel stake picker — opens when challenging or accepting. Filters the vault
+          to legal stakes (unlocked coins; for accepts, within tier gap). */}
+      {duelStakeIntent&&(()=>{
+        const eligible=coins.filter(c=>{
+          if(c.locked)return false;
+          if(duelStakeIntent.kind==="accept"){
+            return Math.abs(c.metalIdx-duelStakeIntent.opposingMetalIdx)<=1;
+          }
+          return true;
+        });
+        const close=()=>setDuelStakeIntent(null);
+        return(
+          <div onClick={close} style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,.78)",display:"flex",alignItems:"flex-end",justifyContent:"center",animation:"fadein .18s ease",padding:"20px 12px"}}>
+            <div onClick={e=>e.stopPropagation()} style={{...card,width:"100%",maxWidth:480,maxHeight:"80vh",overflowY:"auto",padding:"16px 14px",display:"flex",flexDirection:"column",gap:12,animation:"slideUp .22s ease",borderColor:t.borderHi}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div style={{...sectionTitle,fontSize:16}}>{duelStakeIntent.kind==="create"?"Stake a Coin":"Match Their Stake"}</div>
+                <button onClick={close} style={{padding:"4px 10px",borderRadius:6,border:"none",background:"transparent",cursor:"pointer",...F,fontSize:18,color:t.muted,lineHeight:1}}>✕</button>
+              </div>
+              <div style={{...mu,fontSize:12,fontStyle:"italic",lineHeight:1.5}}>
+                {duelStakeIntent.kind==="create"
+                  ? <>Choose a coin to wager against <b>{duelStakeIntent.friendUsername}</b>. They\'ll see your stake and match with one of their own.</>
+                  : <>Pick a coin within one tier of their stake. Locked coins are excluded.</>}
+              </div>
+              {duelStakeIntent.error&&<div style={{padding:"8px 10px",borderRadius:7,background:isDark?"#2a0808":"#fbe8e8",border:`1px solid ${t.danger}`,color:t.danger,...F,fontSize:11,fontWeight:600}}>{duelStakeIntent.error}</div>}
+              {eligible.length===0?(
+                <div style={{textAlign:"center",padding:"24px 18px",...mu,fontSize:13,fontStyle:"italic",opacity:.7}}>No eligible coins. {duelStakeIntent.kind==="accept"?"Their stake is at a tier you don\'t have nearby.":"Unlock a coin or hunt for one."}</div>
+              ):(
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(72px,1fr))",gap:8}}>
+                  {eligible.map(c=>(
+                    <button key={c.id} onClick={()=>submitStake(c.id)} style={{padding:7,borderRadius:9,border:`1px solid ${t.border}`,background:t.surfaceHi,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.borderColor=t.accent;e.currentTarget.style.transform="translateY(-2px)";}} onMouseLeave={e=>{e.currentTarget.style.borderColor=t.border;e.currentTarget.style.transform="";}}>
+                      <CoinCanvas coin={c} size={48}/>
+                      <span style={{...microLabel,fontSize:8,color:RARITY_COLOR[RARITIES[coinRarity(c)]?.id||"common"],letterSpacing:1}}>{RARITIES[coinRarity(c)]?.name||"COMMON"}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Duel result modal — shown after a flip resolves. Three flip-cards
+          appear in sequence (CSS staggered fade), then the winner is announced. */}
+      {duelResult&&(()=>{
+        const close=()=>setDuelResult(null);
+        const {flips,won,winnerUsername,duel}=duelResult;
+        return(
+          <div onClick={close} style={{position:"fixed",inset:0,zIndex:210,background:"rgba(0,0,0,.92)",display:"flex",alignItems:"center",justifyContent:"center",animation:"fadein .25s ease",padding:"20px 16px"}}>
+            <div onClick={e=>e.stopPropagation()} style={{...card,width:"100%",maxWidth:420,padding:"22px 18px",display:"flex",flexDirection:"column",alignItems:"center",gap:18,borderColor:won?t.success:t.danger,boxShadow:`0 0 30px ${won?t.success:t.danger}33`}}>
+              <div style={{...sectionTitle,fontSize:20,letterSpacing:2,color:won?t.success:t.danger,textShadow:`0 0 14px ${won?t.success:t.danger}55`,animation:"fadein .4s ease .8s both"}}>
+                {won?"⚔ VICTORY":"⚔ DEFEAT"}
+              </div>
+              {/* Three flip outcomes — staggered reveal */}
+              <div style={{display:"flex",gap:11,alignItems:"center",justifyContent:"center"}}>
+                {(flips||[]).map((f,i)=>{
+                  if(f===null)return(
+                    <div key={i} style={{width:48,height:48,borderRadius:"50%",border:`2px dashed ${t.border}`,opacity:0.3,animation:`fadein .3s ease ${0.2+i*0.35}s both`}}/>
+                  );
+                  // f === true means challenger won that flip
+                  const myFlipWon=duel.role==="challenger"?f:!f;
+                  return(
+                    <div key={i} style={{width:54,height:54,borderRadius:"50%",border:`2px solid ${myFlipWon?t.success:t.danger}`,background:`radial-gradient(circle at 35% 35%,${myFlipWon?t.success:t.danger}55,${myFlipWon?t.success:t.danger}11)`,display:"flex",alignItems:"center",justifyContent:"center",...F,fontSize:22,fontWeight:900,color:myFlipWon?t.success:t.danger,boxShadow:`0 0 14px ${myFlipWon?t.success:t.danger}55`,animation:`flipReveal .5s cubic-bezier(.45,1.6,.55,1) ${0.2+i*0.35}s both`,transformOrigin:"center"}}>{myFlipWon?"✓":"✗"}</div>
+                  );
+                })}
+              </div>
+              {/* Coins won/lost */}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:14,animation:"fadein .4s ease 1.6s both"}}>
+                {duel.challengerCoin&&(
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                    <CoinCanvas coin={duel.challengerCoin} size={56}/>
+                    <span style={{...microLabel,fontSize:8,color:t.muted}}>{duel.challengerUsername}</span>
+                  </div>
+                )}
+                <span style={{fontSize:18,...F,fontWeight:700,color:t.muted,opacity:.5}}>vs</span>
+                {duel.challengedCoin&&(
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                    <CoinCanvas coin={duel.challengedCoin} size={56}/>
+                    <span style={{...microLabel,fontSize:8,color:t.muted}}>{duel.challengedUsername}</span>
+                  </div>
+                )}
+              </div>
+              <div style={{...mu,fontSize:13,textAlign:"center",fontStyle:"italic",lineHeight:1.55,maxWidth:300,animation:"fadein .4s ease 1.8s both"}}>
+                {won
+                  ? <>Both coins are yours. <b>{winnerUsername}</b> claims the spoils.</>
+                  : <>The fates favoured <b>{winnerUsername}</b>. Your stake has changed hands.</>}
+              </div>
+              <button onClick={close} style={{padding:"9px 22px",borderRadius:9,border:`1px solid ${t.borderHi}`,background:t.surfaceHi,cursor:"pointer",...F,fontSize:11,fontWeight:800,color:t.text,letterSpacing:2,textTransform:"uppercase",animation:"fadein .3s ease 2s both"}}>Close</button>
+            </div>
+          </div>
+        );
+      })()}
       {/* Flying scrap animation — fixed-position overlay, one element per dug cell.
           Each flyer arcs from cell origin toward the marks counter, with floating
           "+◈ N scrap" text near the origin. Timing is tuned so marks ticker fires
