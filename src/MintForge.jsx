@@ -889,7 +889,7 @@ export default function MintForge(){
     t, isDark, setIsDark,
     F, VT, FR, mu, microLabel, sectionTitle, card,
     // Auth + API
-    token, currentPlayer, api, schemaWarning, setSchemaWarning,
+    token, api, schemaWarning, setSchemaWarning,
     // Coins + currency
     coins, setCoins,
     marks, setMarks,
