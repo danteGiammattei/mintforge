@@ -110,20 +110,26 @@ All coin mutations flow through the single transactional endpoint — forges and
 
 ## Migrations (existing deployments)
 
-If your D1 was created before locked coins / friends were added, run:
+Run these in order. Each is idempotent — `CREATE TABLE IF NOT EXISTS` skips if applied; `ALTER TABLE ADD COLUMN` errors with "duplicate column name" if already applied (safe to ignore).
 
 ```bash
+# v1 -> v2: Locked coins + friends
 npx wrangler d1 execute mintforge --file=./migrations/001_locked_friends.sql --remote
-```
 
-If your D1 was created before tarot cards / pickaxe durability / marks currency, run:
-
-```bash
+# v2 -> v3: Marks currency, pickaxe durability, tarot cards
 npx wrangler d1 execute mintforge --file=./migrations/002_marks_durability_tarot.sql --remote
+
+# v3 -> v4: Premium frame + title ownership
+npx wrangler d1 execute mintforge --file=./migrations/003_owned_cosmetics.sql --remote
+
+# v4 -> v5: Coin rarity column
+npx wrangler d1 execute mintforge --file=./migrations/004_coin_rarity.sql --remote
+
+# v5 -> v6: Artefacts table (Shrine system)
+npx wrangler d1 execute mintforge --file=./migrations/005_artefacts.sql --remote
 ```
 
-Both migrations are idempotent for the `CREATE TABLE IF NOT EXISTS` statements.
-The `ALTER TABLE … ADD COLUMN` statements will error with "duplicate column name" if already applied — safe to ignore.
+If you can't run wrangler (e.g. on mobile), the equivalent SQL to paste into the Cloudflare D1 web console is in each migration file.
 
 ## API surface (current)
 
@@ -132,8 +138,8 @@ The `ALTER TABLE … ADD COLUMN` statements will error with "duplicate column na
 | POST   | `/api/auth/register`       | —    | Create account + session                        |
 | POST   | `/api/auth/login`          | —    | Authenticate + session                          |
 | POST   | `/api/auth/logout`         | ✓    | Revoke session                                  |
-| GET    | `/api/vault`               | ✓    | Full player state + coin list + tarots          |
-| POST   | `/api/vault`               | ✓    | Transactional `{remove?, add?, lock?, tarotBuy?, tarotSell?, state?}` |
+| GET    | `/api/vault`               | ✓    | Full player state + coins + tarots + artefacts  |
+| POST   | `/api/vault`               | ✓    | Transactional `{remove?, add?, lock?, tarotBuy?, tarotSell?, artefactAdd?, state?}` |
 | GET    | `/api/users/search?q=`     | ✓    | Username prefix search (max 10)                 |
 | GET    | `/api/users/:username`     | ✓    | Public profile + showcase coins                 |
 | GET    | `/api/friends`             | ✓    | List your friends                               |

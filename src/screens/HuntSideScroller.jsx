@@ -307,47 +307,18 @@ export default function Hunt() {
         className="relative w-full h-[280px] rounded-2xl overflow-hidden cursor-pointer select-none"
         style={{
           touchAction: "none",
-          // When real art layers are present, the sky webp covers the full viewport;
-          // use a neutral warm tone as the load-state fallback. Procedural mode
-          // keeps the original gradient.
-          background: loc.bgLayers.length > 0
-            ? "#c0a87a"
-            : isDark
-              ? "linear-gradient(to bottom, #1a1408 0%, #2a1c0a 60%, #3a2810 100%)"
-              : "linear-gradient(to bottom, #d8c8a0 0%, #c8b890 60%, #a89870 100%)",
+          background: isDark
+            ? "linear-gradient(to bottom, #1a1408 0%, #2a1c0a 60%, #3a2810 100%)"
+            : "linear-gradient(to bottom, #d8c8a0 0%, #c8b890 60%, #a89870 100%)",
           border: `1px solid ${isDark ? "#2a1a0a" : "#a08868"}`,
           boxShadow: "inset 0 0 60px rgba(0,0,0,.45)",
         }}>
-        {/* ── Parallax background layers ──
-            When bgLayers is populated (real art), render each as a
-            CSS background-image div stacked deepest-first. The sky layer
-            (scrollMul=0) is static and covers the viewport fully. The
-            transparent RGBA layers scroll at their respective multipliers
-            using repeat-x so the world tiles infinitely.
-            Falls back to ProceduralBackdrop when no art is configured. */}
-        {loc.bgLayers.length === 0 ? (
+        {/* ── Parallax layers (placeholder) ──
+            v1 ships with a procedural backdrop. As you author per-location
+            art, drop layered images into LOCATIONS[i].bgLayers and they'll
+            render here at their respective scroll multipliers. */}
+        {loc.bgLayers.length === 0 && (
           <ProceduralBackdrop scrollX={eng.scrollX} isDark={isDark}/>
-        ) : (
-          loc.bgLayers.map((layer, i) => {
-            const isStatic = layer.scrollMul === 0;
-            // Scale scrollX → pixels. 60 matches the foreground scroll rate
-            // used in ProceduralBackdrop so the world feels continuous.
-            const offsetPx = isStatic ? 0 : -(eng.scrollX * 60 * layer.scrollMul);
-            return (
-              <div
-                key={i}
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundImage: `url(${layer.path})`,
-                  backgroundRepeat: isStatic ? "no-repeat" : "repeat-x",
-                  backgroundSize:   isStatic ? "cover"     : "auto 100%",
-                  backgroundPosition: isStatic
-                    ? "center bottom"
-                    : `${offsetPx}px bottom`,
-                }}
-              />
-            );
-          })
         )}
 
         {/* ── Active windows (glints) ── */}

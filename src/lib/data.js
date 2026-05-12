@@ -255,14 +255,13 @@ export const LOCATIONS = [
     name: "The Field",
     desc: "Tall grass, distant mountains. The default stretch of earth.",
     unlockShovelLevel: 1,
-    // Four-layer parallax. Each layer is a webp at /public/locations/field/.
-    // scrollMul: 0 = pinned to sky, 1.0 = moves with the foreground world.
-    // Layers are rendered deepest-first; transparent PNGs composite naturally.
+    // v1 placeholder: gradient sky + simple parallax. Real layered
+    // illustrations will land per-location as art is produced.
     bgLayers: [
-      { path: "/locations/field/sky.webp",  scrollMul: 0    }, // full-coverage sky, static
-      { path: "/locations/field/far.webp",  scrollMul: 0.12 }, // distant mountain/ruin silhouette
-      { path: "/locations/field/mid.webp",  scrollMul: 0.40 }, // cypress trees, temple ruins
-      { path: "/locations/field/near.webp", scrollMul: 1.0  }, // foreground dirt, rocks, grass
+      // Each: { path, scrollMul, y, h }
+      // path: relative to /public ; scrollMul: 0=static, 1=world speed
+      // For v1 we omit external images and let HuntSideScroller draw a
+      // default backdrop. Real bgLayers go here once the art exists.
     ],
     scrollSpeed: 70,           // px/sec
     glintFrequency: 0.6,

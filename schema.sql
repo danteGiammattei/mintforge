@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS player_state (
   equipped_tarots TEXT,
   owned_frames    TEXT,
   owned_titles    TEXT,
+  find_streak     INTEGER NOT NULL DEFAULT 0,
+  hanged_man_date TEXT NOT NULL DEFAULT '',
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 
@@ -35,6 +37,7 @@ CREATE TABLE IF NOT EXISTS coins (
   metal_idx       INTEGER NOT NULL,
   shiny           INTEGER NOT NULL DEFAULT 0,
   locked          INTEGER NOT NULL DEFAULT 0,
+  rarity          INTEGER,
   acquired_at     INTEGER NOT NULL,
   PRIMARY KEY (player_id, id),
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
