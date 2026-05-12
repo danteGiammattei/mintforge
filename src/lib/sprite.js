@@ -1,65 +1,58 @@
 /* ─── CHARACTER SPRITE METADATA ───────────────────────────────────────────
- * Single source of truth for the character sprite sheet. Lives at
- * /public/sprites/character.png. The sheet is a packed grid of 24×24
- * cells, 30 columns × 7 rows = 210 frames total.
+ * Per-animation sheet config. Each entry specifies its own source PNG,
+ * sheet dimensions, and cell dimensions — sheets aren't required to share
+ * a layout, which avoids repacking source art and losing pixel fidelity.
  *
- * The artist's row labels weren't documented in the pack, so the row
- * interpretations below were derived by eye. Notes from analysis:
+ * Multi-row animations: frame N's position is computed row-major across
+ * the sheet. With cols=4 and frames=24, frame 0 is (row 0, col 0), frame
+ * 4 is (row 1, col 0), etc. `row` and `startCol` set the *starting* cell;
+ * `frames` is how many cells to play from there, wrapping across rows.
  *
- *   Row 0: idle, facing camera (8 frames). Subtle blink/breathe.
- *   Row 1: walk facing camera (down).
- *   Row 2: walk/run facing camera.
- *   Row 3: MIXED — first ~6 frames face camera, frames 6+ are side-run.
- *   Row 4-5: mixed action poses, mostly facing camera.
- *   Row 6: action set (dig/pickup/swing/fall — varied poses).
+ * To add a new animation:
+ *   1. Drop the sheet into /public/sprites/  (RGBA, character faces right)
+ *   2. Add an entry with src + sheetW/sheetH + cellW/cellH + cols
+ *   3. Set row/startCol/frames/frameMs/loop
+ *   4. Reference the key in SpriteFrame
  *
- * Each animation can specify a startCol offset (default 0) so we can pull
- * the side-run cycle out of row 3 starting at col 6, etc.
- *
- * If something looks wrong in-game, edit the ANIM table — every consumer
- * reads from it.
+ * Note: sprites in /public/sprites/ are pre-flipped to face right since the
+ * world scrolls left past the character (character moves right through it).
  */
 export const SPRITE = {
-  src: "/sprites/character.png",
-  cell: 24,        // each frame is 24×24 px
-  cols: 30,
-  rows: 7,
-  scale: 4,        // default render scale → 96px on screen
+  scale: 2,   // global render scale. 2× = sprite renders ~90×116 in viewport.
 };
 
-// Animation table. Each entry: { row, startCol, frames, frameMs, loop }
-//   row      — 0-indexed top to bottom
-//   startCol — column to begin from (default 0)
-//   frames   — how many cells to play from startCol onward
-//   frameMs  — per-frame duration in ms
-//   loop     — true for looping, false for one-shot
 export const ANIM = {
-  // Standing / breathing facing camera. Used during the brush moment and
-  // when the character is paused mid-sequence. 8 frames at slow cadence.
-  idle: { row: 0, startCol: 0, frames: 8, frameMs: 140, loop: true },
+  // Standing breathing. idle.png is a 9-frame horizontal strip — subtle
+  // sway and weight shift. Loops forever; used during the "found coin"
+  // pause and any future paused-state UI.
+  idle: {
+    src:    "/sprites/idle.png",
+    sheetW: 460, sheetH:  55,
+    cellW:   51, cellH:  55,
+    cols: 9,
+    row: 0, startCol: 0, frames: 9, frameMs: 130, loop: true,
+  },
 
-  // Side-facing run. Row 3 is mixed (front-walk early frames, side-run
-  // later frames). Side-run cycle starts at column 6 — pulling 6 frames
-  // gives a clean loop. If the character looks like it's facing the
-  // camera instead of running rightward, increase startCol to 7 or 8.
-  run: { row: 3, startCol: 6, frames: 6, frameMs: 90, loop: true },
+  // Side-scrolling run. walk.png is a 4×6 grid laid out row-major =
+  // 24 frames of one continuous walk cycle. 90ms/frame ≈ 2.3s/cycle —
+  // matches the world scroll rate so feet don't appear to slip.
+  run: {
+    src:    "/sprites/walk.png",
+    sheetW: 180, sheetH: 348,
+    cellW:   45, cellH:  58,
+    cols: 4,
+    row: 0, startCol: 0, frames: 24, frameMs: 90, loop: true,
+  },
 
-  // Dig swing — short one-shot for the tap response. Row 6 has the
-  // action poses; cols 12-15 read as bent-over/working stances which
-  // match a dig action. Compressed to 4 frames so the tap feels snappy.
-  // If this doesn't look like digging, try startCol 0 or 18.
-  dig: { row: 6, startCol: 12, frames: 4, frameMs: 75, loop: false },
+  // Pickaxe swing — PLACEHOLDER. The raw swing sheet hasn't been exported
+  // from Aseprite yet; for now we re-use idle frames as a one-shot so the
+  // dig animation has a coherent stance with the pickaxe visible. Swap
+  // this entry's src/dims once swing.png exists in /public/sprites/.
+  dig: {
+    src:    "/sprites/idle.png",
+    sheetW: 460, sheetH:  55,
+    cellW:   51, cellH:  55,
+    cols: 9,
+    row: 0, startCol: 0, frames: 9, frameMs: 55, loop: false,
+  },
 };
-
-// Helper: returns CSS background-position for a given anim + frame index.
-// Frame is 0-relative within the animation; we add startCol to get the
-// actual sheet column.
-export function spritePos(animKey, frameIdx) {
-  const a = ANIM[animKey];
-  if (!a) return { backgroundPositionX: 0, backgroundPositionY: 0 };
-  const realCol = (a.startCol || 0) + frameIdx;
-  const x = -realCol * SPRITE.cell * SPRITE.scale;
-  const y = -a.row   * SPRITE.cell * SPRITE.scale;
-  return { backgroundPositionX: `${x}px`, backgroundPositionY: `${y}px` };
-}
-

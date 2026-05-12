@@ -55,10 +55,12 @@ const TAP_TOLERANCE = 0.18;
 // 0.5 = exact center. Keep this consistent with TAP_TOLERANCE check.
 const CHARACTER_X_RATIO = 0.5;
 
-// Glint visual: how long the spark stays visible. Should be shorter than
-// windowDurationMs so glint is a *cue* not a guarantee — late glints would
-// teach players to tap blindly when they see one.
-const GLINT_VISIBLE_MS = 500;
+// How long the glint cue is visible after spawn. At scrollSpeed=0.3 the
+// world moves ~0.55 viewport-fractions in 1800ms, so the glint tracks the
+// coin from screen-entry through the centre of the tap zone before fading.
+// Long enough that the player can actually see and time the hit; short
+// enough that the glint isn't just a "tap now" arrow that removes skill.
+const GLINT_VISIBLE_MS = 1800;
 
 export default function Hunt() {
   const {
@@ -129,10 +131,13 @@ export default function Hunt() {
           e.windows.push({
             id,
             spawnedAt: now,
-            // Each window's "world position" is just the scroll value at
-            // spawn. As scrollX increases past it, the window has moved
-            // to the left of the character (off-screen left).
-            worldX: e.scrollX + 1.2, // 1.2 = it appears 1.2 viewports to the right
+            // Spawn position: right at the viewport edge (screenRatio=1.0)
+            // so the glint cue is visible immediately. Was 1.2 (0.2 vp off-
+            // screen), which made the glint fire invisibly when the world
+            // scrolls slowly. The window then drifts left across the screen
+            // and is tappable while screenRatio is within ±TAP_TOLERANCE of
+            // CHARACTER_X_RATIO.
+            worldX: e.scrollX + 1.0,
             glint,
             expired: false,
             hit: false,
