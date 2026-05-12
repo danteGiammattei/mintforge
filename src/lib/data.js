@@ -255,13 +255,13 @@ export const LOCATIONS = [
     name: "The Field",
     desc: "Tall grass, distant mountains. The default stretch of earth.",
     unlockShovelLevel: 1,
-    // Four-layer parallax. Each layer is a webp at /public/locations/field/.
-    // scrollMul: 0 = pinned to sky, 1.0 = moves with the foreground world.
-    // Layers are rendered deepest-first; transparent PNGs composite naturally.
+    // Three-layer parallax. Sky covers everything; far is a faint silhouette;
+    // near is the foreground the player runs across. The previous mid layer
+    // had a hard top edge that clashed with the sky's painted haze, so it's
+    // been dropped — the sky's own mid-distance gradient sells the depth.
     bgLayers: [
       { path: "/locations/field/sky.webp",  scrollMul: 0    }, // full-coverage sky, static
       { path: "/locations/field/far.webp",  scrollMul: 0.12 }, // distant mountain/ruin silhouette
-      { path: "/locations/field/mid.webp",  scrollMul: 0.40 }, // cypress trees, temple ruins
       { path: "/locations/field/near.webp", scrollMul: 1.0  }, // foreground dirt, rocks, grass
     ],
     // scrollSpeed unit: VIEWPORT-FRACTIONS per second (NOT px/sec — the

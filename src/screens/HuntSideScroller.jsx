@@ -561,10 +561,19 @@ function ProceduralBackdrop({ scrollX, isDark }) {
  * (two full spins) so the coin ends right-side-up regardless of which
  * emblem it carries — important since emblems have a fixed "up". */
 function FoundCoinEmerge({ coin, onDone }) {
+  // Pin onDone in a ref so it doesn't appear in the effect's dependency
+  // list. HuntSideScroller re-renders ~60 times/sec via the RAF tick, which
+  // produces a fresh onDone reference every frame. If we used onDone in
+  // deps, the setTimeout would be cleared and re-created every frame and
+  // the 1400ms timer would NEVER fire — leaving the player stuck on the
+  // "found" phase forever. The ref pattern keeps the latest onDone callable
+  // while running the timer setup exactly once on mount.
+  const onDoneRef = useRef(onDone);
+  useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
   useEffect(() => {
-    const t = setTimeout(onDone, 1400);
+    const t = setTimeout(() => onDoneRef.current?.(), 1400);
     return () => clearTimeout(t);
-  }, [onDone]);
+  }, []); // run once on mount; do NOT add onDone here
   return (
     <div
       className="absolute pointer-events-none"
