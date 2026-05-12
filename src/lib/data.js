@@ -255,15 +255,20 @@ export const LOCATIONS = [
     name: "The Field",
     desc: "Tall grass, distant mountains. The default stretch of earth.",
     unlockShovelLevel: 1,
-    // v1 placeholder: gradient sky + simple parallax. Real layered
-    // illustrations will land per-location as art is produced.
+    // Four-layer parallax. Each layer is a webp at /public/locations/field/.
+    // scrollMul: 0 = pinned to sky, 1.0 = moves with the foreground world.
+    // Layers are rendered deepest-first; transparent PNGs composite naturally.
     bgLayers: [
-      // Each: { path, scrollMul, y, h }
-      // path: relative to /public ; scrollMul: 0=static, 1=world speed
-      // For v1 we omit external images and let HuntSideScroller draw a
-      // default backdrop. Real bgLayers go here once the art exists.
+      { path: "/locations/field/sky.webp",  scrollMul: 0    }, // full-coverage sky, static
+      { path: "/locations/field/far.webp",  scrollMul: 0.12 }, // distant mountain/ruin silhouette
+      { path: "/locations/field/mid.webp",  scrollMul: 0.40 }, // cypress trees, temple ruins
+      { path: "/locations/field/near.webp", scrollMul: 1.0  }, // foreground dirt, rocks, grass
     ],
-    scrollSpeed: 70,           // px/sec
+    // scrollSpeed unit: VIEWPORT-FRACTIONS per second (NOT px/sec — the
+    // comment used to say px/sec and the value was 70, which made windows
+    // zip past in 10ms. 0.3 means the world scrolls ~one viewport every
+    // ~3 seconds, giving the player time to react to a glint cue.
+    scrollSpeed: 0.3,
     glintFrequency: 0.6,
     windowSpacingMs: 6000,     // average ~6s between windows
     windowDurationMs: 1800,    // ~1.8s tap-eligible window
