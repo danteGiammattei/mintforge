@@ -339,7 +339,12 @@ export default function Hunt() {
           <ProceduralBackdrop scrollX={eng.scrollX} isDark={isDark}/>
         ) : (
           loc.bgLayers.map((layer, i) => {
-            const SCROLL_PX_SCALE = 333;
+            // Scroll constant: pixels of parallax movement per viewport-fraction
+            // of world scroll. 150 with scrollSpeed=0.3 gives the near layer
+            // ~45px/sec — a chill walking pace that doesn't pull the eye
+            // away from the gameplay action. Bump higher for a more frantic
+            // feel; lower for a slow-stroll feel.
+            const SCROLL_PX_SCALE = 150;
             const isStatic = layer.scrollMul === 0;
             const offsetPx = isStatic ? 0 : -(eng.scrollX * SCROLL_PX_SCALE * layer.scrollMul);
             return (
