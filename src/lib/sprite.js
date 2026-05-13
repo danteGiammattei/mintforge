@@ -44,15 +44,17 @@ export const ANIM = {
     row: 0, startCol: 0, frames: 24, frameMs: 90, loop: true,
   },
 
-  // Pickaxe swing — PLACEHOLDER. The raw swing sheet hasn't been exported
-  // from Aseprite yet; for now we re-use idle frames as a one-shot so the
-  // dig animation has a coherent stance with the pickaxe visible. Swap
-  // this entry's src/dims once swing.png exists in /public/sprites/.
+  // Pickaxe swing. 11-frame strip: wind-up → overhead → arc → strike →
+  // recovery. The source was generated at high resolution with non-uniform
+  // spacing; the slicer in /tools normalises it into this clean horizontal
+  // strip with frames bottom-anchored so the character's feet stay planted
+  // through the swing. 45ms × 11 ≈ 500ms total — snappy tap response.
+  // (If a future export has more frames, just bump cols/frames here.)
   dig: {
-    src:    "/sprites/idle.png",
-    sheetW: 460, sheetH:  55,
-    cellW:   51, cellH:  55,
-    cols: 9,
-    row: 0, startCol: 0, frames: 9, frameMs: 55, loop: false,
+    src:    "/sprites/swing.png",
+    sheetW: 330, sheetH:  61,
+    cellW:   30, cellH:  61,
+    cols: 11,
+    row: 0, startCol: 0, frames: 11, frameMs: 45, loop: false,
   },
 };
