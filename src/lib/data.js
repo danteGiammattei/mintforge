@@ -324,17 +324,22 @@ export const EMBLEMS_EXTRA = [
 ];
 
 // Per-metal emblem rosters. Look up by metalIdx (0-8 from METALS array).
-//   0=Copper  1=Bronze   →  base + extra (32 emblems)
-//   2-8 (Silver→Astral)  →  base only (16 emblems)
+// Updated for the high-res sheet, which adds extra emblems for Silver,
+// Obsidian and Eldritch (alongside the existing Copper/Bronze extras).
+// Platinum and Void aren't in the high-res sheet — they fall back to
+// EMBLEMS_BASE so coinImagePath still resolves to a stable filename
+// (CoinCanvas's procedural fallback paints them if the file 404s).
+//   0=Copper, 1=Bronze, 2=Silver, 5=Obsidian, 7=Eldritch → base + extra (32)
+//   3=Gold, 4=Platinum, 6=Void, 8=Astral                  → base only   (16)
 export const EMBLEMS_BY_METAL = [
   [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 0 Copper
   [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 1 Bronze
-  EMBLEMS_BASE,                        // 2 Silver
+  [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 2 Silver
   EMBLEMS_BASE,                        // 3 Gold
-  EMBLEMS_BASE,                        // 4 Platinum
-  EMBLEMS_BASE,                        // 5 Obsidian
-  EMBLEMS_BASE,                        // 6 Void
-  EMBLEMS_BASE,                        // 7 Eldritch
+  EMBLEMS_BASE,                        // 4 Platinum (procedural)
+  [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 5 Obsidian
+  EMBLEMS_BASE,                        // 6 Void (procedural)
+  [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 7 Eldritch
   EMBLEMS_BASE,                        // 8 Astral
 ];
 
@@ -361,6 +366,6 @@ export function emblemForCoin(seed, metalIdx) {
 export function coinImagePath(coin) {
   const metal = METAL_SLUGS[coin.metalIdx] || "copper";
   const emblem = emblemForCoin(coin.seed, coin.metalIdx);
-  return `/coins/${metal}_${emblem}.png`;
+  return `/coins/${metal}_${emblem}.webp`;
 }
 

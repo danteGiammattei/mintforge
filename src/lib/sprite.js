@@ -44,16 +44,14 @@ export const ANIM = {
     row: 0, startCol: 0, frames: 24, frameMs: 90, loop: true,
   },
 
-  // Pickaxe swing. 11-frame strip: wind-up → overhead → arc → strike →
-  // recovery. The source was generated at high resolution with non-uniform
-  // spacing; the slicer in /tools normalises it into this clean horizontal
-  // strip with frames bottom-anchored so the character's feet stay planted
-  // through the swing. 45ms × 11 ≈ 500ms total — snappy tap response.
-  // (If a future export has more frames, just bump cols/frames here.)
+  // Pickaxe swing. 11-frame strip extracted from the high-quality source:
+  // wind-up → overhead → arc → strike → recovery. Cells are bottom-anchored
+  // so the character's feet stay planted through the swing motion.
+  // 45ms × 11 ≈ 500ms total — snappy tap response.
   dig: {
     src:    "/sprites/swing.png",
-    sheetW: 330, sheetH:  61,
-    cellW:   30, cellH:  61,
+    sheetW: 396, sheetH:  59,
+    cellW:   36, cellH:  59,
     cols: 11,
     row: 0, startCol: 0, frames: 11, frameMs: 45, loop: false,
   },
