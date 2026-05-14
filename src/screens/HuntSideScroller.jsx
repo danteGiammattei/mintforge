@@ -395,12 +395,25 @@ export default function Hunt() {
           className="absolute pointer-events-none"
           style={{
             left: charXPx,
-            bottom: "22%",
+            // Feet at 14% from viewport bottom puts them on the near layer's
+            // rocky content. Previously 22% left the character floating well
+            // above the ground — the walk cells have 0px bottom padding so
+            // the div's bottom IS where the feet are.
+            bottom: "14%",
             transform: "translate(-50%, 0)",
           }}>
           {phase === "hunt" && <SpriteFrame anim="run"/>}
-          {phase === "dig"  && <SpriteFrame anim="dig" onComplete={handleDigAnimDone}/>}
-          {phase === "found" && <SpriteFrame anim="idle"/>}
+          {/* Keep the dig sprite mounted through both phases so it holds on
+              its final frame after the swing completes — the previous "idle"
+              animation during 'found' showed the wrong pose and read as a
+              glitch. dig is loop:false so SpriteFrame freezes on the last
+              cell once onComplete fires. */}
+          {(phase === "dig" || phase === "found") && (
+            <SpriteFrame
+              anim="dig"
+              onComplete={phase === "dig" ? handleDigAnimDone : undefined}
+            />
+          )}
         </div>
 
         {/* ── Dig hole + dirt mound (during dig and brief after) ── */}

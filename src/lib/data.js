@@ -168,41 +168,58 @@ export const MAX_BR = BRUSH_UPS.length - 1;
 export const SHOVEL_MAX_DUR = [null, 40, 60, 90, 130, 180, 250, 350, 500, 700];
 
 /* ─── TAROT ───────────────────────────────────────────────────────────────
-   Nine cards across three rarity tiers. Maximum 2 equipped. Each effect is
-   *visible* during normal play (numerical badge, conditional UI, post-find moment). */
+   Thirteen cards — one for each piece of art in /public/tarot/. Three
+   rarity tiers; equip up to two at once. Every effect listed below maps to
+   a field consumed by `tarotBuffs()` in lib/coin.js (xpMul, marksMul,
+   pinSlots, revealRarity, allowSkip, firstStrikeBonus, forgeRefund,
+   forgeDiscount, shinyBonus, rerollRarity, rarityFloor, guaranteedEvery
+   /Floor). If you change an effect here, that's the only place to edit
+   — the buff reducer auto-picks it up. */
 export const TAROT_CARDS = [
   // ── COMMON TIER ──────────────────────────────────────────────────
-  { id:"magician", title:"The Magician", roman:"I",  rarity:"common",  price:800,  minLvl:5,
-    xpMul:0.25,
-    desc:"+25% XP from every find." },
-  { id:"lovers",   title:"The Lovers",   roman:"VI", rarity:"common",  price:1000, minLvl:6,
+  { id:"magician",        title:"The Magician",       roman:"I",   rarity:"common", price:800,  minLvl:5,
+    xpMul:0.20,
+    desc:"+20% XP from every find." },
+  { id:"high_priestess",  title:"The High Priestess", roman:"II",  rarity:"common", price:1000, minLvl:6,
+    revealRarity:true,
+    desc:"Every coin glint reveals the rarity before you commit." },
+  { id:"empress",         title:"The Empress",        roman:"III", rarity:"common", price:1100, minLvl:7,
+    marksMul:0.20,
+    desc:"+20% marks when selling coins." },
+  { id:"emperor",         title:"The Emperor",        roman:"IV",  rarity:"common", price:1200, minLvl:8,
     pinSlots:1,
     desc:"+1 display cabinet slot." },
-  { id:"empress",  title:"The Empress",  roman:"III",rarity:"common",  price:1200, minLvl:8,
-    marksMul:0.15,
-    desc:"+15% marks from selling coins." },
 
   // ── RARE TIER ────────────────────────────────────────────────────
-  { id:"hermit",           title:"The Hermit",       roman:"IX", rarity:"rare", price:2200, minLvl:12,
-    revealRarity:true, allowSkip:true,
-    desc:"Every coin window glints — no silent finds. The lantern lights the path." },
-  { id:"wheel_of_fortune", title:"Wheel of Fortune", roman:"X",  rarity:"rare", price:2800, minLvl:15,
-    guaranteedEvery:7, guaranteedFloor:2,
-    desc:"Every 7th find is guaranteed Rare or higher. Counter visible on hunt screen." },
-  { id:"chariot",          title:"The Chariot",      roman:"VII",rarity:"rare", price:2400, minLvl:14,
-    firstStrikeBonus:0.25,
-    desc:"+25% chance the coin is in your first dig cell (instant find, max XP)." },
+  { id:"hierophant",      title:"The Hierophant",     roman:"V",   rarity:"rare",   price:2000, minLvl:11,
+    forgeRefund:0.25,
+    desc:"25% chance to recover the scrap when forging artefacts." },
+  { id:"lovers",          title:"The Lovers",         roman:"VI",  rarity:"rare",   price:2200, minLvl:12,
+    marksMul:0.40,
+    desc:"+40% marks when selling coins. (Stacks with Empress.)" },
+  { id:"chariot",         title:"The Chariot",        roman:"VII", rarity:"rare",   price:2400, minLvl:14,
+    firstStrikeBonus:0.30,
+    desc:"+30% chance the coin sits under your very first dig cell." },
+  { id:"strength",        title:"Strength",           roman:"VIII",rarity:"rare",   price:2600, minLvl:15,
+    shinyBonus:0.05,
+    desc:"+5% shiny chance on every brush, on top of your brush level." },
+  { id:"hermit",          title:"The Hermit",         roman:"IX",  rarity:"rare",   price:2800, minLvl:16,
+    allowSkip:true,
+    desc:"Skip a coin you don't want — no durability lost." },
 
   // ── LEGENDARY TIER ───────────────────────────────────────────────
-  { id:"tower",      title:"The Tower",      roman:"XVI",rarity:"legendary", price:5000, minLvl:25,
-    forgeDiscount:0.40,
-    desc:"All artefact forging costs reduced by 40%." },
-  { id:"hanged_man", title:"The Hanged Man", roman:"XII",rarity:"legendary", price:4500, minLvl:22,
+  { id:"wheel_of_fortune",title:"Wheel of Fortune",   roman:"X",   rarity:"legendary", price:5000, minLvl:22,
+    guaranteedEvery:7, guaranteedFloor:2,
+    desc:"Every 7th find is guaranteed Rare or higher. Counter visible on hunt screen." },
+  { id:"justice",         title:"Justice",            roman:"XI",  rarity:"legendary", price:4800, minLvl:24,
     rerollRarity:1,
     desc:"Once per day, reroll the rarity of a coin you just found." },
-  { id:"sun",        title:"The Sun",        roman:"XIX",rarity:"legendary", price:5500, minLvl:30,
-    rarityFloor:1, glyph:"☀",
+  { id:"hanged_man",      title:"The Hanged Man",     roman:"XII", rarity:"legendary", price:5200, minLvl:26,
+    rarityFloor:1,
     desc:"All finds are guaranteed at least Uncommon rarity." },
+  { id:"tower",           title:"The Tower",          roman:"XVI", rarity:"legendary", price:5500, minLvl:28,
+    forgeDiscount:0.40,
+    desc:"All artefact forging costs reduced by 40%." },
 ];
 export const TAROT_BY_ID = Object.fromEntries(TAROT_CARDS.map(c => [c.id, c]));
 // Two equipped at a time — combinations matter, but no card is "always-on".
