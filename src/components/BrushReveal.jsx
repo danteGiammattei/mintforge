@@ -24,7 +24,14 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
 
   const [pct, setPct]       = useState(0);
   const [gleam, setGleam]   = useState(false);
-  const [cursor, setCursor] = useState({ x:-300, y:-300 });
+  // Cursor position is stored in CANVAS-LOCAL coords (0..RS), not viewport
+  // pixels — and the brush emoji is rendered as a child of the canvas
+  // wrapper, not a position:fixed overlay. This sidesteps a class of bugs
+  // where any ancestor with `transform`/`filter`/`will-change` becomes the
+  // containing block for fixed-positioned descendants and the emoji
+  // appears far away from the actual pointer.
+  const [cursor, setCursor] = useState({ x: -100, y: -100 });
+  const [hovering, setHovering] = useState(false);
 
   // Paint the coin once. Prefer the high-res illustrated coin image
   // (matches what's shown elsewhere in the game), fall back to the
@@ -137,10 +144,11 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
     e.preventDefault();
     const rect = cv.getBoundingClientRect();
     const { x, y } = gp(e, rect);
-    setCursor({
-      x: e.touches ? e.touches[0].clientX : e.clientX,
-      y: e.touches ? e.touches[0].clientY : e.clientY,
-    });
+    // Cursor is in canvas-local coordinates (0..RS). The emoji renders as
+    // an absolute-positioned child of the same wrapper that contains the
+    // canvas, so x/y map directly to the wrapper's coordinate space.
+    setCursor({ x, y });
+    setHovering(true);
     if (!downRef.current && !e.touches) return;
     if (prevRef.current) stroke(x, y, prevRef.current.x, prevRef.current.y);
     prevRef.current = { x, y };
@@ -155,7 +163,14 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
     prevRef.current = { x, y };
   }, []);
 
-  const onUp = useCallback(() => { downRef.current = false; prevRef.current = null; }, []);
+  const onUp = useCallback(() => {
+    downRef.current = false;
+    prevRef.current = null;
+    // On touch, lifting the finger should hide the cursor — otherwise the
+    // brush emoji is stranded at the last touched position with no way
+    // for the player to know they're not interacting.
+    setHovering(false);
+  }, []);
 
   const hint = pct < .12 ? "Hold and drag to brush"
              : pct < .45 ? "Keep brushing..."
@@ -164,15 +179,31 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
 
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:14, userSelect:"none" }}>
-      <div style={{ position:"fixed", left:cursor.x, top:cursor.y, pointerEvents:"none", zIndex:999, transform:"translate(-50%,-50%)", fontSize:28 }}>🖌️</div>
-      <div style={{ position:"relative", width:RS, height:RS, borderRadius:"50%", overflow:"hidden", flexShrink:0, cursor:"none", boxShadow:`0 0 0 6px ${t.surface},0 0 0 7px ${t.borderHi},0 18px 40px rgba(0,0,0,.5),inset 0 0 30px rgba(0,0,0,.4)` }}>
-        <canvas ref={coinRef} style={{ imageRendering:"pixelated", position:"absolute", top:0, left:0, width:RS, height:RS }}/>
-        <canvas ref={dirtRef} width={RS} height={RS}
-                style={{ position:"absolute", top:0, left:0, touchAction:"none" }}
-                onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp} onMouseLeave={onUp}
-                onTouchMove={onMove} onTouchStart={onDown} onTouchEnd={onUp}/>
-        {gleam && <div style={{ position:"absolute", top:0, left:0, width:"60%", height:"100%", background:`linear-gradient(108deg,transparent,${m.hl}dd 50%,transparent)`, animation:"gleam .9s ease-out forwards", pointerEvents:"none", mixBlendMode:"screen" }}/>}
-        <div style={{ position:"absolute", inset:0, borderRadius:"50%", border:`2px solid rgba(255,255,255,${pct*.18+.04})`, pointerEvents:"none" }}/>
+      <div style={{ position:"relative", width:RS, height:RS, borderRadius:"50%", overflow:"visible", flexShrink:0, cursor:"none", boxShadow:`0 0 0 6px ${t.surface},0 0 0 7px ${t.borderHi},0 18px 40px rgba(0,0,0,.5),inset 0 0 30px rgba(0,0,0,.4)` }}>
+        <div style={{ position:"absolute", inset:0, borderRadius:"50%", overflow:"hidden" }}>
+          <canvas ref={coinRef} style={{ imageRendering:"pixelated", position:"absolute", top:0, left:0, width:RS, height:RS }}/>
+          <canvas ref={dirtRef} width={RS} height={RS}
+                  style={{ position:"absolute", top:0, left:0, touchAction:"none" }}
+                  onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp} onMouseLeave={onUp}
+                  onMouseEnter={() => setHovering(true)}
+                  onTouchMove={onMove} onTouchStart={onDown} onTouchEnd={onUp}/>
+          {gleam && <div style={{ position:"absolute", top:0, left:0, width:"60%", height:"100%", background:`linear-gradient(108deg,transparent,${m.hl}dd 50%,transparent)`, animation:"gleam .9s ease-out forwards", pointerEvents:"none", mixBlendMode:"screen" }}/>}
+          <div style={{ position:"absolute", inset:0, borderRadius:"50%", border:`2px solid rgba(255,255,255,${pct*.18+.04})`, pointerEvents:"none" }}/>
+        </div>
+        {/* Brush cursor: positioned in canvas-local coords. Visible only
+            while pointer is over the canvas (mouse hover OR active touch).
+            Renders OUTSIDE the overflow:hidden circle so the brush handle
+            can extend past the round window naturally. */}
+        {hovering && (
+          <div style={{
+            position:"absolute",
+            left: cursor.x, top: cursor.y,
+            pointerEvents:"none",
+            transform:"translate(-50%,-50%)",
+            fontSize:28,
+            filter:"drop-shadow(0 1px 2px rgba(0,0,0,.6))",
+          }}>🖌️</div>
+        )}
       </div>
       {pct < 1 && (
         <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, width:RS }}>
