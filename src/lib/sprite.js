@@ -36,12 +36,15 @@ export const ANIM = {
   // Side-scrolling run. walk.png is a 4×6 grid laid out row-major =
   // 24 frames of one continuous walk cycle. 90ms/frame ≈ 2.3s/cycle —
   // matches the world scroll rate so feet don't appear to slip.
+  // Walking cycle. 4 cols × 6 rows = 24 frames, played row-major. 55ms
+  // per frame so the cycle completes in ~1.3s — feet read as stepping
+  // rather than drifting against the parallax ground.
   run: {
     src:    "/sprites/walk.png",
     sheetW: 180, sheetH: 348,
     cellW:   45, cellH:  58,
     cols: 4,
-    row: 0, startCol: 0, frames: 24, frameMs: 90, loop: true,
+    row: 0, startCol: 0, frames: 24, frameMs: 55, loop: true,
   },
 
   // Pickaxe swing. 11-frame strip extracted from the high-quality source:

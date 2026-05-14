@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { drawCoin, RNG } from "../lib/coin.js";
-import { METALS, BA } from "../lib/data.js";
+import { METALS, BA, coinImagePath } from "../lib/data.js";
 
 /* Local rendering constants — only used inside BrushReveal so they live here.
  *   RS = render size of the coin/dirt canvas (180px square)
@@ -26,10 +26,29 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
   const [gleam, setGleam]   = useState(false);
   const [cursor, setCursor] = useState({ x:-300, y:-300 });
 
-  // Paint the coin once
+  // Paint the coin once. Prefer the high-res illustrated coin image
+  // (matches what's shown elsewhere in the game), fall back to the
+  // procedural canvas painter if the image fails to load (404, etc).
   useEffect(() => {
-    if (coinRef.current) drawCoin(coinRef.current, coin, RS);
-  }, [coin.seed]);
+    const cv = coinRef.current;
+    if (!cv) return;
+    cv.width = RS; cv.height = RS;
+    const ctx = cv.getContext("2d");
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, RS, RS);
+      // Clip to the circular coin area so the image is masked the same
+      // way as the brush mechanic (which samples a circle).
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(RS/2, RS/2, RS/2 - 1, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(img, 0, 0, RS, RS);
+      ctx.restore();
+    };
+    img.onerror = () => drawCoin(cv, coin, RS); // procedural fallback
+    img.src = coinImagePath(coin);
+  }, [coin.seed, coin.metalIdx]);
 
   // Paint the dirt overlay — pseudo-random rocks, particles, scratches
   useEffect(() => {
@@ -145,7 +164,7 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
 
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:14, userSelect:"none" }}>
-      <div style={{ position:"fixed", left:cursor.x, top:cursor.y, pointerEvents:"none", zIndex:999, transform:"translate(-50%,-70%)", fontSize:24 }}>🖌️</div>
+      <div style={{ position:"fixed", left:cursor.x, top:cursor.y, pointerEvents:"none", zIndex:999, transform:"translate(-50%,-50%)", fontSize:28 }}>🖌️</div>
       <div style={{ position:"relative", width:RS, height:RS, borderRadius:"50%", overflow:"hidden", flexShrink:0, cursor:"none", boxShadow:`0 0 0 6px ${t.surface},0 0 0 7px ${t.borderHi},0 18px 40px rgba(0,0,0,.5),inset 0 0 30px rgba(0,0,0,.4)` }}>
         <canvas ref={coinRef} style={{ imageRendering:"pixelated", position:"absolute", top:0, left:0, width:RS, height:RS }}/>
         <canvas ref={dirtRef} width={RS} height={RS}

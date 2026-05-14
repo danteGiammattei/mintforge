@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { drawCoin, coinRarity, coinValue } from "../lib/coin.js";
-import { METALS, RARITIES, SHAPE_NAMES } from "../lib/data.js";
+import { METALS, RARITIES, SHAPE_NAMES, coinImagePath } from "../lib/data.js";
 
 /* ─── COIN MODAL ──────────────────────────────────────────────────────────
  * Full-screen modal with a 3D-feeling coin inspector. Drag to spin the coin
@@ -19,8 +19,22 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, t, isDa
   const [rot, setRot] = useState({ x: 12, y: 0 });
   const m = METALS[coin.metalIdx];
 
+  // Paint the coin onto the canvas. Prefer the illustrated coin image so
+  // it matches what appears elsewhere; fall back to the procedural painter
+  // if the image fails (404). The canvas stays so the existing rotation
+  // transform + radial highlight + glint overlays continue to work.
   useEffect(() => {
-    if (cvRef.current) drawCoin(cvRef.current, coin, 220);
+    const cv = cvRef.current;
+    if (!cv) return;
+    cv.width = 220; cv.height = 220;
+    const ctx = cv.getContext("2d");
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, 220, 220);
+      ctx.drawImage(img, 0, 0, 220, 220);
+    };
+    img.onerror = () => drawCoin(cv, coin, 220);
+    img.src = coinImagePath(coin);
   }, [coin.seed, coin.metalIdx, coin.shiny]);
 
   // Inertial spin loop — when not dragging, velocity decays and rotation drifts

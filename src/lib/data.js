@@ -255,13 +255,13 @@ export const LOCATIONS = [
     name: "The Field",
     desc: "Tall grass, distant mountains. The default stretch of earth.",
     unlockShovelLevel: 1,
-    // Two-layer parallax: sky covers everything, near is the foreground
-    // the player runs across. The mid and far layers were dropped because
-    // their painted horizons clashed with the sky's own painted haze —
-    // hard top edges on both layers read as floating cutouts rather than
-    // distance. The sky alone sells the mid-distance depth.
+    // Three-layer parallax: sky covers everything; far is a sky-removed
+    // silhouette of distant hills/ruins; near is the foreground the player
+    // runs across. The far layer's painted sky was alpha-keyed out so its
+    // hills composite cleanly against any sky tint.
     bgLayers: [
       { path: "/locations/field/sky.webp",  scrollMul: 0    }, // full-coverage sky, static
+      { path: "/locations/field/far.webp",  scrollMul: 0.15 }, // distant hills, ruins, cypresses
       { path: "/locations/field/near.webp", scrollMul: 1.0  }, // foreground dirt, rocks, grass
     ],
     // scrollSpeed unit: VIEWPORT-FRACTIONS per second (NOT px/sec — the
@@ -324,22 +324,17 @@ export const EMBLEMS_EXTRA = [
 ];
 
 // Per-metal emblem rosters. Look up by metalIdx (0-8 from METALS array).
-// Updated for the high-res sheet, which adds extra emblems for Silver,
-// Obsidian and Eldritch (alongside the existing Copper/Bronze extras).
-// Platinum and Void aren't in the high-res sheet — they fall back to
-// EMBLEMS_BASE so coinImagePath still resolves to a stable filename
-// (CoinCanvas's procedural fallback paints them if the file 404s).
-//   0=Copper, 1=Bronze, 2=Silver, 5=Obsidian, 7=Eldritch → base + extra (32)
-//   3=Gold, 4=Platinum, 6=Void, 8=Astral                  → base only   (16)
+//   0=Copper  1=Bronze   →  base + extra (32 emblems)
+//   2-8 (Silver→Astral)  →  base only (16 emblems)
 export const EMBLEMS_BY_METAL = [
   [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 0 Copper
   [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 1 Bronze
-  [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 2 Silver
+  EMBLEMS_BASE,                        // 2 Silver
   EMBLEMS_BASE,                        // 3 Gold
-  EMBLEMS_BASE,                        // 4 Platinum (procedural)
-  [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 5 Obsidian
-  EMBLEMS_BASE,                        // 6 Void (procedural)
-  [...EMBLEMS_BASE, ...EMBLEMS_EXTRA], // 7 Eldritch
+  EMBLEMS_BASE,                        // 4 Platinum
+  EMBLEMS_BASE,                        // 5 Obsidian
+  EMBLEMS_BASE,                        // 6 Void
+  EMBLEMS_BASE,                        // 7 Eldritch
   EMBLEMS_BASE,                        // 8 Astral
 ];
 
@@ -366,6 +361,6 @@ export function emblemForCoin(seed, metalIdx) {
 export function coinImagePath(coin) {
   const metal = METAL_SLUGS[coin.metalIdx] || "copper";
   const emblem = emblemForCoin(coin.seed, coin.metalIdx);
-  return `/coins/${metal}_${emblem}.webp`;
+  return `/coins/${metal}_${emblem}.png`;
 }
 
