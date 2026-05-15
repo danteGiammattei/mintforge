@@ -4,6 +4,7 @@ import { bannerStyle } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
 import TarotCard from "../components/TarotCard.jsx";
 import ShovelIcon from "../components/ShovelIcon.jsx";
+import RouletteWheel from "../components/RouletteWheel.jsx";
 
 /* ─── TAVERN ──────────────────────────────────────────────────────────────
  * Three sub-tabs:
@@ -27,6 +28,11 @@ export default function Tavern() {
     setTavernView, setShopTab, setFrame, setSelectedTitle, setTab,
     buyFrame, buyTitle, buyTarot, buyNewPickaxe, repairPickaxe, NEW_PICKAXE_COST,
     toggleTarot, promptAcceptDuel, declineDuel, flipDuel,
+    // Gambling — wired in MintForge, presented in the Gamble sub-view
+    gambMode, setGambMode, betIds, betCoins, toggleBet,
+    gambPhase, gambResult, gamble, doGamble, gambOk, resetGamble,
+    roulBetId, setRoulBetId, roulBetCoin, roulResult, roulDone,
+    onRoulResult, resetRoulette,
     METALS, FRAMES, BANNERS, TAROT_CARDS, TITLES, PREMIUM_TITLES, SHOVEL_UPS, MAX_EQUIPPED_TAROTS,
     t, isDark, F, FR, mu, microLabel, sectionTitle, card,
   } = useGame();
@@ -66,7 +72,7 @@ export default function Tavern() {
         {/* Duels hidden until friend-vs-friend coin battles are reworked.
             Duel state, API, accept/decline/flip handlers, list — all preserved
             in MintForge.jsx + functions/api/duels/. Just not navigable. */}
-        {[["shop","◈","Shop"],["repair","⚒","Repair"]].map(([id,ic,lbl])=>{
+        {[["shop","◈","Shop"],["gamble","🎲","Gamble"],["repair","⚒","Repair"]].map(([id,ic,lbl])=>{
           const active=tavernView===id;
           return (
             <button
@@ -290,6 +296,172 @@ export default function Tavern() {
                 })}
               </div>
             </>
+          )}
+        </div>
+      )}
+
+      {/* ── GAMBLE VIEW ──────────────────────────────────────────────────
+          Two minigames: Coin Toss and the Roulette wheel. Coin Toss is a
+          50/50 — win → coin's metal tier bumps up one, lose → coin lost.
+          Roulette is six-sector weighted: most likely outcomes punish you,
+          rare outcomes are big upside. All state lives in MintForge so this
+          view is mostly presentation. */}
+      {tavernView==="gamble"&&(
+        <div className="animate-fadein flex flex-col gap-3.5">
+          {/* Mode picker */}
+          <div className="flex gap-1.5 p-1 rounded-[10px]"
+               style={{ background:t.surface, border:`1px solid ${t.border}` }}>
+            {[["toss","🪙","Coin Toss"],["roulette","🎡","Roulette"]].map(([id,ic,lbl])=>{
+              const active=gambMode===id;
+              return (
+                <button key={id}
+                  onClick={()=>{ setGambMode(id); resetGamble(); resetRoulette(); }}
+                  className="flex-1 py-2 rounded-md border-none cursor-pointer text-[11px] font-bold uppercase tracking-[1.5px] transition-all flex items-center justify-center gap-1.5"
+                  style={{
+                    ...F,
+                    background:active?`linear-gradient(135deg,${t.accentHi},${t.accent})`:"transparent",
+                    color:active?t.accentInk:t.muted,
+                  }}>
+                  <span className="text-base">{ic}</span>{lbl}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Coin Toss UI ── */}
+          {gambMode==="toss"&&(
+            <div className="p-4" style={card}>
+              <div className="text-[11px] uppercase tracking-[1.5px] font-bold mb-2.5" style={{...F,color:t.muted}}>
+                {gamble.label} · {gamble.desc}
+              </div>
+
+              {gambPhase==="select"&&(
+                <>
+                  <div className="text-xs italic mb-3" style={mu}>
+                    Pick {gamble.count} coin{gamble.count>1?"s":""} to stake. Heads → metal tier up. Tails → the coin is lost forever.
+                  </div>
+                  {/* Coin picker — only unlocked, unpinned coins */}
+                  <div className="grid grid-cols-4 gap-2 max-h-[260px] overflow-y-auto pr-1 mb-3">
+                    {coins.filter(c=>!c.locked).slice(0,80).map(c=>{
+                      const selected=betIds.includes(c.id);
+                      return (
+                        <button key={c.id}
+                          onClick={()=>toggleBet(c.id)}
+                          className="p-1.5 rounded-md cursor-pointer transition-all"
+                          style={{
+                            border:`2px solid ${selected?t.accent:"transparent"}`,
+                            background:selected?`${t.accent}22`:t.surface,
+                          }}>
+                          <CoinCanvas coin={c} size={48}/>
+                        </button>
+                      );
+                    })}
+                    {coins.filter(c=>!c.locked).length===0 && (
+                      <div className="col-span-4 text-xs italic py-6 text-center" style={mu}>
+                        No unlocked coins to bet — find some on the hunt first.
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    disabled={!gambOk}
+                    onClick={doGamble}
+                    className="w-full py-2.5 rounded-md font-bold uppercase tracking-[1.5px] text-xs border-none transition-opacity"
+                    style={{
+                      ...F,
+                      background:gambOk?`linear-gradient(135deg,${t.accentHi},${t.accent})`:t.surface,
+                      color:gambOk?t.accentInk:t.muted,
+                      cursor:gambOk?"pointer":"not-allowed",
+                      opacity:gambOk?1:0.5,
+                    }}>
+                    {gambOk?"Flip the coin":`Pick ${gamble.count} coin${gamble.count>1?"s":""} to flip`}
+                  </button>
+                </>
+              )}
+
+              {gambPhase==="spinning"&&(
+                <div className="py-10 text-center">
+                  <div className="text-6xl mb-3 animate-spin" style={{ animationDuration:"0.4s" }}>🪙</div>
+                  <div className="text-xs uppercase tracking-[2px] font-bold" style={{...F,color:t.muted}}>Flipping…</div>
+                </div>
+              )}
+
+              {gambPhase==="result"&&gambResult&&(
+                <div className="py-6 text-center flex flex-col items-center gap-3.5">
+                  <div className="text-5xl">{gambResult.won?"✨":"💀"}</div>
+                  <div className="text-base font-extrabold uppercase tracking-[2px]"
+                       style={{...F,color:gambResult.won?"#7ad888":"#ff8080"}}>
+                    {gambResult.msg}
+                  </div>
+                  {gambResult.add[0] && (
+                    <div className="flex flex-col items-center gap-1">
+                      <CoinCanvas coin={gambResult.add[0]} size={88}/>
+                      <div className="text-xs italic" style={mu}>New coin minted</div>
+                    </div>
+                  )}
+                  <button
+                    onClick={resetGamble}
+                    className="px-5 py-2 rounded-md font-bold uppercase tracking-[1.5px] text-xs border-none cursor-pointer"
+                    style={{...F, background:t.surface, color:t.muted, border:`1px solid ${t.border}` }}>
+                    Bet again
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Roulette UI ── */}
+          {gambMode==="roulette"&&(
+            <div className="p-4" style={card}>
+              <div className="text-[11px] uppercase tracking-[1.5px] font-bold mb-2.5" style={{...F,color:t.muted}}>
+                Roulette · stake one coin · 6 sectors
+              </div>
+
+              {!roulBetCoin&&!roulDone&&(
+                <>
+                  <div className="text-xs italic mb-3" style={mu}>
+                    Pick a coin to stake. The wheel spins. Outcomes range from <span style={{color:"#ff8080"}}>LOSE</span> (most common) to <span style={{color:"#d070ff"}}>JACKPOT</span> (rare).
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 max-h-[240px] overflow-y-auto pr-1">
+                    {coins.filter(c=>!c.locked).slice(0,80).map(c=>(
+                      <button key={c.id}
+                        onClick={()=>setRoulBetId(c.id)}
+                        className="p-1.5 rounded-md cursor-pointer transition-all"
+                        style={{
+                          border:`2px solid ${roulBetId===c.id?t.accent:"transparent"}`,
+                          background:roulBetId===c.id?`${t.accent}22`:t.surface,
+                        }}>
+                        <CoinCanvas coin={c} size={48}/>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {roulBetCoin&&(
+                <div className="flex flex-col items-center gap-3 py-2">
+                  <RouletteWheel
+                    betCoin={roulBetCoin}
+                    onResult={onRoulResult}
+                    disabled={false}
+                    t={t}
+                  />
+                  {roulResult&&(
+                    <div className="text-center flex flex-col items-center gap-2">
+                      <div className="text-sm font-extrabold uppercase tracking-[2px]"
+                           style={{...F,color:t.fg}}>
+                        {roulResult.msg||roulResult.outcome}
+                      </div>
+                      <button
+                        onClick={resetRoulette}
+                        className="px-5 py-2 rounded-md font-bold uppercase tracking-[1.5px] text-xs border-none cursor-pointer mt-1"
+                        style={{...F, background:t.surface, color:t.muted, border:`1px solid ${t.border}` }}>
+                        Spin again
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

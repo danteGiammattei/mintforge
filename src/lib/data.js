@@ -39,8 +39,11 @@ export const HOUSES = ["the Ashen Crown","the Collapsing Sun","the Iron Serpent"
 export const CONDS  = ["Pristine","Mint","Fine","Good","Fair","Worn","Corroded"];
 
 /* ─── PROGRESSION ─────────────────────────────────────────────────────── */
-export const TITLES       = ["Novice Digger","Copper Hand","Bronzesmith","Silver Seeker","Coin Warden","Vault Keeper","Master Minter","Grand Archivist","Mythic Collector","Void Walker"];
-export const TITLE_LEVELS = [1, 5, 10, 15, 22, 30, 40, 52, 65, 80];
+// XP-gated titles. The TITLE_LEVELS array MUST stay the same length as
+// TITLES — entries pair by index. selectTitle UI fades anything you haven't
+// yet hit the level for.
+export const TITLES       = ["Novice Digger","Copper Hand","Bronzesmith","Silver Seeker","Coin Warden","Vault Keeper","Master Minter","Grand Archivist","Mythic Collector","Void Walker","Starbinder","Coin Sage","Eternal Forge"];
+export const TITLE_LEVELS = [1, 5, 10, 15, 22, 30, 40, 52, 65, 80, 95, 110, 130];
 
 /* ─── RARITY (independent of metal) ──────────────────────────────────────
    Six tiers. A coin's rarity is independent of its metal — a Common Bronze
@@ -127,10 +130,18 @@ export const ARTEFACT_GRADES = [
 export const ARTEFACT_FORGE_COST = [250, 600, 1500, 3500, 7500, 14000, 22000, 32000, 50000];
 
 /* ─── PREMIUM TITLES ──────────────────────────────────────────────────── */
+// Premium titles — purchased with marks, level-gated. The `effect` string
+// maps to a CSS class in styles.css for the visual flair on the title text.
+// IMPORTANT: keep VALID_TITLE_IDS in functions/api/vault/index.js in sync
+// with any additions here, otherwise the server will silently drop new IDs
+// from saves.
 export const PREMIUM_TITLES = [
   { id:"goldspun",    label:"Goldspun",            minLvl:10, price:600,  effect:"shimmer" },
   { id:"voidtouched", label:"Void-Touched",        minLvl:20, price:1500, effect:"void" },
   { id:"astral",      label:"Of the Astral Hour",  minLvl:35, price:3500, effect:"astral" },
+  // Skeleton-gameplay-era additions
+  { id:"bone_reaper", label:"Bone Reaper",         minLvl:18, price:1200, effect:"shimmer" },
+  { id:"fortunes_hand",label:"Fortune's Hand",     minLvl:25, price:2000, effect:"shimmer" },
 ];
 export const PREMIUM_TITLE_BY_ID  = Object.fromEntries(PREMIUM_TITLES.map(t => [t.id, t]));
 export const PREMIUM_TITLE_LABELS = new Set(PREMIUM_TITLES.map(t => t.label));

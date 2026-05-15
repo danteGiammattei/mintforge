@@ -390,6 +390,32 @@ export const GAMBLES = [
       return   { won:false, remove:[c.id], add:[],                                                         msg:"TAILS — COIN LOST" };
     },
   },
+  // Triple Stack: stake 3 coins of the SAME metal. Win → all 3 become coins
+  // of the NEXT metal tier (capped at Astral). Lose → keep 1 random coin,
+  // the other 2 are lost. ~38% win rate — more frequent than toss-up but
+  // requires you to collect 3 same-metal coins to play.
+  { id:"triple", label:"Triple Stack", icon:"🃏", desc:"3 same-metal coins · win → all tier up · lose → keep 1", odds:"~38%", count:3, same:true,
+    resolve: (bet) => {
+      const meta = bet[0].metalIdx;
+      if (Math.random() < .38) {
+        return {
+          won:true,
+          remove: bet.map(c => c.id),
+          add: bet.map(() => mkCoin(newSeed(), 1, Math.min(MAX_TIER, meta + 1))),
+          msg: "TRIPLE STACK!",
+        };
+      }
+      // Lose: keep one random coin from the stake
+      const keptIdx = Math.floor(Math.random() * bet.length);
+      const kept = bet[keptIdx];
+      return {
+        won: false,
+        remove: bet.filter((_, i) => i !== keptIdx).map(c => c.id),
+        add: [],
+        msg: `LOST — KEPT ${kept.metalIdx >= 0 ? "ONE" : ""}`,
+      };
+    },
+  },
 ];
 
 /* Alias for new CoinCanvas defensive-fallback path. Same function, clearer
