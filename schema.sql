@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS player_state (
   owned_titles    TEXT,
   find_streak     INTEGER NOT NULL DEFAULT 0,
   hanged_man_date TEXT NOT NULL DEFAULT '',
+  ore_counts      TEXT NOT NULL DEFAULT '[0,0,0,0,0,0,0,0,0]',
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 

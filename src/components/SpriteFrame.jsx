@@ -2,22 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import { SPRITE, ANIM } from "../lib/sprite.js";
 
 /* ─── SPRITE FRAME ────────────────────────────────────────────────────────
- * Renders an animated sprite by stepping through cells of the source sheet
- * specified by the ANIM entry. Each anim can use its own sheet (different
- * source PNGs, different cell sizes, different grid layouts).
- *
- * Frame indexing is row-major: given anim.cols, starting position
- * (anim.row, anim.startCol) and a 0-based frame counter, the absolute
- * cell is computed by walking right then wrapping down. Lets a 24-frame
- * walk cycle laid out in a 4×6 grid play as one continuous animation.
- *
- * Steps frames via a setTimeout chain rather than setInterval. Each tick
- * schedules the next, so non-loop anims just stop scheduling when they
- * hit their final frame.
+ * Renders a single animated sprite by stepping through cells of the
+ * shared character sheet. Uses CSS background-image + background-position
+ * so we don't allocate per-frame DOM (one div, position changes).
  *
  * Props:
  *   anim       — key into ANIM ('idle' | 'run' | 'dig' | ...)
- *   onComplete — fires once on the final frame of non-loop anims
+ *   onComplete — for non-loop anims, fires when the last frame plays
+ *                (useful for chaining: dig anim → spawn dig result)
+ *
+ * Implementation note: we step frames via a setTimeout chain rather than
+ * setInterval. Lets each frame set the timeout for the *next* frame,
+ * which avoids drift if the browser throttles. Also makes loop vs
+ * one-shot behavior trivial (just stop scheduling when done).
  */
 export default function SpriteFrame({ anim = "idle", onComplete }) {
   const a = ANIM[anim];
@@ -52,24 +49,26 @@ export default function SpriteFrame({ anim = "idle", onComplete }) {
     return () => clearTimeout(timerRef.current);
   }, [anim]); // re-init when animation changes
 
-  // Compute absolute (row, col) of the current frame within the sheet.
-  // anim.row + startCol set the starting position; frame counts forward
-  // row-major, wrapping at anim.cols.
-  const S = SPRITE.scale;
-  const cols = a.cols || 1;
-  const absIndex = (a.row * cols) + (a.startCol || 0) + frame;
-  const realRow  = Math.floor(absIndex / cols);
-  const realCol  = absIndex % cols;
+  // Per-anim sheet — every animation declares its own src + cell size in
+  // sprite.js. Heights differ between anims of the same character (e.g.
+  // warrior_attack is taller than warrior_walk so the axe-overhead frames
+  // fit). Cells are bottom-anchored by the parent positioning so feet
+  // stay planted as the cell grows upward.
+  const sheetW = a.sheetW * SPRITE.scale;
+  const sheetH = a.sheetH * SPRITE.scale;
+  const cellW  = a.cellW  * SPRITE.scale;
+  const cellH  = a.cellH  * SPRITE.scale;
+  const realCol = (a.startCol || 0) + frame;
 
   return (
     <div
       style={{
-        width:  a.cellW * S,
-        height: a.cellH * S,
+        width:  cellW,
+        height: cellH,
         backgroundImage: `url(${a.src})`,
-        backgroundSize: `${a.sheetW * S}px ${a.sheetH * S}px`,
-        backgroundPositionX: `-${realCol * a.cellW * S}px`,
-        backgroundPositionY: `-${realRow * a.cellH * S}px`,
+        backgroundSize: `${sheetW}px ${sheetH}px`,
+        backgroundPositionX: `-${realCol * cellW}px`,
+        backgroundPositionY: `-${a.row   * cellH}px`,
         backgroundRepeat: "no-repeat",
         imageRendering: "pixelated",
       }}

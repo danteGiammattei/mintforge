@@ -1,14 +1,15 @@
 import { json, bad, getAuth } from "../_utils.js";
 
 /* Valid tarot card IDs — kept in lockstep with the client TAROT_CARDS catalog.
-   Three tiers: 3 common, 3 rare, 3 legendary. */
+   12 cards across three tiers (post-skeleton-gameplay rewrite). Effects on
+   the client side are TBD/no-op for now, but ownership is still tracked. */
 const VALID_TAROT_IDS = new Set([
   // common
-  "magician", "lovers", "empress",
+  "magician", "high_priestess", "empress", "emperor",
   // rare
-  "hermit", "wheel_of_fortune", "chariot",
+  "lovers", "chariot", "strength", "hermit",
   // legendary
-  "tower", "hanged_man", "sun",
+  "wheel_of_fortune", "justice", "hanged_man", "tower",
 ]);
 /* Premium frame/banner IDs — only premium ones are validated since standard frames
    are XP-gated and never require ownership tracking. */
@@ -58,6 +59,18 @@ export async function onRequestGet({ request, env }) {
   const v4Extras = await tryQuery(env,
     `SELECT find_streak, hanged_man_date
        FROM player_state WHERE player_id = ?1`, pid);
+  // v8+ ore counters. Resilient to missing migration via tryQuery wrapper.
+  const v8Extras = await tryQuery(env,
+    `SELECT ore_counts FROM player_state WHERE player_id = ?1`, pid);
+  let oreCounts = [0,0,0,0,0,0,0,0,0];
+  if (v8Extras?.ore_counts) {
+    try {
+      const parsed = JSON.parse(v8Extras.ore_counts);
+      if (Array.isArray(parsed) && parsed.length === 9) {
+        oreCounts = parsed.map(n => Math.max(0, Math.min(10, Number(n)||0)));
+      }
+    } catch {}
+  }
 
   // Coins. Try with rarity first; fall back to v1 schema if column missing.
   let coins = await tryQueryAll(env,
@@ -95,6 +108,7 @@ export async function onRequestGet({ request, env }) {
     ownedTitles: v3Extras?.owned_titles ? JSON.parse(v3Extras.owned_titles) : [],
     findStreak: typeof v4Extras?.find_streak === "number" ? v4Extras.find_streak : 0,
     hangedManDate: typeof v4Extras?.hanged_man_date === "string" ? v4Extras.hanged_man_date : "",
+    oreCounts,
     artefacts: artefactsRows.map(r => ({
       id: r.id,
       metal: r.metal,
@@ -213,10 +227,12 @@ export async function onRequestPost({ request, env }) {
     const v2Fields = []; const v2Binds = [pid];
     const v3Fields = []; const v3Binds = [pid];
     const v4Fields = []; const v4Binds = [pid];
+    const v8Fields = []; const v8Binds = [pid];
     const addBase = (col, value) => { baseBinds.push(value); baseFields.push(`${col} = ?${baseBinds.length}`); };
     const addV2 = (col, value) => { v2Binds.push(value); v2Fields.push(`${col} = ?${v2Binds.length}`); };
     const addV3 = (col, value) => { v3Binds.push(value); v3Fields.push(`${col} = ?${v3Binds.length}`); };
     const addV4 = (col, value) => { v4Binds.push(value); v4Fields.push(`${col} = ?${v4Binds.length}`); };
+    const addV8 = (col, value) => { v8Binds.push(value); v8Fields.push(`${col} = ?${v8Binds.length}`); };
 
     if (Number.isFinite(s.xp))           addBase("xp", Math.max(0, s.xp | 0));
     if (Number.isFinite(s.shovelLevel))  addBase("shovel_level", Math.max(1, Math.min(9, s.shovelLevel | 0)));
@@ -249,6 +265,12 @@ export async function onRequestPost({ request, env }) {
     if (Number.isFinite(s.findStreak))     addV4("find_streak", Math.max(0, Math.min(99, s.findStreak | 0)));
     if (typeof s.hangedManDate === "string") addV4("hanged_man_date", s.hangedManDate.slice(0, 24));
 
+    // v8+ ore counters (skeleton-gameplay loop). Clamp each cell to 0..10.
+    if (Array.isArray(s.oreCounts) && s.oreCounts.length === 9) {
+      const clamped = s.oreCounts.map(n => Math.max(0, Math.min(10, Number(n)||0)));
+      addV8("ore_counts", JSON.stringify(clamped));
+    }
+
     if (baseFields.length) {
       stmts.push(env.DB.prepare(
         `UPDATE player_state SET ${baseFields.join(", ")} WHERE player_id = ?1`
@@ -268,6 +290,11 @@ export async function onRequestPost({ request, env }) {
       optionalStmts.push(env.DB.prepare(
         `UPDATE player_state SET ${v4Fields.join(", ")} WHERE player_id = ?1`
       ).bind(...v4Binds));
+    }
+    if (v8Fields.length) {
+      optionalStmts.push(env.DB.prepare(
+        `UPDATE player_state SET ${v8Fields.join(", ")} WHERE player_id = ?1`
+      ).bind(...v8Binds));
     }
   }
 

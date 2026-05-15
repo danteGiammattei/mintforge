@@ -117,6 +117,10 @@ export default function MintForge(){
   const [findStreak,setFindStreak]=useState(0);
   // Hanged Man: daily reroll usage. Stores ISO date string of last use.
   const [hangedManDate,setHangedManDate]=useState("");
+  // Ore counters — one per metal (length 9). Filled by skeleton kills in
+  // HuntSideScroller, drained by claimOreCoin. Persisted to D1 via vault POST.
+  // Resilient to missing-migration: starts as zeros, loaded from server when present.
+  const [oreCounts,setOreCounts]=useState(()=>new Array(9).fill(0));
   // Hermit: peek at the rarity that *would* roll for the current hunt coin.
   // Computed via deterministic seed branch so it matches what onDigFound rolls.
   const [hermitPeek,setHermitPeek]=useState(null);
@@ -225,6 +229,12 @@ export default function MintForge(){
       setOwnedTitles(v.ownedTitles||[]);
       setFindStreak(typeof v.findStreak==="number"?v.findStreak:0);
       setHangedManDate(typeof v.hangedManDate==="string"?v.hangedManDate:"");
+      // ore_counts — resilient to missing migration. Server returns either
+      // an array of 9 ints, or omits the field entirely if the column isn't
+      // present yet. Default to zeros either way.
+      setOreCounts(Array.isArray(v.oreCounts) && v.oreCounts.length===9
+        ? v.oreCounts.map(n => Number(n)||0)
+        : new Array(9).fill(0));
       setArtefacts(v.artefacts||[]);
       setSchemaWarning(v.schemaWarning||null);
       // reconstruct coins from stored {seed, metalIdx, shiny, locked, id, rarity?}
@@ -275,8 +285,8 @@ export default function MintForge(){
   /* ── sync scalar state (debounced) ─────────────────────────────── */
   useDebouncedEffect(()=>{
     if(!loadedFromServer)return;
-    api.tx({state:{xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles,findStreak,hangedManDate}}).catch(()=>{});
-  },[xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles,findStreak,hangedManDate,loadedFromServer],800);
+    api.tx({state:{xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles,findStreak,hangedManDate,oreCounts}}).catch(()=>{});
+  },[xp,shovelLevel,brushLevel,frame,bio,selectedTitle,pinnedIds,marks,shovelDur,ownedTarots,equippedTarots,ownedFrames,ownedTitles,findStreak,hangedManDate,oreCounts,loadedFromServer],800);
 
   /* ── load friends list on auth + when entering social tab ──── */
   useEffect(()=>{
@@ -451,6 +461,43 @@ export default function MintForge(){
     window.addEventListener("keydown",h);
     return()=>window.removeEventListener("keydown",h);
   },[tab,phase,canDig,shovelDur]); // eslint-disable-line
+
+  // ── ORE SYSTEM ────────────────────────────────────────────────────
+  // addOre: invoked by HuntSideScroller every time a skeleton drops an ore.
+  // metalIdx 0..8 maps to METALS array. Cap at ORE_PER_BAR (10) so further
+  // drops while a bar is full are simply discarded (player must claim).
+  const addOre = useCallback((metalIdx, n = 1) => {
+    setOreCounts(prev => {
+      const next = prev.slice();
+      next[metalIdx] = Math.min(10, (next[metalIdx] || 0) + n);
+      return next;
+    });
+    // Kill XP scales linearly with player level.
+    // Tweak the multiplier here to rebalance — currently 12 * level per kill.
+    const killXP = 12 * Math.max(1, level);
+    setXP(p => p + Math.round(killXP * (1 + (buff.xpMul || 0))));
+  }, [level, buff.xpMul]);
+
+  // claimOreCoin: called when the player taps a full ore bar in OreBars.
+  // Resets that metal's ore counter to 0, generates a new coin of that
+  // metal using the existing coin-gen system (rarity, shape, emblem all
+  // rolled), then transitions to the brush phase. The brush flow takes
+  // over from there — shiny still rolls during brushing as usual.
+  const claimOreCoin = useCallback((metalIdx) => {
+    if ((oreCounts[metalIdx] || 0) < 10) return; // safety
+    // Drain the bar
+    setOreCounts(prev => {
+      const next = prev.slice();
+      next[metalIdx] = 0;
+      return next;
+    });
+    // Generate a coin of this metal at the player's level. We pass
+    // metalIdx+1 because mkCoin's 4th param expects 1-indexed metal cap.
+    const coin = mkCoin(newSeed(), level, null, metalIdx + 1);
+    // Hand off to brush phase. Brush expects foundCoin to be set.
+    setFoundCoin(coin);
+    setPhase("brush");
+  }, [oreCounts, level]);
 
   const onDigFound=(cnt,total)=>{
     // ─ COHERENT RARITY MODEL ─
@@ -889,7 +936,7 @@ export default function MintForge(){
     t, isDark, setIsDark,
     F, VT, FR, mu, microLabel, sectionTitle, card,
     // Auth + API
-    token, api, schemaWarning, setSchemaWarning,
+    token, currentPlayer, api, schemaWarning, setSchemaWarning,
     // Coins + currency
     coins, setCoins,
     marks, setMarks,
@@ -936,6 +983,8 @@ export default function MintForge(){
     onFieldInteract, onDig, onDigFound, onCellScrap, onTooDeep,
     onAbandon, onSkipHunt, onBrushDone, onBannerDone,
     rerollFoundRarity, hangedManAvailable, todayDate,
+    // Ore counters (skeleton drops feed these; full bar → claim coin)
+    oreCounts, setOreCounts, addOre, claimOreCoin,
     // Tarot daily / bonus state
     hangedManUsed, setHangedManUsed,
     hangedManDate, setHangedManDate,

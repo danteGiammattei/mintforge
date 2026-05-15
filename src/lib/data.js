@@ -168,62 +168,91 @@ export const MAX_BR = BRUSH_UPS.length - 1;
 export const SHOVEL_MAX_DUR = [null, 40, 60, 90, 130, 180, 250, 350, 500, 700];
 
 /* ─── TAROT ───────────────────────────────────────────────────────────────
-   Thirteen cards — one for each piece of art in /public/tarot/. Three
-   rarity tiers; equip up to two at once. Every effect listed below maps to
-   a field consumed by `tarotBuffs()` in lib/coin.js (xpMul, marksMul,
-   pinSlots, revealRarity, allowSkip, firstStrikeBonus, forgeRefund,
-   forgeDiscount, shinyBonus, rerollRarity, rarityFloor, guaranteedEvery
-   /Floor). If you change an effect here, that's the only place to edit
-   — the buff reducer auto-picks it up. */
+   Twelve cards across three rarity tiers. One per webp art file in
+   /public/tarot/. Max 2 equipped at a time.
+
+   Effects are currently DISABLED — every card has a placeholder description
+   and no gameplay-active fields. This was intentional during the skeleton-
+   gameplay rewrite (the old `firstStrikeBonus`, `revealRarity`, etc. were
+   tied to the dig-grid mechanic which no longer exists). Re-enable per card
+   by adding the relevant field (`xpMul`, `marksMul`, `pinSlots`, etc) — the
+   buff reducer in coin.js still consumes them. */
 export const TAROT_CARDS = [
-  // ── COMMON TIER ──────────────────────────────────────────────────
+  // ── COMMON ─────────────────────────────────────────────────────────
   { id:"magician",        title:"The Magician",       roman:"I",   rarity:"common", price:800,  minLvl:5,
-    xpMul:0.20,
-    desc:"+20% XP from every find." },
+    desc:"Effect coming soon." },
   { id:"high_priestess",  title:"The High Priestess", roman:"II",  rarity:"common", price:1000, minLvl:6,
-    revealRarity:true,
-    desc:"Every coin glint reveals the rarity before you commit." },
-  { id:"empress",         title:"The Empress",        roman:"III", rarity:"common", price:1100, minLvl:7,
-    marksMul:0.20,
-    desc:"+20% marks when selling coins." },
-  { id:"emperor",         title:"The Emperor",        roman:"IV",  rarity:"common", price:1200, minLvl:8,
-    pinSlots:1,
-    desc:"+1 display cabinet slot." },
+    desc:"Effect coming soon." },
+  { id:"empress",         title:"The Empress",        roman:"III", rarity:"common", price:1200, minLvl:7,
+    desc:"Effect coming soon." },
+  { id:"emperor",         title:"The Emperor",        roman:"IV",  rarity:"common", price:1400, minLvl:8,
+    desc:"Effect coming soon." },
 
-  // ── RARE TIER ────────────────────────────────────────────────────
-  { id:"hierophant",      title:"The Hierophant",     roman:"V",   rarity:"rare",   price:2000, minLvl:11,
-    forgeRefund:0.25,
-    desc:"25% chance to recover the scrap when forging artefacts." },
+  // ── RARE ───────────────────────────────────────────────────────────
   { id:"lovers",          title:"The Lovers",         roman:"VI",  rarity:"rare",   price:2200, minLvl:12,
-    marksMul:0.40,
-    desc:"+40% marks when selling coins. (Stacks with Empress.)" },
+    desc:"Effect coming soon." },
   { id:"chariot",         title:"The Chariot",        roman:"VII", rarity:"rare",   price:2400, minLvl:14,
-    firstStrikeBonus:0.30,
-    desc:"+30% chance the coin sits under your very first dig cell." },
+    desc:"Effect coming soon." },
   { id:"strength",        title:"Strength",           roman:"VIII",rarity:"rare",   price:2600, minLvl:15,
-    shinyBonus:0.05,
-    desc:"+5% shiny chance on every brush, on top of your brush level." },
+    desc:"Effect coming soon." },
   { id:"hermit",          title:"The Hermit",         roman:"IX",  rarity:"rare",   price:2800, minLvl:16,
-    allowSkip:true,
-    desc:"Skip a coin you don't want — no durability lost." },
+    desc:"Effect coming soon." },
 
-  // ── LEGENDARY TIER ───────────────────────────────────────────────
-  { id:"wheel_of_fortune",title:"Wheel of Fortune",   roman:"X",   rarity:"legendary", price:5000, minLvl:22,
-    guaranteedEvery:7, guaranteedFloor:2,
-    desc:"Every 7th find is guaranteed Rare or higher. Counter visible on hunt screen." },
-  { id:"justice",         title:"Justice",            roman:"XI",  rarity:"legendary", price:4800, minLvl:24,
-    rerollRarity:1,
-    desc:"Once per day, reroll the rarity of a coin you just found." },
+  // ── LEGENDARY ──────────────────────────────────────────────────────
+  { id:"wheel_of_fortune",title:"Wheel of Fortune",   roman:"X",   rarity:"legendary", price:4800, minLvl:22,
+    desc:"Effect coming soon." },
+  { id:"justice",         title:"Justice",            roman:"XI",  rarity:"legendary", price:5000, minLvl:24,
+    desc:"Effect coming soon." },
   { id:"hanged_man",      title:"The Hanged Man",     roman:"XII", rarity:"legendary", price:5200, minLvl:26,
-    rarityFloor:1,
-    desc:"All finds are guaranteed at least Uncommon rarity." },
+    desc:"Effect coming soon." },
   { id:"tower",           title:"The Tower",          roman:"XVI", rarity:"legendary", price:5500, minLvl:28,
-    forgeDiscount:0.40,
-    desc:"All artefact forging costs reduced by 40%." },
+    desc:"Effect coming soon." },
 ];
 export const TAROT_BY_ID = Object.fromEntries(TAROT_CARDS.map(c => [c.id, c]));
 // Two equipped at a time — combinations matter, but no card is "always-on".
 export const MAX_EQUIPPED_TAROTS = 2;
+
+/* ─── ORE / SKELETON GAMEPLAY ─────────────────────────────────────────────
+   The hunt screen is now a side-scroller where skeletons spawn from the
+   right, walk toward the player, get tapped to die, and drop one ore. Each
+   ore is for a specific metal (matched to the existing METALS array).
+   When a metal's ore bar fills, the player claims a coin of that metal —
+   the existing brush-reveal flow takes over and rolls rarity + shiny as
+   usual. */
+
+// 9 ore drop weights — one per metal index. Sum to 1.0 ± rounding.
+// Heavier weighting on copper/bronze so the loop feels active early, with
+// astral as a vanishingly rare drop. Tweak in-game by editing this array.
+export const ORE_DROP_WEIGHTS = [
+  0.35,  // 0 Copper
+  0.25,  // 1 Bronze
+  0.15,  // 2 Silver
+  0.10,  // 3 Gold
+  0.07,  // 4 Platinum
+  0.04,  // 5 Obsidian
+  0.025, // 6 Void
+  0.01,  // 7 Eldritch
+  0.005, // 8 Astral
+];
+
+// How many ore drops fill a single bar (same for every metal — drop
+// weights do the heavy lifting on coin-acquisition pacing).
+export const ORE_PER_BAR = 10;
+
+// Default zero state. Used when player_state.ore_counts is missing or
+// when starting a fresh account.
+export const DEFAULT_ORE_COUNTS = METALS.map(() => 0);
+
+// Roll a single ore drop. Pure function — caller passes RNG range.
+// Returns a metalIdx (0..8) according to ORE_DROP_WEIGHTS.
+export function rollOreMetal(rand01) {
+  let acc = 0;
+  for (let i = 0; i < ORE_DROP_WEIGHTS.length; i++) {
+    acc += ORE_DROP_WEIGHTS[i];
+    if (rand01 < acc) return i;
+  }
+  return ORE_DROP_WEIGHTS.length - 1; // safety — should never hit
+}
 
 /* ─── DIG PIT ─────────────────────────────────────────────────────────── */
 // 4×4 grid of soil cells. Used by both DigPit (rendering) and the main
@@ -272,20 +301,15 @@ export const LOCATIONS = [
     name: "The Field",
     desc: "Tall grass, distant mountains. The default stretch of earth.",
     unlockShovelLevel: 1,
-    // Three-layer parallax: sky covers everything; far is a sky-removed
-    // silhouette of distant hills/ruins; near is the foreground the player
-    // runs across. The far layer's painted sky was alpha-keyed out so its
-    // hills composite cleanly against any sky tint.
+    // Three-layer parallax: sky static, near foreground scrolls at world
+    // speed. Far layer dropped per the skeleton-gameplay redesign — its
+    // role is taken by procedurally-spawned trees/bushes/vending machines
+    // in HuntSideScroller.
     bgLayers: [
-      { path: "/locations/field/sky.webp",  scrollMul: 0    }, // full-coverage sky, static
-      { path: "/locations/field/far.webp",  scrollMul: 0.15 }, // distant hills, ruins, cypresses
-      { path: "/locations/field/near.webp", scrollMul: 1.0  }, // foreground dirt, rocks, grass
+      { path: "/locations/field/sky.webp",  scrollMul: 0    },
+      { path: "/locations/field/near.webp", scrollMul: 1.0  },
     ],
-    // scrollSpeed unit: VIEWPORT-FRACTIONS per second (NOT px/sec — the
-    // comment used to say px/sec and the value was 70, which made windows
-    // zip past in 10ms. 0.3 means the world scrolls ~one viewport every
-    // ~3 seconds, giving the player time to react to a glint cue.
-    scrollSpeed: 0.3,
+    scrollSpeed: 0.3,            // viewport-widths per second
     glintFrequency: 0.6,
     windowSpacingMs: 6000,     // average ~6s between windows
     windowDurationMs: 1800,    // ~1.8s tap-eligible window
