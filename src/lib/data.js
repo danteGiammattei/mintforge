@@ -318,7 +318,7 @@ export const LOCATIONS = [
     // in HuntSideScroller.
     bgLayers: [
       { path: "/locations/field/sky.webp",  scrollMul: 0    },
-      { path: "/locations/field/near.webp", scrollMul: 1.0  },
+      { path: "/locations/field/near.webp", scrollMul: 0.8 },
     ],
     scrollSpeed: 0.3,            // viewport-widths per second
     glintFrequency: 0.6,
