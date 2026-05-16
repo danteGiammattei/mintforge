@@ -145,26 +145,21 @@ export default function Hunt() {
   const viewportRef = useRef(null);
   const rafRef = useRef(null);
 
-  // Player anim. Three modes: walk (default), idle (when a skeleton has
-  // engaged and stopped in front), attack (one-shot per tap).
-  // `attackId` is bumped per tap → stable key for the attack SpriteFrame
-  // so onComplete fires reliably and the anim doesn't restart mid-flight.
+  // Player anim has two state pieces:
+  //   - `playerAnim` tracks whether we're currently in an attack swing
+  //     ("warrior_attack") or available for ambient ("warrior_walk").
+  //   - The actual ambient anim (walk vs idle) is derived AT RENDER TIME
+  //     from engine.current.skeleton.state — see `actualAnim` below.
+  //   - `attackId` is bumped per tap → stable key for the attack
+  //     SpriteFrame so onComplete fires reliably and the anim doesn't
+  //     restart mid-flight.
   const [playerAnim, setPlayerAnim] = useState("warrior_walk");
   const [attackId,   setAttackId]   = useState(0);
 
-  // Derive the ambient anim (walk vs idle) from current engagement state.
-  // When an attack is in flight we leave playerAnim alone — it'll snap
-  // back to the right ambient via handleAttackDone.
+  // Reset to walk when leaving/returning to hunt phase.
   useEffect(() => {
-    if (phase !== "hunt") return;
-    if (playerAnim === "warrior_attack") return; // don't interrupt swing
-    const sk = engine.current.skeleton;
-    const engaged = sk && sk.state === "idle";
-    const want = engaged ? "warrior_idle" : "warrior_walk";
-    if (playerAnim !== want) setPlayerAnim(want);
-    // Read engine.skeleton on every render tick so this re-checks; the
-    // tick state-bump from the RAF loop is what makes this effective.
-  });
+    if (phase === "hunt") setPlayerAnim("warrior_walk");
+  }, [phase]);
 
   // ── Viewport sizing ──────────────────────────────────────────────────
   const [viewSize, setViewSize] = useState({ w: 600, h: 280 });
@@ -323,10 +318,9 @@ export default function Hunt() {
   };
 
   const handleAttackDone = () => {
-    // Snap back to the right ambient — if a skeleton is still engaged
-    // (e.g. on a miss / out-of-range tap), keep idling. Otherwise walk.
-    const sk = engine.current.skeleton;
-    setPlayerAnim(sk && sk.state === "idle" ? "warrior_idle" : "warrior_walk");
+    // Clear the attack flag. The next render derives the right ambient
+    // (idle if skeleton engaged, walk otherwise) automatically.
+    setPlayerAnim("warrior_walk");
   };
 
   // ── Background parallax layers ───────────────────────────────────────
@@ -455,29 +449,43 @@ export default function Hunt() {
           );
         })()}
 
-        {/* Warrior */}
-        <div style={{
-          position: "absolute",
-          left: charXPx,
-          bottom: groundLineFromBottom,
-          transform: `translate(-50%, 0) scale(${PLAYER_SCALE_RATIO})`,
-          transformOrigin: "50% 100%",
-          pointerEvents: "none",
-        }}>
-          <SpriteFrame
-            anim={playerAnim}
-            // Distinct keys per anim mode so the SpriteFrame remounts
-            // cleanly on transitions (walk → idle → walk → attack → …).
-            // Attack uses attackId so each tap restarts the swing from
-            // frame 0 even if you tap rapidly.
-            key={
-              playerAnim === "warrior_attack" ? `atk-${attackId}` :
-              playerAnim === "warrior_idle"   ? "idle" :
-                                                "walk"
-            }
-            onComplete={playerAnim === "warrior_attack" ? handleAttackDone : undefined}
-          />
-        </div>
+        {/* Warrior. The actual anim is derived AT RENDER TIME from
+            engine state — so the moment the skeleton transitions to
+            idle (engaged), the warrior immediately switches to idle too.
+            No useEffect, no race, no missed transitions: just a direct
+            read on every RAF tick. */}
+        {(() => {
+          const sk = engine.current.skeleton;
+          const engaged = sk && sk.state === "idle";
+          // Attack flag wins; otherwise pick walk/idle from engagement.
+          const actualAnim = playerAnim === "warrior_attack"
+            ? "warrior_attack"
+            : engaged ? "warrior_idle" : "warrior_walk";
+          return (
+            <div style={{
+              position: "absolute",
+              left: charXPx,
+              bottom: groundLineFromBottom,
+              transform: `translate(-50%, 0) scale(${PLAYER_SCALE_RATIO})`,
+              transformOrigin: "50% 100%",
+              pointerEvents: "none",
+            }}>
+              <SpriteFrame
+                anim={actualAnim}
+                // Distinct keys per anim mode so the SpriteFrame remounts
+                // cleanly on transitions (walk → idle → walk → attack → …).
+                // Attack uses attackId so each tap restarts the swing from
+                // frame 0 even if you tap rapidly.
+                key={
+                  actualAnim === "warrior_attack" ? `atk-${attackId}` :
+                  actualAnim === "warrior_idle"   ? "idle" :
+                                                    "walk"
+                }
+                onComplete={actualAnim === "warrior_attack" ? handleAttackDone : undefined}
+              />
+            </div>
+          );
+        })()}
 
         {renderDecor(frontDecor)}
 
