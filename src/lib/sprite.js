@@ -66,11 +66,13 @@ export const ANIM = {
     sheetW: 480, sheetH: 64, cellW: 96, cellH: 64,
     cols: 5, row: 0, startCol: 0, frames: 5, frameMs: 70, loop: false,
   },
-  // Death anim — long for weight, holds on final frame after.
+  // Death anim — new sheet (Skeleton_01_White_Die, 13 frames × 96×64).
+  // Wider cells than walk so the falling body has room without horizontal
+  // cell-shift artifacts. Held on final frame after all 13 play.
   skeleton_die: {
     src: "/sprites/skeleton_die.png",
-    sheetW: 1245, sheetH: 64, cellW: 83, cellH: 64,
-    cols: 15, row: 0, startCol: 0, frames: 15, frameMs: 70, loop: false,
+    sheetW: 1248, sheetH: 64, cellW: 96, cellH: 64,
+    cols: 13, row: 0, startCol: 0, frames: 13, frameMs: 70, loop: false,
   },
 };
 

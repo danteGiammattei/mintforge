@@ -53,25 +53,28 @@ const SPAWN_BASE_COOLDOWN_MS = 1000;    // minimum delay after death
 const SPAWN_JITTER_MIN_MS    = 1000;    // 1-4s additional jitter
 const SPAWN_JITTER_MAX_MS    = 4000;
 
-// Character scale ratios — both applied via CSS transform anchored at feet
-// (transform-origin: 50% 100%) so neither floats off the ground when scaled.
-const PLAYER_SCALE_RATIO   = 0.7;
-const SKELETON_SCALE_RATIO = 0.7;
+// Character scale ratios — sourced from the alignment-lab numbers that
+// felt right side-by-side (warrior 0.8×, skeleton 0.95×). Both applied
+// via CSS transform anchored at feet (transform-origin: 50% 100%) so
+// neither floats off the ground when scaled.
+const PLAYER_SCALE_RATIO   = 0.8;
+const SKELETON_SCALE_RATIO = 0.95;
 
-// How many frames of skeleton_die we actually play. The full 15-frame
-// source has the body lying down with horizontal drift in late frames —
-// capping early gives a clean stagger-and-vanish.
-const SKELETON_DIE_FRAMES_USED = 8;
+// How many frames of skeleton_die we play. The new 13-frame sheet has
+// cleaner per-frame alignment, so we can use all of them without the
+// "body drifting" issue that capped the old sheet at 8.
+const SKELETON_DIE_FRAMES_USED = 13;
 const SKELETON_DIE_DURATION_MS = SKELETON_DIE_FRAMES_USED * ANIM.skeleton_die.frameMs;
 
 // Flying-ore animation. Pure visual — addOre is called immediately on
 // kill so the player's bar increments instantly.
 const FLY_DURATION_MS = 1100;
-// How high above the spawn point the gem peaks before falling
 const FLY_ARC_HEIGHT_PX = 90;
 
-// Decoration density. Mobile-conscious cap.
-const DECOR_MAX = 8;
+// Decorations disabled for now (trees/bushes/vending). Setting MAX to 0
+// stops spawning without removing the rest of the system, so re-enabling
+// later is a single number change.
+const DECOR_MAX = 0;
 const DECOR_SPAWN_MS = 1200;
 
 // Decoration kinds. `layer` is z-order: "back" renders behind character,
@@ -103,7 +106,7 @@ function rollDecorKind() {
     r -= k.weight;
     if (r <= 0) return k;
   }
-  return null;
+  return DECOR_KINDS[0];
 }
 
 export default function Hunt() {
@@ -142,14 +145,26 @@ export default function Hunt() {
   const viewportRef = useRef(null);
   const rafRef = useRef(null);
 
-  // Player anim: walk default; attack plays once on tap with stable key.
+  // Player anim. Three modes: walk (default), idle (when a skeleton has
+  // engaged and stopped in front), attack (one-shot per tap).
+  // `attackId` is bumped per tap → stable key for the attack SpriteFrame
+  // so onComplete fires reliably and the anim doesn't restart mid-flight.
   const [playerAnim, setPlayerAnim] = useState("warrior_walk");
   const [attackId,   setAttackId]   = useState(0);
 
-  // Reset to walk when returning to hunt phase.
+  // Derive the ambient anim (walk vs idle) from current engagement state.
+  // When an attack is in flight we leave playerAnim alone — it'll snap
+  // back to the right ambient via handleAttackDone.
   useEffect(() => {
-    if (phase === "hunt") setPlayerAnim("warrior_walk");
-  }, [phase]);
+    if (phase !== "hunt") return;
+    if (playerAnim === "warrior_attack") return; // don't interrupt swing
+    const sk = engine.current.skeleton;
+    const engaged = sk && sk.state === "idle";
+    const want = engaged ? "warrior_idle" : "warrior_walk";
+    if (playerAnim !== want) setPlayerAnim(want);
+    // Read engine.skeleton on every render tick so this re-checks; the
+    // tick state-bump from the RAF loop is what makes this effective.
+  });
 
   // ── Viewport sizing ──────────────────────────────────────────────────
   const [viewSize, setViewSize] = useState({ w: 600, h: 280 });
@@ -307,7 +322,12 @@ export default function Hunt() {
     addOre(target.dropMetalIdx, 1);
   };
 
-  const handleAttackDone = () => setPlayerAnim("warrior_walk");
+  const handleAttackDone = () => {
+    // Snap back to the right ambient — if a skeleton is still engaged
+    // (e.g. on a miss / out-of-range tap), keep idling. Otherwise walk.
+    const sk = engine.current.skeleton;
+    setPlayerAnim(sk && sk.state === "idle" ? "warrior_idle" : "warrior_walk");
+  };
 
   // ── Background parallax layers ───────────────────────────────────────
   const renderBgLayers = () => (loc.bgLayers || []).map((layer, i) => {
@@ -392,7 +412,10 @@ export default function Hunt() {
         style={{
           position: "relative",
           flex: 1,
-          minHeight: 240,
+          // Taller floor — +100px from the previous 240 default. Matches
+          // the alignment-lab "right-feeling" framing where the warrior
+          // takes ~30% of viewport height and there's real sky overhead.
+          minHeight: 340,
           background: "#1a1208",
           overflow: "hidden",
           cursor: "pointer",
@@ -443,7 +466,15 @@ export default function Hunt() {
         }}>
           <SpriteFrame
             anim={playerAnim}
-            key={playerAnim === "warrior_attack" ? `atk-${attackId}` : "walk"}
+            // Distinct keys per anim mode so the SpriteFrame remounts
+            // cleanly on transitions (walk → idle → walk → attack → …).
+            // Attack uses attackId so each tap restarts the swing from
+            // frame 0 even if you tap rapidly.
+            key={
+              playerAnim === "warrior_attack" ? `atk-${attackId}` :
+              playerAnim === "warrior_idle"   ? "idle" :
+                                                "walk"
+            }
             onComplete={playerAnim === "warrior_attack" ? handleAttackDone : undefined}
           />
         </div>
