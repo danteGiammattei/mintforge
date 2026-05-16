@@ -491,9 +491,12 @@ export default function MintForge(){
       next[metalIdx] = 0;
       return next;
     });
-    // Generate a coin of this metal at the player's level. We pass
-    // metalIdx+1 because mkCoin's 4th param expects 1-indexed metal cap.
-    const coin = mkCoin(newSeed(), level, null, metalIdx + 1);
+    // Generate a coin OF EXACTLY this metal at the player's level.
+    // mkCoin signature: mkCoin(seed, pLvl, tier, tierCap, rarityOverride)
+    // — `tier` is the fixed metalIdx (when non-null). Passing it as the
+    // 4th positional param made it a CAP (so silver claim could roll
+    // copper/bronze/silver instead of locking to silver).
+    const coin = mkCoin(newSeed(), level, metalIdx);
     // Hand off to brush phase. Brush expects foundCoin to be set.
     setFoundCoin(coin);
     setPhase("brush");

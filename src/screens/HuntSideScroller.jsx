@@ -66,7 +66,9 @@ const SKELETON_DIE_DURATION_MS = SKELETON_DIE_FRAMES_USED * ANIM.skeleton_die.fr
 
 // Flying-ore animation. Pure visual — addOre is called immediately on
 // kill so the player's bar increments instantly.
-const FLY_DURATION_MS = 750;
+const FLY_DURATION_MS = 1100;
+// How high above the spawn point the gem peaks before falling
+const FLY_ARC_HEIGHT_PX = 90;
 
 // Decoration density. Mobile-conscious cap.
 const DECOR_MAX = 8;
@@ -74,20 +76,24 @@ const DECOR_SPAWN_MS = 1200;
 
 // Decoration kinds. `layer` is z-order: "back" renders behind character,
 // "front" renders in front. `weight` controls spawn frequency.
+// Back-layer sprites are deliberately SMALL — they sit way above the
+// walking strip to read as "distant treeline / silhouette" rather than
+// "tree on the path". Front-layer sprites are larger and sit at the
+// viewport floor in front of the player.
 const DECOR_KINDS = [
-  // Back-layer trees — sit ABOVE the walking strip, suggest distance.
-  { src: "/decor/tree_1.png", w: 130, h: 120, layer: "back",  weight: 16 },
-  { src: "/decor/tree_2.png", w:  80, h:  64, layer: "back",  weight: 14 },
-  { src: "/decor/tree_3.png", w:  72, h:  60, layer: "back",  weight: 14 },
-  { src: "/decor/tree_4.png", w:  74, h:  68, layer: "back",  weight: 14 },
-  // Front-layer bushes — at the very bottom, mostly clipped by viewport
-  // floor. Top peeks above to occlude the player's feet/lower legs.
-  { src: "/decor/bush_1.png", w: 160, h:  78, layer: "front", weight: 12 },
-  { src: "/decor/bush_2.png", w:  74, h:  48, layer: "front", weight: 10 },
-  { src: "/decor/bush_3.png", w:  96, h:  70, layer: "front", weight: 10 },
-  { src: "/decor/bush_4.png", w:  72, h:  42, layer: "front", weight: 10 },
-  // Vending easter-egg, back layer.
-  { src: "/decor/vending.png", w: 50, h: 105, layer: "back",  weight: 2 },
+  // Back-layer trees — small, far. Bottom anchored at the top of the
+  // walking strip; smaller than before so they read as distance.
+  { src: "/decor/tree_1.png", w:  80, h:  72, layer: "back",  weight: 16 },
+  { src: "/decor/tree_2.png", w:  50, h:  40, layer: "back",  weight: 14 },
+  { src: "/decor/tree_3.png", w:  46, h:  38, layer: "back",  weight: 14 },
+  { src: "/decor/tree_4.png", w:  48, h:  42, layer: "back",  weight: 14 },
+  // Front-layer bushes — big, foreground. Stand on the viewport floor.
+  { src: "/decor/bush_1.png", w: 180, h:  88, layer: "front", weight: 12 },
+  { src: "/decor/bush_2.png", w:  90, h:  60, layer: "front", weight: 10 },
+  { src: "/decor/bush_3.png", w: 120, h:  88, layer: "front", weight: 10 },
+  { src: "/decor/bush_4.png", w:  88, h:  52, layer: "front", weight: 10 },
+  // Vending easter-egg — back layer, smaller scale to match the trees.
+  { src: "/decor/vending.png", w: 38, h:  78, layer: "back",  weight: 2 },
 ];
 
 const DECOR_TOTAL_WEIGHT = DECOR_KINDS.reduce((s, d) => s + d.weight, 0);
@@ -168,11 +174,19 @@ export default function Hunt() {
       const dt = Math.min(64, now - e.lastTime);
       e.lastTime = now;
 
-      // World always scrolls (even during skeleton-idle — feels alive).
-      // The brush phase pauses scroll by short-circuiting below.
-      if (phase === "hunt") {
+      // Determine if the world should be scrolling this frame:
+      // - hunt phase, AND
+      // - no skeleton currently locked in close-combat (idle / dying)
+      // When the skeleton engages the player, EVERYTHING freezes
+      // (background scroll, decoration drift, even skeleton spawn timer)
+      // so the moment reads as a stand-off. Resumes the instant the
+      // skeleton dies and is despawned.
+      const engaged = e.skeleton && (e.skeleton.state === "idle" || e.skeleton.state === "dying");
+      if (phase === "hunt" && !engaged) {
         e.scrollX += (loc.scrollSpeed * dt) / 1000;
+      }
 
+      if (phase === "hunt") {
         // ── Skeleton state machine ───────────────────────────────────
         if (!e.skeleton && now >= e.nextSpawnAt) {
           // Spawn 1.2 viewports right of the player's world position.
@@ -203,9 +217,9 @@ export default function Hunt() {
               + SPAWN_JITTER_MIN_MS + Math.random() * (SPAWN_JITTER_MAX_MS - SPAWN_JITTER_MIN_MS);
           }
         } else if (e.skeleton && e.skeleton.state === "idle") {
-          // Skeleton holds position. Track world drift so the frozen
-          // screen position stays valid even as scrollX advances.
-          e.skeleton.worldX = e.scrollX + e.skeleton.frozenScreenX;
+          // No-op. World scroll is frozen above while engaged, so the
+          // skeleton's worldX naturally stays fixed and screen position
+          // is stable. Animation loops via skeleton_idle.
         } else if (e.skeleton && e.skeleton.state === "dying") {
           if (now - e.skeleton.dyingAt > SKELETON_DIE_DURATION_MS) {
             e.skeleton = null;
@@ -323,10 +337,15 @@ export default function Hunt() {
     const x = worldXToPx(d.worldX);
     if (x < -d.kind.w || x > viewSize.w + d.kind.w) return null;
     const bottomPx = d.kind.layer === "front"
-      // Front: bottom of sprite at -50% of its height (mostly below viewport)
-      ? -Math.round(d.kind.h * 0.5) + (d.yJitter % 8)
-      // Back: bottom of sprite at walkStripTopY + jitter upward
-      : walkStripTopY + d.yJitter;
+      // FRONT: bottom of sprite at viewport floor (0), so the whole bush
+      // is visible standing on the ground IN FRONT of the player. Small
+      // jitter for variety.
+      ? 0 + (d.yJitter % 6)
+      // BACK: bottom of sprite anchored WELL ABOVE the walking strip
+      // (top of warrior + 24px clearance + jitter) so trees never crowd
+      // the player's walking line. Small heights make them read as
+      // distant treeline silhouettes.
+      : walkStripTopY + 24 + d.yJitter;
     return (
       <img key={d.id}
         src={d.kind.src}
@@ -431,33 +450,58 @@ export default function Hunt() {
 
         {renderDecor(frontDecor)}
 
-        {/* Flying ores — render last so they're on top of everything */}
+        {/* Flying ores — render last so they're on top of everything.
+            More dramatic than the previous attempt: bigger arc, scaling
+            from a tiny pop-out at the start to full size mid-flight then
+            shrinking as it falls, slow rotation, and a punchier
+            metal-coloured glow. Pure feedback — bar already incremented. */}
         {engine.current.flyingOres.map(f => {
-          const t = Math.min(1, (performance.now() - f.startedAt) / FLY_DURATION_MS);
-          // Quadratic ease-in (slow start, fast finish — gravity feel)
-          const ease = t * t;
-          const x = f.startX + (f.endX - f.startX) * ease;
-          // Arc: lift slightly at start, fall to endY
-          const lift = Math.sin(t * Math.PI) * 28;
-          const y = f.startY + (f.endY - f.startY) * ease - lift;
+          const tNow = (performance.now() - f.startedAt) / FLY_DURATION_MS;
+          const t = Math.min(1, tNow);
+          // Two-phase ease: a slow lift (ease-out), then a fast fall (ease-in).
+          // Triangle wave for the arc: 0..1 over t=0..0.5 (rising),
+          // 1..0 over t=0.5..1 (falling). Smoothed via sine.
+          const arcT = Math.sin(t * Math.PI); // 0 → 1 → 0
+          const fallT = t < 0.5 ? 0 : (t - 0.5) * 2; // 0..1 over second half
+          // Horizontal: parabolic drift toward endX
+          const x = f.startX + (f.endX - f.startX) * (t * t);
+          // Vertical: start at startY, ARC UP by FLY_ARC_HEIGHT_PX, then
+          // FALL through to endY in second half.
+          const y = f.startY + arcT * FLY_ARC_HEIGHT_PX - fallT * (f.startY - f.endY + FLY_ARC_HEIGHT_PX);
+          // Scale: pop-in from 0.4 → 1.4 (mid), → 0.9 (landing)
+          const scale = 0.4 + Math.sin(t * Math.PI) * 1.0 + (1 - t) * 0.1;
+          // Spin: full rotation over the flight
+          const rotation = t * 540;
+          // Fade only at the very end
           const opacity = t < 0.85 ? 1 : (1 - (t - 0.85) / 0.15);
+          const metal = METALS[f.metalIdx];
           return (
-            <img
+            <div
               key={f.id}
-              src={`/decor/ore_${f.metalIdx}.png`}
-              alt=""
               style={{
                 position: "absolute",
-                left: x - 14,
+                left: x,
                 bottom: y,
-                width: 28,
-                height: 33,
-                imageRendering: "pixelated",
-                opacity,
+                width: 36,
+                height: 42,
                 pointerEvents: "none",
-                filter: `drop-shadow(0 0 4px ${METALS[f.metalIdx].hl})`,
-              }}
-            />
+                transform: `translate(-50%, 0) scale(${scale}) rotate(${rotation}deg)`,
+                opacity,
+                // Strong drop-shadow plus a glow disc behind
+                filter: `drop-shadow(0 0 6px ${metal.hl}) drop-shadow(0 0 12px ${metal.base}aa)`,
+                willChange: "transform, opacity",
+              }}>
+              <img
+                src={`/decor/ore_${f.metalIdx}.png`}
+                alt=""
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  imageRendering: "pixelated",
+                  display: "block",
+                }}
+              />
+            </div>
           );
         })}
 
