@@ -55,6 +55,17 @@ const SPAWN_BASE_COOLDOWN_MS = 1000;    // minimum delay after death
 const SPAWN_JITTER_MIN_MS    = 1000;    // additional 1-4s random
 const SPAWN_JITTER_MAX_MS    = 4000;
 
+// Ore drops — visible on the ground after a kill, player taps to collect.
+// Lifetime gives a window before they're "lost" — adds urgency, prevents
+// piling up forever.
+const ORE_LIFETIME_MS = 8000;
+const ORE_BOB_AMPLITUDE = 3;    // pixels up/down for visual bob
+const ORE_BOB_SPEED_MS  = 700;  // ms per full bob cycle
+
+// Player scale — smaller than skeleton so the warrior feels right-sized
+// against the world. Skeleton stays at SPRITE_SCALE; player gets PLAYER_SCALE.
+const PLAYER_SCALE_RATIO = 0.7;
+
 // Decoration density. ~8 concurrent gives a fuller landscape feel without
 // hurting mobile perf — they're <img> elements, not animated sprites.
 const DECOR_MAX = 8;
@@ -118,10 +129,19 @@ export default function Hunt() {
     scrollX: 0,
     worldFrozen: false,
     // One-at-a-time skeleton model. `skeleton` is null between spawns.
-    // Shape: { id, worldX, state:'walk'|'dying', spawnedAt, dyingAt }
+    // Shape: {
+    //   id, worldX, state:'walk'|'dying', spawnedAt, dyingAt,
+    //   dropMetalIdx,                 // rolled at death time
+    //   frozenScreenX,                // viewport px captured at death — used
+    //                                 // to render the death anim STATIONARY
+    //                                 // (skeleton stops "moving" on death)
+    // }
     skeleton: null,
-    // Next spawn time. Starts 1.2s after mount to give the player a beat.
     nextSpawnAt: performance.now() + 1200,
+    // Ore drops. Spawned on skeleton kill. Drift with world until picked
+    // up by tap or aged out (8s lifetime so misses cost the player).
+    // Shape: { id, worldX, metalIdx, spawnedAt }
+    ores: [],
     // Decoration entities (procedural background spawning)
     decorations: [],
     nextDecorAt: performance.now() + 600,
@@ -207,6 +227,14 @@ export default function Hunt() {
           }
         }
 
+        // ── Ore drops ────────────────────────────────────────────────
+        // Each ore is a worldX-anchored entity that drifts left with the
+        // world. Lives for ORE_LIFETIME_MS or until tapped/scrolled away.
+        e.ores = e.ores.filter(o =>
+          now - o.spawnedAt < ORE_LIFETIME_MS
+          && o.worldX > e.scrollX - 0.5
+        );
+
         // ── Decoration lifecycle ──────────────────────────────────────
         if (e.decorations.length < DECOR_MAX && now >= e.nextDecorAt) {
           const kind = rollDecorKind();
@@ -214,11 +242,14 @@ export default function Hunt() {
             id: `d-${now}-${Math.random().toString(36).slice(2,6)}`,
             kind,
             worldX: e.scrollX + 1.4,
-            // Vertical jitter — front-layer items sit slightly LOWER so they
-            // visually cross in front of the character feet plane.
+            // yOffset interpretation depends on layer (see renderDecor):
+            //   back  → extra px above the walking-strip ceiling (so back
+            //           decor varies in how far behind the player it sits)
+            //   front → extra px above the "mostly-below-viewport" baseline
+            //           (so foreground bushes pop up to different heights)
             yOffset: kind.layer === "front"
-              ? -8 - Math.random() * 6   // dip below ground line (closer to camera)
-              :  Math.random() * 22,     // jitter upward (further away)
+              ? Math.random() * 18           // 0..18 px upward variance
+              : Math.random() * 30 + 4,      // 4..34 px upward variance
           });
           e.nextDecorAt = now + DECOR_SPAWN_MS * (0.7 + Math.random() * 0.6);
         }
@@ -234,33 +265,61 @@ export default function Hunt() {
   }, [loc]);
 
   // ── Tap handler ───────────────────────────────────────────────────────
+  // Priority: ore pickup > skeleton kill > miss. All three play the
+  // attack anim for feedback (the warrior swings either way), but only
+  // the first two have actual effects.
   const handleTap = () => {
     if (phase !== "hunt") return;
     if (engine.current.worldFrozen) return;
-    if (shovelDur <= 0) return; // axe broken
     const eng = engine.current;
 
-    // Is there a skeleton in tap range?
-    let target = null;
-    if (eng.skeleton && eng.skeleton.state === "walk") {
-      const screenRatio = eng.skeleton.worldX - eng.scrollX;
-      const dist = Math.abs(screenRatio - CHARACTER_X_RATIO);
-      if (dist < TAP_TOLERANCE) target = eng.skeleton;
-    }
-
-    // Always play the attack animation for feedback (hit OR miss)
+    // Always start the attack swing for tap feedback
     setAttackId(id => id + 1);
     setPlayerAnim("warrior_attack");
 
-    if (target) {
-      // Hit: skeleton dies, drops ore, durability ticks down.
-      target.state = "dying";
-      target.dyingAt = performance.now();
-      target.dropMetalIdx = rollOreMetal(Math.random());
-      // Tick durability (1 per kill — keeps the axe meaningful)
-      setShovelDur(d => Math.max(0, d - 1));
-      // Award ore to the appropriate bar via the game context
-      addOre(target.dropMetalIdx, 1);
+    // 1) ORE PICKUP — closest ore within tap range
+    let closestOre = null;
+    let closestOreDist = Infinity;
+    for (const o of eng.ores) {
+      const screenRatio = o.worldX - eng.scrollX;
+      const dist = Math.abs(screenRatio - CHARACTER_X_RATIO);
+      if (dist < TAP_TOLERANCE && dist < closestOreDist) {
+        closestOre = o;
+        closestOreDist = dist;
+      }
+    }
+    if (closestOre) {
+      addOre(closestOre.metalIdx, 1);
+      eng.ores = eng.ores.filter(o => o.id !== closestOre.id);
+      return;
+    }
+
+    // 2) SKELETON KILL — only walking skeletons, only if in range, only
+    //    if the axe isn't broken
+    if (shovelDur <= 0) return;
+    if (eng.skeleton && eng.skeleton.state === "walk") {
+      const screenRatio = eng.skeleton.worldX - eng.scrollX;
+      const dist = Math.abs(screenRatio - CHARACTER_X_RATIO);
+      if (dist < TAP_TOLERANCE) {
+        // Hit: skeleton starts dying anim, freezes in screen-space, drops
+        // one ore at its current position.
+        const target = eng.skeleton;
+        target.state = "dying";
+        target.dyingAt = performance.now();
+        // Capture screen position so the death anim doesn't drift with scroll
+        target.frozenScreenX = target.worldX - eng.scrollX;
+        target.dropMetalIdx = rollOreMetal(Math.random());
+        // Tick durability — keeps the axe meaningful
+        setShovelDur(d => Math.max(0, d - 1));
+        // Spawn the ore at the skeleton's current world position so it sits
+        // there for the player to tap. Does NOT auto-add to the bar.
+        eng.ores.push({
+          id: `ore-${performance.now()}-${Math.random().toString(36).slice(2,6)}`,
+          worldX: target.worldX,
+          metalIdx: target.dropMetalIdx,
+          spawnedAt: performance.now(),
+        });
+      }
     }
     // (Miss: just play the swing animation, no other effect.)
   };
@@ -314,10 +373,18 @@ export default function Hunt() {
   };
 
   // ── Decoration positioning ───────────────────────────────────────────
-  // The "ground line" is where character feet land. Decorations stand on
-  // this same line by default; front-layer entries get a negative offset
-  // pushing them slightly below so they visually overlap the character.
+  // Decorations are pushed to the EDGES of the walking strip — never on
+  // the character's walking path. Back-layer entries sit HIGH on screen
+  // (above the character's head, suggesting distance). Front-layer entries
+  // sit LOW (at or below the character's feet, in the immediate foreground
+  // so they pass IN FRONT of the player visually).
   const groundLineFromBottom = Math.round(viewSize.h * CHARACTER_BOTTOM_RATIO);
+  // The "walking strip ceiling" — roughly the top of the character.
+  // Back-layer decor must sit ABOVE this line so it doesn't intrude on
+  // the walking zone. PLAYER_SCALE shrinks the warrior, so reduce the
+  // strip height accordingly.
+  const charPixelHeight = ANIM.warrior_walk.cellH * SPRITE_SCALE * PLAYER_SCALE_RATIO;
+  const walkStripTopY    = groundLineFromBottom + charPixelHeight; // px from viewport bottom
 
   // Partition decorations by layer once per render so we can interleave
   // back-layer behind the character and front-layer in front.
@@ -327,6 +394,17 @@ export default function Hunt() {
   const renderDecor = (list) => list.map(d => {
     const x = worldXToPx(d.worldX);
     if (x < -d.kind.w || x > viewSize.w + d.kind.w) return null;
+    // Position depends on layer:
+    //   back  → bottom edge sits at the walk-strip ceiling (so tree
+    //           grows upward into the sky, never into the walking zone).
+    //           yOffset is variation in how high above the ceiling it sits.
+    //   front → bottom edge sits well below the ground line — most of
+    //           the decor is partly clipped by the viewport floor, only
+    //           the top of the bush/tree is visible. Creates a "I'm in
+    //           the immediate foreground" feel.
+    const bottomPx = d.kind.layer === "front"
+      ? -Math.round(d.kind.h * 0.55) + d.yOffset   // most below viewport, top peeks
+      : walkStripTopY + d.yOffset;                 // bottom of back-decor sits on strip ceiling
     return (
       <img key={d.id}
         src={d.kind.src}
@@ -334,7 +412,7 @@ export default function Hunt() {
         style={{
           position: "absolute",
           left: x,
-          bottom: groundLineFromBottom - d.yOffset,
+          bottom: bottomPx,
           width: d.kind.w,
           height: d.kind.h,
           imageRendering: "pixelated",
@@ -369,11 +447,17 @@ export default function Hunt() {
 
         {/* Skeleton — between back decor and character so it reads as
             "in the world" but never gets occluded by anything except
-            front-layer decorations. */}
+            front-layer decorations. When dying, the skeleton's screen X
+            is FROZEN (uses frozenScreenX captured at death time) so the
+            death anim plays in place rather than drifting left with
+            the world scroll. */}
         {engine.current.skeleton && (() => {
           const sk = engine.current.skeleton;
-          const x = worldXToPx(sk.worldX);
-          const animKey = sk.state === "dying" ? "skeleton_die" : "skeleton_walk";
+          const isDying = sk.state === "dying";
+          // For walking: track world. For dying: use the frozen screen X.
+          const screenRatio = isDying ? sk.frozenScreenX : (sk.worldX - engine.current.scrollX);
+          const x = screenRatio * viewSize.w;
+          const animKey = isDying ? "skeleton_die" : "skeleton_walk";
           const a = ANIM[animKey];
           const cellPx = a.cellW * SPRITE_SCALE;
           return (
@@ -389,14 +473,77 @@ export default function Hunt() {
           );
         })()}
 
+        {/* Ore drops — tap to collect. Worldx-anchored so they drift left
+            with the world. Tinted via CSS filter to match the metal
+            colour (so the player can tell at a glance which bar fills).
+            A subtle bob animation makes them stand out from the static
+            decoration. The actual tap-handling is the viewport-level
+            onClick which routes through the priority chain in handleTap. */}
+        {engine.current.ores.map(o => {
+          const x = worldXToPx(o.worldX);
+          if (x < -60 || x > viewSize.w + 60) return null;
+          // Bob: sin wave based on the time since spawn
+          const bob = Math.sin(((performance.now() - o.spawnedAt) / ORE_BOB_SPEED_MS) * Math.PI * 2) * ORE_BOB_AMPLITUDE;
+          // Hue rotation — METALS palette gives us a base colour; we
+          // approximate it via filter on the gray rock sprite. Cheaper
+          // than re-rendering per metal.
+          const metal = METALS[o.metalIdx] || METALS[0];
+          return (
+            <div key={o.id}
+              style={{
+                position: "absolute",
+                left: x - 24,
+                bottom: groundLineFromBottom - 4 + bob,
+                width: 48,
+                height: 24,
+                pointerEvents: "none",
+                // The metal-colored disc behind the rock — gives a glow
+                // and color cue regardless of CSS filter limitations.
+                filter: `drop-shadow(0 0 5px ${metal.hl}aa)`,
+              }}>
+              <img
+                src="/decor/ore.png"
+                alt=""
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  imageRendering: "pixelated",
+                  // Multiply blend with a tinted backdrop would be ideal,
+                  // but works cross-browser via a simple hue/saturation tint:
+                  filter: `drop-shadow(0 0 2px ${metal.hl})`,
+                }}
+              />
+              {/* Color halo — a small disc of the metal's base color
+                  behind the rock, made visible through CSS blend. */}
+              <div style={{
+                position: "absolute",
+                inset: "30% 30%",
+                borderRadius: "50%",
+                background: metal.base,
+                mixBlendMode: "multiply",
+                opacity: 0.7,
+                pointerEvents: "none",
+              }}/>
+            </div>
+          );
+        })}
+
         {/* Warrior (player character) — centred at CHARACTER_X_RATIO.
+            Scaled to PLAYER_SCALE_RATIO so the warrior reads at the right
+            size against the world (skeletons stay at full scale).
             Key is `attackId` (stable per-attack) NOT `tick` (which would
             remount every frame and prevent onComplete from firing). */}
         <div style={{
           position: "absolute",
           left: charXPx,
           bottom: groundLineFromBottom,
-          transform: "translate(-50%, 0)",
+          // translate-50% centers horizontally; transform-origin keeps the
+          // scale anchored at the feet (bottom-center) so shrinking doesn't
+          // make the character float off the ground.
+          transform: `translate(-50%, 0) scale(${PLAYER_SCALE_RATIO})`,
+          transformOrigin: "50% 100%",
           pointerEvents: "none",
         }}>
           <SpriteFrame
