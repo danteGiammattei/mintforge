@@ -45,29 +45,59 @@ const TAP_TOLERANCE = 0.18;
 // Player horizontal position in the viewport (0 = left edge, 1 = right).
 const CHARACTER_X_RATIO = 0.5;
 
+// Character feet sit this fraction of viewport height ABOVE the bottom.
+// Lower number = character closer to viewport floor. Tuned against the
+// near.webp's visible ground line so feet land on rocks/grass naturally.
+const CHARACTER_BOTTOM_RATIO = 0.06;
+
 // Skeleton spawn timing
 const SPAWN_BASE_COOLDOWN_MS = 1000;    // minimum delay after death
 const SPAWN_JITTER_MIN_MS    = 1000;    // additional 1-4s random
 const SPAWN_JITTER_MAX_MS    = 4000;
 
-// Max concurrent decoration entities (mobile-conscious cap)
-const DECOR_MAX = 4;
-// Spawn a decoration roughly every N ms
-const DECOR_SPAWN_MS = 2200;
+// Decoration density. ~8 concurrent gives a fuller landscape feel without
+// hurting mobile perf — they're <img> elements, not animated sprites.
+const DECOR_MAX = 8;
+const DECOR_SPAWN_MS = 1200; // average; jitters ±30% in spawn logic
 
-// Asset paths for decorations. Pre-build once so we don't allocate per-frame.
+// Decoration assets. `mul` is decoration depth (1.0 = ground plane).
+// `layer` controls Z-order:
+//   "back"  = renders BEHIND the character (most decorations)
+//   "front" = renders IN FRONT of the character — creates parallax depth
+//             where a bush/tree passes over the player in the foreground.
+// `weight` controls spawn frequency. Higher = more common.
 const DECOR_KINDS = [
-  // Each: src, footprint (rendered width × height in CSS px), drift speed multiplier
-  { src: "/decor/tree_1.png",  w: 124, h: 114, mul: 1.0 },
-  { src: "/decor/tree_2.png",  w:  70, h:  56, mul: 1.0 },
-  { src: "/decor/tree_3.png",  w:  64, h:  54, mul: 1.0 },
-  { src: "/decor/tree_4.png",  w:  66, h:  62, mul: 1.0 },
-  { src: "/decor/bush_1.png",  w: 130, h:  64, mul: 1.0 },
-  { src: "/decor/bush_2.png",  w:  60, h:  40, mul: 1.0 },
-  { src: "/decor/bush_3.png",  w:  78, h:  58, mul: 1.0 },
-  { src: "/decor/bush_4.png",  w:  58, h:  34, mul: 1.0 },
-  { src: "/decor/vending.png", w:  90, h: 188, mul: 1.0 },
+  // Trees — bigger, more common. Mostly back layer for distance feel.
+  { src: "/decor/tree_1.png",  w: 186, h: 171, mul: 1.0, layer: "back",  weight: 18 },
+  { src: "/decor/tree_2.png",  w: 105, h:  84, mul: 1.0, layer: "back",  weight: 14 },
+  { src: "/decor/tree_3.png",  w:  96, h:  81, mul: 1.0, layer: "back",  weight: 14 },
+  { src: "/decor/tree_4.png",  w:  99, h:  93, mul: 1.0, layer: "back",  weight: 14 },
+  // A handful of front-layer trees + bushes for depth/parallax illusion
+  { src: "/decor/tree_2.png",  w: 130, h: 104, mul: 1.0, layer: "front", weight: 6  },
+  { src: "/decor/tree_3.png",  w: 120, h: 100, mul: 1.0, layer: "front", weight: 6  },
+
+  // Bushes — small, scattered, both layers
+  { src: "/decor/bush_1.png",  w: 130, h:  64, mul: 1.0, layer: "back",  weight: 10 },
+  { src: "/decor/bush_2.png",  w:  60, h:  40, mul: 1.0, layer: "back",  weight: 8  },
+  { src: "/decor/bush_3.png",  w:  78, h:  58, mul: 1.0, layer: "front", weight: 8  },
+  { src: "/decor/bush_4.png",  w:  58, h:  34, mul: 1.0, layer: "front", weight: 8  },
+
+  // Vending machine — rare oddity, fits in screen.
+  // Source is 45×94, downscaled previously was 90×188 (too tall). Scale 1.5×
+  // for a small fun easter-egg presence.
+  { src: "/decor/vending.png", w:  60, h: 125, mul: 1.0, layer: "back",  weight: 2  },
 ];
+
+// Pre-compute total weight for the weighted spawner
+const DECOR_TOTAL_WEIGHT = DECOR_KINDS.reduce((s, d) => s + d.weight, 0);
+function rollDecorKind() {
+  let r = Math.random() * DECOR_TOTAL_WEIGHT;
+  for (const k of DECOR_KINDS) {
+    r -= k.weight;
+    if (r <= 0) return k;
+  }
+  return DECOR_KINDS[0];
+}
 
 export default function Hunt() {
   const {
@@ -102,7 +132,14 @@ export default function Hunt() {
   const rafRef = useRef(null);
 
   // Player anim state. "walk" by default, "attack" plays once on tap.
+  // `attackId` increments on each tap that starts a NEW attack — the
+  // SpriteFrame is keyed on this so it remounts (restarting from frame 0)
+  // ONLY on a fresh tap, not on every render tick. Previously the key
+  // included `tick` which incremented 60×/sec, remounting the SpriteFrame
+  // every frame, restarting the anim every frame, never reaching the
+  // final frame — so onComplete never fired and the player got stuck.
   const [playerAnim, setPlayerAnim] = useState("warrior_walk");
+  const [attackId,   setAttackId]   = useState(0);
 
   // When phase transitions back to "hunt", unfreeze the world.
   useEffect(() => {
@@ -172,13 +209,16 @@ export default function Hunt() {
 
         // ── Decoration lifecycle ──────────────────────────────────────
         if (e.decorations.length < DECOR_MAX && now >= e.nextDecorAt) {
-          const kind = DECOR_KINDS[Math.floor(Math.random() * DECOR_KINDS.length)];
+          const kind = rollDecorKind();
           e.decorations.push({
             id: `d-${now}-${Math.random().toString(36).slice(2,6)}`,
             kind,
             worldX: e.scrollX + 1.4,
-            // Slight vertical jitter so they don't all line up perfectly
-            yOffset: Math.random() * 14,
+            // Vertical jitter — front-layer items sit slightly LOWER so they
+            // visually cross in front of the character feet plane.
+            yOffset: kind.layer === "front"
+              ? -8 - Math.random() * 6   // dip below ground line (closer to camera)
+              :  Math.random() * 22,     // jitter upward (further away)
           });
           e.nextDecorAt = now + DECOR_SPAWN_MS * (0.7 + Math.random() * 0.6);
         }
@@ -208,7 +248,8 @@ export default function Hunt() {
       if (dist < TAP_TOLERANCE) target = eng.skeleton;
     }
 
-    // Always play the attack animation for feedback
+    // Always play the attack animation for feedback (hit OR miss)
+    setAttackId(id => id + 1);
     setPlayerAnim("warrior_attack");
 
     if (target) {
@@ -273,9 +314,35 @@ export default function Hunt() {
   };
 
   // ── Decoration positioning ───────────────────────────────────────────
-  // Bottom-anchored on the ground line (which we treat as the bottom 14%
-  // of the viewport — same as the character feet position).
-  const groundLineFromBottom = Math.round(viewSize.h * 0.14);
+  // The "ground line" is where character feet land. Decorations stand on
+  // this same line by default; front-layer entries get a negative offset
+  // pushing them slightly below so they visually overlap the character.
+  const groundLineFromBottom = Math.round(viewSize.h * CHARACTER_BOTTOM_RATIO);
+
+  // Partition decorations by layer once per render so we can interleave
+  // back-layer behind the character and front-layer in front.
+  const backDecor  = engine.current.decorations.filter(d => d.kind.layer !== "front");
+  const frontDecor = engine.current.decorations.filter(d => d.kind.layer === "front");
+
+  const renderDecor = (list) => list.map(d => {
+    const x = worldXToPx(d.worldX);
+    if (x < -d.kind.w || x > viewSize.w + d.kind.w) return null;
+    return (
+      <img key={d.id}
+        src={d.kind.src}
+        alt=""
+        style={{
+          position: "absolute",
+          left: x,
+          bottom: groundLineFromBottom - d.yOffset,
+          width: d.kind.w,
+          height: d.kind.h,
+          imageRendering: "pixelated",
+          pointerEvents: "none",
+        }}
+      />
+    );
+  });
 
   return (
     <div className="flex flex-col" style={{ width: "100%", height: "100%", userSelect: "none" }}>
@@ -297,35 +364,17 @@ export default function Hunt() {
         {/* Parallax background */}
         {renderBgLayers()}
 
-        {/* Decorations (procedural). Render before character so character is in front. */}
-        {engine.current.decorations.map(d => {
-          const x = worldXToPx(d.worldX);
-          // Off-screen culling for the renderer
-          if (x < -d.kind.w || x > viewSize.w + d.kind.w) return null;
-          return (
-            <img key={d.id}
-              src={d.kind.src}
-              alt=""
-              style={{
-                position: "absolute",
-                left: x,
-                bottom: groundLineFromBottom - d.yOffset,
-                width: d.kind.w,
-                height: d.kind.h,
-                imageRendering: "pixelated",
-                pointerEvents: "none",
-              }}
-            />
-          );
-        })}
+        {/* Back-layer decorations (behind character) */}
+        {renderDecor(backDecor)}
 
-        {/* Skeleton */}
+        {/* Skeleton — between back decor and character so it reads as
+            "in the world" but never gets occluded by anything except
+            front-layer decorations. */}
         {engine.current.skeleton && (() => {
           const sk = engine.current.skeleton;
           const x = worldXToPx(sk.worldX);
           const animKey = sk.state === "dying" ? "skeleton_die" : "skeleton_walk";
           const a = ANIM[animKey];
-          // Center the cell horizontally on its world position
           const cellPx = a.cellW * SPRITE_SCALE;
           return (
             <div key={sk.id}
@@ -340,7 +389,9 @@ export default function Hunt() {
           );
         })()}
 
-        {/* Warrior (player character) — centred at CHARACTER_X_RATIO */}
+        {/* Warrior (player character) — centred at CHARACTER_X_RATIO.
+            Key is `attackId` (stable per-attack) NOT `tick` (which would
+            remount every frame and prevent onComplete from firing). */}
         <div style={{
           position: "absolute",
           left: charXPx,
@@ -350,11 +401,15 @@ export default function Hunt() {
         }}>
           <SpriteFrame
             anim={playerAnim}
-            // Restart attack from frame 0 each tap
-            key={playerAnim === "warrior_attack" ? "atk-" + tick : "walk"}
+            key={playerAnim === "warrior_attack" ? `atk-${attackId}` : "walk"}
             onComplete={playerAnim === "warrior_attack" ? handleAttackDone : undefined}
           />
         </div>
+
+        {/* Front-layer decorations — render LAST so they sit in front of
+            the character. Creates parallax depth (a bush passing in
+            front of the player as the world scrolls). */}
+        {renderDecor(frontDecor)}
 
         {/* Axe-durability indicator (small, top-right). Visible always. */}
         <div style={{
