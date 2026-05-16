@@ -936,7 +936,12 @@ export default function MintForge(){
     t, isDark, setIsDark,
     F, VT, FR, mu, microLabel, sectionTitle, card,
     // Auth + API
-    token, currentPlayer, api, schemaWarning, setSchemaWarning,
+    // `player` is the local state var (line 79); aliased to `currentPlayer`
+    // for the context export so existing consumers — and any future code
+    // that grabs it from useGame() — can read either name. setPlayer + 
+    // setToken are exposed so the AuthScreen / sign-out button can mutate.
+    token, setToken, player, currentPlayer: player, setPlayer, api,
+    schemaWarning, setSchemaWarning,
     // Coins + currency
     coins, setCoins,
     marks, setMarks,
