@@ -103,7 +103,7 @@ function rollDecorKind() {
     r -= k.weight;
     if (r <= 0) return k;
   }
-  return DECOR_KINDS[0];
+  return null;
 }
 
 export default function Hunt() {
