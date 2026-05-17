@@ -343,8 +343,9 @@ export function tarotBuffs(equippedIds) {
     guaranteedEvery:0, guaranteedFloor:0,
     firstStrikeBonus:0, rarityFloor:0,
     forgeDiscount:0,
+    shinyBonus:0,
     // Legacy fields — neutral defaults so older code that reads them doesn't break
-    shinyBonus:0, tierUp:0, durMul:1, digSpeed:0, artefactRate:0, forgeRefund:0, rerollDig:0,
+    tierUp:0, durMul:1, digSpeed:0, artefactRate:0, forgeRefund:0, rerollDig:0,
   };
   for (const id of equippedIds || []) {
     const c = TAROT_BY_ID[id]; if (!c) continue;
@@ -360,6 +361,7 @@ export function tarotBuffs(equippedIds) {
     if (c.firstStrikeBonus) buff.firstStrikeBonus += c.firstStrikeBonus;
     if (c.rarityFloor)      buff.rarityFloor = Math.max(buff.rarityFloor, c.rarityFloor);
     if (c.forgeDiscount)    buff.forgeDiscount += c.forgeDiscount;
+    if (c.shinyBonus)       buff.shinyBonus   += c.shinyBonus;
   }
   return buff;
 }

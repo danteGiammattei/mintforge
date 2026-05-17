@@ -179,45 +179,59 @@ export const MAX_BR = BRUSH_UPS.length - 1;
 export const SHOVEL_MAX_DUR = [null, 40, 60, 90, 130, 180, 250, 350, 500, 700];
 
 /* ─── TAROT ───────────────────────────────────────────────────────────────
-   Twelve cards across three rarity tiers. One per webp art file in
-   /public/tarot/. Max 2 equipped at a time.
+   Twelve cards ordered from least → most powerful. Max 2 equipped.
 
-   Effects are currently DISABLED — every card has a placeholder description
-   and no gameplay-active fields. This was intentional during the skeleton-
-   gameplay rewrite (the old `firstStrikeBonus`, `revealRarity`, etc. were
-   tied to the dig-grid mechanic which no longer exists). Re-enable per card
-   by adding the relevant field (`xpMul`, `marksMul`, `pinSlots`, etc) — the
-   buff reducer in coin.js still consumes them. */
+   Effects use existing buff fields consumed by tarotBuffs() in coin.js:
+     xpMul, marksMul, pinSlots, shinyBonus, revealRarity, allowSkip,
+     rerollRarity, guaranteedEvery+guaranteedFloor, rarityFloor,
+     forgeDiscount.
+
+   Scaling intent — early cards give a single small passive (XP %, marks %),
+   mid cards give targeted bonuses or QoL (extra display slot, shiny chance),
+   late cards give game-changing buffs (rarity floors, guaranteed rares,
+   forge discount) and the final two stack multiple effects. */
 export const TAROT_CARDS = [
-  // ── COMMON ─────────────────────────────────────────────────────────
-  { id:"magician",        title:"The Magician",       roman:"I",   rarity:"common", price:800,  minLvl:5,
-    desc:"Effect coming soon." },
-  { id:"high_priestess",  title:"The High Priestess", roman:"II",  rarity:"common", price:1000, minLvl:6,
-    desc:"Effect coming soon." },
-  { id:"empress",         title:"The Empress",        roman:"III", rarity:"common", price:1200, minLvl:7,
-    desc:"Effect coming soon." },
-  { id:"emperor",         title:"The Emperor",        roman:"IV",  rarity:"common", price:1400, minLvl:8,
-    desc:"Effect coming soon." },
+  // ── 1-4 — Common, single small passives ─────────────────────────────
+  { id:"magician",       title:"The Magician",       roman:"I",   rarity:"common", price:800,  minLvl:5,
+    xpMul:0.05,
+    desc:"+5% XP from every find." },
+  { id:"high_priestess", title:"The High Priestess", roman:"II",  rarity:"common", price:1100, minLvl:7,
+    xpMul:0.10,
+    desc:"+10% XP from every find." },
+  { id:"empress",        title:"The Empress",        roman:"III", rarity:"common", price:1400, minLvl:9,
+    marksMul:0.10,
+    desc:"+10% marks from selling coins." },
+  { id:"emperor",        title:"The Emperor",        roman:"IV",  rarity:"common", price:1800, minLvl:11,
+    marksMul:0.20,
+    desc:"+20% marks from selling coins." },
 
-  // ── RARE ───────────────────────────────────────────────────────────
-  { id:"lovers",          title:"The Lovers",         roman:"VI",  rarity:"rare",   price:2200, minLvl:12,
-    desc:"Effect coming soon." },
-  { id:"chariot",         title:"The Chariot",        roman:"VII", rarity:"rare",   price:2400, minLvl:14,
-    desc:"Effect coming soon." },
-  { id:"strength",        title:"Strength",           roman:"VIII",rarity:"rare",   price:2600, minLvl:15,
-    desc:"Effect coming soon." },
-  { id:"hermit",          title:"The Hermit",         roman:"IX",  rarity:"rare",   price:2800, minLvl:16,
-    desc:"Effect coming soon." },
+  // ── 5-8 — Rare, targeted bonuses + QoL ──────────────────────────────
+  { id:"lovers",         title:"The Lovers",         roman:"VI",  rarity:"rare",   price:2200, minLvl:13,
+    pinSlots:1,
+    desc:"+1 display cabinet slot." },
+  { id:"strength",       title:"Strength",           roman:"VIII",rarity:"rare",   price:2700, minLvl:15,
+    shinyBonus:0.02,
+    desc:"+2% shiny chance when brushing." },
+  { id:"chariot",        title:"The Chariot",        roman:"VII", rarity:"rare",   price:3200, minLvl:17,
+    shinyBonus:0.04, xpMul:0.10,
+    desc:"+4% shiny chance · +10% XP." },
+  { id:"hermit",         title:"The Hermit",         roman:"IX",  rarity:"rare",   price:3800, minLvl:19,
+    revealRarity:true, allowSkip:true,
+    desc:"Lantern reveals coin rarity before brushing. Skip any coin." },
 
-  // ── LEGENDARY ──────────────────────────────────────────────────────
-  { id:"wheel_of_fortune",title:"Wheel of Fortune",   roman:"X",   rarity:"legendary", price:4800, minLvl:22,
-    desc:"Effect coming soon." },
-  { id:"justice",         title:"Justice",            roman:"XI",  rarity:"legendary", price:5000, minLvl:24,
-    desc:"Effect coming soon." },
-  { id:"hanged_man",      title:"The Hanged Man",     roman:"XII", rarity:"legendary", price:5200, minLvl:26,
-    desc:"Effect coming soon." },
-  { id:"hierophant",      title:"The Hierophant",     roman:"V",   rarity:"legendary", price:5500, minLvl:28,
-    desc:"Effect coming soon." },
+  // ── 9-12 — Legendary, game-changing ─────────────────────────────────
+  { id:"hanged_man",     title:"The Hanged Man",     roman:"XII", rarity:"legendary", price:4500, minLvl:22,
+    rerollRarity:1,
+    desc:"Once per day, reroll the rarity of a coin you just found." },
+  { id:"justice",        title:"Justice",            roman:"XI",  rarity:"legendary", price:5200, minLvl:25,
+    guaranteedEvery:5, guaranteedFloor:2,
+    desc:"Every 5th find guaranteed Rare or higher." },
+  { id:"wheel_of_fortune",title:"Wheel of Fortune",  roman:"X",   rarity:"legendary", price:5800, minLvl:28,
+    guaranteedEvery:3, guaranteedFloor:2, marksMul:0.15,
+    desc:"Every 3rd find guaranteed Rare or higher · +15% marks." },
+  { id:"hierophant",     title:"The Hierophant",     roman:"V",   rarity:"legendary", price:7000, minLvl:32,
+    rarityFloor:1, xpMul:0.20, marksMul:0.20,
+    desc:"All finds guaranteed at least Uncommon · +20% XP · +20% marks." },
 ];
 export const TAROT_BY_ID = Object.fromEntries(TAROT_CARDS.map(c => [c.id, c]));
 // Two equipped at a time — combinations matter, but no card is "always-on".

@@ -1,13 +1,22 @@
+import { useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import PickaxeIcon from "../components/PickaxeIcon.jsx";
 
 /* ─── FORGE ───────────────────────────────────────────────────────────────
- * Equipment-upgrade tab. Two upgrade tracks: Shovel (depth/metal tiers) and
- * Brush (shiny chance). Each requires a specific recipe of coins to forge.
+ * Two views, switchable like the tavern sub-tabs:
+ *   "upgrades" — original Shovel + Brush upgrade tracks (the existing
+ *                cost-coins-to-level-up mechanic).
+ *   "axe"      — future axe-loadout view where the player will be able to
+ *                slot a CHARM into the axehead and wrap something around
+ *                the handle for buffs/effects. Currently a stylized
+ *                placeholder so the navigation + framing is in place; the
+ *                slot data model + UI lands in a follow-up patch.
  *
- * The hero banner uses a warm orange gradient + flicker animation to read
- * as a literal forge. Repair button is shown when shovel durability < max
- * and routes to Tavern → repair sub-tab. */
+ * The hero banner uses a cosmic-eldritch gradient (matches the gamble
+ * panel in the tavern) instead of the old warm-forge orange, so the
+ * "ascend your equipment" theme reads consistently with the rest of
+ * the otherworldly UI direction. Repair button is shown when shovel
+ * durability < max and routes to Tavern → repair sub-tab. */
 export default function Forge() {
   const {
     coins, sacrificialCoins,
@@ -17,8 +26,119 @@ export default function Forge() {
     METALS, MAX_SH, MAX_BR, SHOVEL_UPS, BRUSH_UPS, SHOVEL_TIER_CAP,
     t, isDark, F, FR, mu, microLabel, card,
   } = useGame();
+  const [forgeView, setForgeView] = useState("upgrades");
+  // Eldritch palette — same as the tavern's gamble views for visual
+  // continuity. Kept inline so it doesn't leak elsewhere.
+  const E = {
+    bg:"#08051c", bgPanel:"rgba(14,8,40,.65)",
+    violet:"#7a4cff", violetHi:"#9a72ff",
+    cyan:"#00e5ff", gold:"#f0c850",
+    dread:"#ff3d6c", ink:"#e8e0ff", muted:"#8278b0",
+    border:"rgba(122,76,255,.35)", borderHi:"rgba(0,229,255,.6)",
+  };
   return (
     <div className="animate-fadein">
+      {/* Eldritch view-switcher (UPGRADES / AXE LOADOUT). Same shape as
+          the tavern's gamble picker. */}
+      <div className="flex gap-1.5 p-1 rounded-[10px] mb-3.5"
+           style={{ background:E.bgPanel, border:`1px solid ${E.border}` }}>
+        {[["upgrades","⚒","Upgrades"],["axe","✶","Axe Loadout"]].map(([id,ic,lbl])=>{
+          const active=forgeView===id;
+          return (
+            <button key={id}
+              onClick={()=>setForgeView(id)}
+              className="flex-1 py-2 rounded-md border-none cursor-pointer text-[11px] font-bold uppercase tracking-[1.5px] transition-all flex items-center justify-center gap-1.5"
+              style={{
+                ...F,
+                background:active?`linear-gradient(135deg,${E.violet},${E.cyan})`:"transparent",
+                color:active?"#08051c":E.muted,
+                boxShadow: active ? `0 0 16px ${E.violet}88` : "none",
+              }}>
+              <span style={{ fontSize:16, color:active?"#08051c":E.cyan }}>{ic}</span>{lbl}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ─── AXE LOADOUT (placeholder) ─────────────────────────────────
+          Centred axe with two empty slots and a hint string. The data
+          model for slots (charmId + wrapId on the player) and the catalog
+          of slottable items lands in a later patch. */}
+      {forgeView==="axe"&&(
+        <div className="animate-fadein flex flex-col items-center gap-5 py-8 rounded-[14px]"
+             style={{
+               background:
+                 "radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.6) 50%, transparent 51%), "+
+                 "radial-gradient(1px 1px at 78% 32%, rgba(180,200,255,.5) 50%, transparent 51%), "+
+                 "radial-gradient(1px 1px at 41% 67%, rgba(220,180,255,.6) 50%, transparent 51%), "+
+                 "radial-gradient(1px 1px at 86% 81%, rgba(255,200,220,.4) 50%, transparent 51%), "+
+                 "radial-gradient(2px 2px at 60% 12%, rgba(255,255,255,.3) 50%, transparent 51%), "+
+                 "radial-gradient(ellipse at 50% 50%, rgba(40,20,80,.4), rgba(8,5,28,.95) 70%), "+
+                 E.bg,
+               border:`1px solid ${E.border}`,
+               boxShadow:`0 0 24px rgba(122,76,255,.18), inset 0 0 32px rgba(0,229,255,.04)`,
+               position:"relative", overflow:"hidden",
+             }}>
+          <div style={{...FR, fontSize:22, color:E.violetHi, letterSpacing:".5px"}}>The Axe</div>
+          <div style={{...F, fontSize:11, color:E.muted, letterSpacing:1.5, textTransform:"uppercase", textAlign:"center", maxWidth:280}}>
+            Channel charms · bind sigils · ascend your tool
+          </div>
+
+          {/* Layout: charm slot (top) → axe (middle) → wrap slot (bottom).
+              On wider viewports we could push these to the sides, but
+              vertical stack reads cleanly on mobile. */}
+          <div className="flex flex-col items-center gap-3 mt-3">
+            {/* Charm slot — empty */}
+            <div className="flex flex-col items-center gap-1.5">
+              <div style={{...F, fontSize:10, color:E.cyan, letterSpacing:2, textTransform:"uppercase"}}>Charm</div>
+              <div style={{
+                width:72, height:72, borderRadius:"50%",
+                border:`2px dashed ${E.border}`,
+                background:`radial-gradient(circle, ${E.violet}22, transparent 70%)`,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                color:E.muted, fontSize:26,
+              }}>+</div>
+            </div>
+
+            {/* Axe centre */}
+            <div style={{
+              padding:18, borderRadius:14,
+              background:`radial-gradient(circle, ${E.violet}33, transparent 70%)`,
+              filter:`drop-shadow(0 0 18px ${E.cyan}66)`,
+            }}>
+              <PickaxeIcon size={110} color={E.cyan} dur={shovelDur} maxDur={maxDur}/>
+            </div>
+
+            {/* Wrap slot — empty */}
+            <div className="flex flex-col items-center gap-1.5">
+              <div style={{...F, fontSize:10, color:E.cyan, letterSpacing:2, textTransform:"uppercase"}}>Handle Wrap</div>
+              <div style={{
+                width:72, height:32, borderRadius:6,
+                border:`2px dashed ${E.border}`,
+                background:`linear-gradient(90deg, ${E.violet}22, transparent, ${E.violet}22)`,
+                display:"flex", alignItems:"center", justifyContent:"center",
+                color:E.muted, fontSize:24,
+              }}>+</div>
+            </div>
+          </div>
+
+          <div className="px-5 py-3 mt-2 rounded-md text-center"
+               style={{
+                 background:"rgba(20,12,40,.6)",
+                 border:`1px solid ${E.border}`,
+                 maxWidth:320,
+               }}>
+            <div style={{...FR, fontSize:13, color:E.violetHi, marginBottom:6}}>Coming Soon</div>
+            <div style={{...F, fontSize:11, color:E.muted, lineHeight:1.6}}>
+              Charms slot into the axehead for passive effects (XP, durability, rare-find chance). Handle wraps add active or conditional bonuses. Earn or craft items to fill these slots.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── UPGRADES VIEW (original Shovel/Brush tracks) ─────────────── */}
+      {forgeView==="upgrades"&&(
+        <>
       {/* Hero banner — flicker-lit forge with warm orange ember glow */}
       <div
         className="-mx-3.5 -mt-[18px] mb-4 px-[22px] pt-9 pb-5 relative overflow-hidden"
@@ -188,6 +308,8 @@ export default function Forge() {
           );
         })}
       </div>
+        </>
+      )}
     </div>
   );
 }
