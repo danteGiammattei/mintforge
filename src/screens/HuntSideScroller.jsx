@@ -377,32 +377,61 @@ export default function Hunt() {
     );
   });
 
-  // ── BRUSH PHASE — render BrushReveal over the side-scroller ─────────
-  // When the player taps a full ore bar, claimOreCoin sets phase=brush and
-  // foundCoin. We render BrushReveal here. onBrushDone hands back to the
-  // post-brush flow (RevealBanner → back to hunt).
-  if (phase === "brush" && foundCoin) {
-    const br = BRUSH_UPS?.[brushLevel] || { alpha: BA, shinyChance: 0.01 };
-    return (
-      <div className="flex flex-col items-center justify-center" style={{ width:"100%", height:"100%", padding: 16 }}>
-        <BrushReveal
-          coin={foundCoin}
-          brushAlpha={br.alpha}
-          shinyChance={Math.min(0.95, (br.shinyChance || 0.01) + (buff.shinyBonus || 0))}
-          onRevealed={onBrushDone}
-          t={t}
-        />
-      </div>
-    );
-  }
+  // The whole-page tap catcher: any click outside the OreBars buttons
+  // (which have their own onClick handlers and stopPropagation) counts as
+  // an attack tap. This means the bottom-third "dead area" below the bars
+  // is also a valid attack zone — useful on tall phones where the viewport
+  // sits centred and there's blank canvas below.
+  const handlePageTap = (ev) => {
+    // Don't fire if the user tapped a bar (full bar = claim, partial = no-op).
+    // Ore-bar buttons live inside the OreBars component; we detect them by
+    // walking up the DOM and checking for the [data-orebar] attribute set
+    // on the OreBars wrapper.
+    let n = ev.target;
+    while (n && n !== ev.currentTarget) {
+      if (n.dataset && n.dataset.orebar) return;
+      n = n.parentNode;
+    }
+    handleTap();
+  };
+
+  // ── BRUSH PHASE — overlay BrushReveal on top of the hunt viewport.
+  //    DO NOT early-return — that unmounts the hunt's <div>, breaking the
+  //    ResizeObserver. When the user returns to hunt, the new viewport
+  //    mounts but the observer is gone, viewSize stays stale at the
+  //    default (600×280), and every screen-space calculation produces
+  //    wrong values — sprites blob to the left edge. Overlay keeps the
+  //    hunt mounted underneath. */
+  const brushOverlay = (phase === "brush" && foundCoin) ? (
+    <div style={{
+      position: "absolute", inset: 0,
+      background: "rgba(20,12,8,.92)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 50,
+    }}>
+      <BrushReveal
+        coin={foundCoin}
+        brushAlpha={(BRUSH_UPS?.[brushLevel] || { alpha: BA }).alpha}
+        shinyChance={Math.min(0.95, ((BRUSH_UPS?.[brushLevel] || { shinyChance: 0.01 }).shinyChance) + (buff.shinyBonus || 0))}
+        onRevealed={onBrushDone}
+        t={t}
+      />
+    </div>
+  ) : null;
 
   // ── Default HUNT view ──────────────────────────────────────────────
   return (
-    <div className="flex flex-col" style={{ width: "100%", height: "100%", userSelect: "none" }}>
+    <div
+      onClick={handlePageTap}
+      // No touch handler — modern mobile fires onClick from taps without
+      // the 300ms delay. The previous onTouchStart called preventDefault
+      // which threw a passive-listener warning on every tap.
+      className="flex flex-col"
+      style={{ width: "100%", height: "100%", userSelect: "none", position: "relative" }}>
       <div
         ref={viewportRef}
-        onClick={handleTap}
-        onTouchStart={(e) => { e.preventDefault(); handleTap(); }}
+        // onClick handled at the page level (handlePageTap) so the dead
+        // area below the bars also counts as a tap zone.
         style={{
           position: "relative",
           flex: 1,
@@ -562,11 +591,40 @@ export default function Hunt() {
         </div>
       </div>
 
-      <OreBars
-        counts={oreCounts || []}
-        onClaim={(metalIdx) => claimOreCoin(metalIdx)}
-        theme={t}
-      />
+      {/* OreBars wrapper carries data-orebar so handlePageTap can skip
+          attack-firing when the user taps a bar (claim) or its dead space
+          between buttons. */}
+      <div data-orebar="1">
+        <OreBars
+          counts={oreCounts || []}
+          onClaim={(metalIdx) => claimOreCoin(metalIdx)}
+          theme={t}
+        />
+      </div>
+
+      {/* Bottom tap-catcher — fills whatever blank canvas remains below
+          the ore bars. Pure attack hit zone (handlePageTap on the wrapper
+          handles it; this just gives the dead area visible height). */}
+      <div style={{
+        flex: 1,
+        minHeight: 0,
+        // Subtle hint cursor + faint label so the player knows it's tappable
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "rgba(255,255,255,.18)",
+        fontSize: 11,
+        textTransform: "uppercase",
+        letterSpacing: 1.5,
+      }}>
+        tap anywhere to attack
+      </div>
+
+      {/* Brush overlay — sits on top of everything during phase==="brush".
+          Hunt JSX stays mounted underneath so ResizeObserver + engine
+          state stay valid across the brush→hunt transition. */}
+      {brushOverlay}
     </div>
   );
 }

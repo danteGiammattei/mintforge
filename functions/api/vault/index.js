@@ -9,7 +9,7 @@ const VALID_TAROT_IDS = new Set([
   // rare
   "lovers", "chariot", "strength", "hermit",
   // legendary
-  "wheel_of_fortune", "justice", "hanged_man", "tower",
+  "wheel_of_fortune", "justice", "hanged_man", "hierophant",
 ]);
 /* Premium frame/banner IDs — only premium ones are validated since standard frames
    are XP-gated and never require ownership tracking. */

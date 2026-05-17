@@ -882,7 +882,13 @@ export default function MintForge(){
     else if(sector.outcome==="x2"){add=[mkCoin(newSeed(),1,tier),mkCoin(newSeed(),1,tier)];won=true;msg="DOUBLE RETURN";}
     else if(sector.outcome==="up2"){add=[mkCoin(newSeed(),1,Math.min(MAX_TIER,tier+2))];won=true;msg="DOUBLE TIER UP";}
     else if(sector.outcome==="jackpot"){add=[mkCoin(newSeed(),1,MAX_TIER)];won=true;msg="JACKPOT — VOID COIN";}
-    setCoins(prev=>[...add,...prev.filter(c=>!remove.includes(c.id))]);setXP(p=>p+(won?140:20));setRoulResult({won,add,msg});setRoulDone(true);
+    setCoins(prev=>[...add,...prev.filter(c=>!remove.includes(c.id))]);setXP(p=>p+(won?140:20));
+    // Stash the original bet coin in the result. Once we remove it from
+    // `coins` above, roulBetCoin (derived from coins.find) goes null —
+    // which previously made the entire result block disappear because the
+    // Tavern UI was conditioned on roulBetCoin. The result now carries
+    // its own snapshot of the coin so the post-spin UI stays visible.
+    setRoulResult({won,add,msg,betCoin:roulBetCoin,sector});setRoulDone(true);
     api.tx({remove,add:add.map(c=>({id:c.id,seed:c.seed,metalIdx:c.metalIdx,shiny:!!c.shiny}))}).catch(()=>{});
   };
   const resetRoulette=()=>{setRoulBetId(null);setRoulResult(null);setRoulDone(false);};

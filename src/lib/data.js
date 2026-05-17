@@ -216,7 +216,7 @@ export const TAROT_CARDS = [
     desc:"Effect coming soon." },
   { id:"hanged_man",      title:"The Hanged Man",     roman:"XII", rarity:"legendary", price:5200, minLvl:26,
     desc:"Effect coming soon." },
-  { id:"tower",           title:"The Tower",          roman:"XVI", rarity:"legendary", price:5500, minLvl:28,
+  { id:"hierophant",      title:"The Hierophant",     roman:"V",   rarity:"legendary", price:5500, minLvl:28,
     desc:"Effect coming soon." },
 ];
 export const TAROT_BY_ID = Object.fromEntries(TAROT_CARDS.map(c => [c.id, c]));
@@ -318,7 +318,7 @@ export const LOCATIONS = [
     // in HuntSideScroller.
     bgLayers: [
       { path: "/locations/field/sky.webp",  scrollMul: 0    },
-      { path: "/locations/field/near.webp", scrollMul: 0.8 },
+      { path: "/locations/field/near.webp", scrollMul: 1.0  },
     ],
     scrollSpeed: 0.3,            // viewport-widths per second
     glintFrequency: 0.6,

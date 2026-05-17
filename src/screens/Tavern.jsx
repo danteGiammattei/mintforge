@@ -306,12 +306,60 @@ export default function Tavern() {
           Roulette is six-sector weighted: most likely outcomes punish you,
           rare outcomes are big upside. All state lives in MintForge so this
           view is mostly presentation. */}
-      {tavernView==="gamble"&&(
+      {/* ════════════════════════════════════════════════════════════════
+            ELDRITCH GAMBLE VIEW
+            ───────────────────────────────────────────────────────────────
+            Deliberate visual departure from the rest of the tavern: the
+            gambling games are framed as cosmic offerings to an indifferent
+            god. Deep void backdrops, violet/cyan glow, drifting starfield,
+            pixel-art ornament corners, and the actual coin you're betting
+            renders via CoinCanvas mid-flip instead of a generic emoji. */}
+      {tavernView==="gamble"&&(()=>{
+        // Eldritch palette — kept inline so it doesn't leak to the rest
+        // of the tavern's warmer brown/tan look.
+        const E = {
+          bg:"#08051c", bgPanel:"rgba(14,8,40,.65)",
+          violet:"#7a4cff", violetHi:"#9a72ff",
+          cyan:"#00e5ff", gold:"#f0c850",
+          dread:"#ff3d6c", ink:"#e8e0ff", muted:"#8278b0",
+          border:"rgba(122,76,255,.35)", borderHi:"rgba(0,229,255,.6)",
+        };
+        // Reusable cosmic-void panel. Multi-layer radial-gradient star
+        // pattern is pure CSS, no JS, no images — keeps the deploy lean.
+        const eldritchPanel = {
+          background:
+            "radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.6) 50%, transparent 51%), "+
+            "radial-gradient(1px 1px at 78% 32%, rgba(180,200,255,.5) 50%, transparent 51%), "+
+            "radial-gradient(1px 1px at 41% 67%, rgba(220,180,255,.6) 50%, transparent 51%), "+
+            "radial-gradient(1px 1px at 86% 81%, rgba(255,200,220,.4) 50%, transparent 51%), "+
+            "radial-gradient(1px 1px at 24% 88%, rgba(160,200,255,.5) 50%, transparent 51%), "+
+            "radial-gradient(2px 2px at 60% 12%, rgba(255,255,255,.3) 50%, transparent 51%), "+
+            "radial-gradient(ellipse at 50% 50%, rgba(40,20,80,.4), rgba(8,5,28,.95) 70%), "+
+            E.bg,
+          border:`1px solid ${E.border}`, borderRadius:14, padding:18,
+          boxShadow:`0 0 24px rgba(122,76,255,.18), inset 0 0 32px rgba(0,229,255,.04)`,
+          position:"relative", overflow:"hidden",
+        };
+        return (
         <div className="animate-fadein flex flex-col gap-3.5">
-          {/* Mode picker */}
+          <style>{`
+            @keyframes eldritchCoinFlip {
+              0%   { transform: perspective(600px) rotateY(0deg)   scale(0.9); filter: brightness(1) drop-shadow(0 0 12px #00e5ff); }
+              25%  { transform: perspective(600px) rotateY(450deg) scaleX(0.15) scale(1.05); filter: brightness(1.4) drop-shadow(0 0 18px #9a72ff); }
+              50%  { transform: perspective(600px) rotateY(900deg) scale(1.1); filter: brightness(1.6) drop-shadow(0 0 22px #00e5ff); }
+              75%  { transform: perspective(600px) rotateY(1350deg) scaleX(0.15) scale(1.05); filter: brightness(1.4) drop-shadow(0 0 18px #9a72ff); }
+              100% { transform: perspective(600px) rotateY(1800deg) scale(0.95); filter: brightness(1) drop-shadow(0 0 12px #f0c850); }
+            }
+            @keyframes eldritchPulse {
+              0%, 100% { opacity: 0.5; transform: scale(1); }
+              50%      { opacity: 1;   transform: scale(1.04); }
+            }
+          `}</style>
+
+          {/* Mode picker (eldritch) */}
           <div className="flex gap-1.5 p-1 rounded-[10px]"
-               style={{ background:t.surface, border:`1px solid ${t.border}` }}>
-            {[["toss","🪙","Coin Toss"],["roulette","🎡","Roulette"]].map(([id,ic,lbl])=>{
+               style={{ background:E.bgPanel, border:`1px solid ${E.border}` }}>
+            {[["toss","◐","Coin Toss"],["roulette","✶","Roulette"]].map(([id,ic,lbl])=>{
               const active=gambMode===id;
               return (
                 <button key={id}
@@ -319,28 +367,31 @@ export default function Tavern() {
                   className="flex-1 py-2 rounded-md border-none cursor-pointer text-[11px] font-bold uppercase tracking-[1.5px] transition-all flex items-center justify-center gap-1.5"
                   style={{
                     ...F,
-                    background:active?`linear-gradient(135deg,${t.accentHi},${t.accent})`:"transparent",
-                    color:active?t.accentInk:t.muted,
+                    background:active?`linear-gradient(135deg,${E.violet},${E.cyan})`:"transparent",
+                    color:active?"#08051c":E.muted,
+                    boxShadow: active ? `0 0 16px ${E.violet}88` : "none",
                   }}>
-                  <span className="text-base">{ic}</span>{lbl}
+                  <span style={{ fontSize: 16, color: active ? "#08051c" : E.cyan }}>{ic}</span>{lbl}
                 </button>
               );
             })}
           </div>
 
-          {/* ── Coin Toss UI ── */}
+          {/* ─── COIN TOSS ─────────────────────────────────────────── */}
           {gambMode==="toss"&&(
-            <div className="p-4" style={card}>
-              <div className="text-[11px] uppercase tracking-[1.5px] font-bold mb-2.5" style={{...F,color:t.muted}}>
-                {gamble.label} · {gamble.desc}
+            <div style={eldritchPanel}>
+              <div style={{...FR, fontSize:18, color:E.violetHi, letterSpacing:".5px", textAlign:"center", marginBottom:4 }}>
+                {gamble.label}
+              </div>
+              <div style={{...F, fontSize:11, color:E.muted, letterSpacing:1.5, textTransform:"uppercase", textAlign:"center", marginBottom:14 }}>
+                {gamble.desc}
               </div>
 
               {gambPhase==="select"&&(
                 <>
-                  <div className="text-xs italic mb-3" style={mu}>
-                    Pick {gamble.count} coin{gamble.count>1?"s":""} to stake. Heads → metal tier up. Tails → the coin is lost forever.
+                  <div style={{...F, fontSize:12, fontStyle:"italic", color:E.ink, opacity:.75, textAlign:"center", marginBottom:14 }}>
+                    Offer a coin to the void. Heads — its metal ascends. Tails — it is consumed.
                   </div>
-                  {/* Coin picker — only unlocked, unpinned coins */}
                   <div className="grid grid-cols-4 gap-2 max-h-[260px] overflow-y-auto pr-1 mb-3">
                     {coins.filter(c=>!c.locked).slice(0,80).map(c=>{
                       const selected=betIds.includes(c.id);
@@ -349,59 +400,95 @@ export default function Tavern() {
                           onClick={()=>toggleBet(c.id)}
                           className="p-1.5 rounded-md cursor-pointer transition-all"
                           style={{
-                            border:`2px solid ${selected?t.accent:"transparent"}`,
-                            background:selected?`${t.accent}22`:t.surface,
+                            border:`2px solid ${selected?E.cyan:"transparent"}`,
+                            background:selected ? `${E.violet}33` : "rgba(20,12,40,.4)",
+                            boxShadow:selected ? `0 0 12px ${E.cyan}66` : "none",
                           }}>
                           <CoinCanvas coin={c} size={48}/>
                         </button>
                       );
                     })}
                     {coins.filter(c=>!c.locked).length===0 && (
-                      <div className="col-span-4 text-xs italic py-6 text-center" style={mu}>
-                        No unlocked coins to bet — find some on the hunt first.
+                      <div className="col-span-4 text-xs italic py-6 text-center" style={{...F, color:E.muted}}>
+                        Your vault is empty. The void hungers regardless.
                       </div>
                     )}
                   </div>
                   <button
                     disabled={!gambOk}
                     onClick={doGamble}
-                    className="w-full py-2.5 rounded-md font-bold uppercase tracking-[1.5px] text-xs border-none transition-opacity"
+                    className="w-full py-2.5 rounded-md font-bold uppercase tracking-[2px] text-xs border-none transition-all"
                     style={{
                       ...F,
-                      background:gambOk?`linear-gradient(135deg,${t.accentHi},${t.accent})`:t.surface,
-                      color:gambOk?t.accentInk:t.muted,
-                      cursor:gambOk?"pointer":"not-allowed",
-                      opacity:gambOk?1:0.5,
+                      background:gambOk ? `linear-gradient(135deg,${E.violet},${E.cyan})` : "rgba(20,12,40,.5)",
+                      color:gambOk ? "#08051c" : E.muted,
+                      cursor:gambOk ? "pointer" : "not-allowed",
+                      opacity:gambOk ? 1 : 0.5,
+                      boxShadow:gambOk ? `0 0 18px ${E.violet}88` : "none",
                     }}>
-                    {gambOk?"Flip the coin":`Pick ${gamble.count} coin${gamble.count>1?"s":""} to flip`}
+                    {gambOk ? "⟁  Offer to the Void  ⟁" : `Select ${gamble.count} coin${gamble.count>1?"s":""}`}
                   </button>
                 </>
               )}
 
-              {gambPhase==="spinning"&&(
-                <div className="py-10 text-center">
-                  <div className="text-6xl mb-3 animate-spin" style={{ animationDuration:"0.4s" }}>🪙</div>
-                  <div className="text-xs uppercase tracking-[2px] font-bold" style={{...F,color:t.muted}}>Flipping…</div>
+              {/* Spinning — actual selected coin via CoinCanvas in a 3D flip */}
+              {gambPhase==="spinning"&&betCoins[0]&&(
+                <div className="py-10 flex flex-col items-center justify-center gap-4">
+                  <div style={{ width:110, height:110, position:"relative", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    <div style={{
+                      position:"absolute", inset:-20, borderRadius:"50%",
+                      background:`radial-gradient(circle, ${E.violet}66, transparent 70%)`,
+                      animation:"eldritchPulse 1.4s ease-in-out infinite",
+                      pointerEvents:"none",
+                    }}/>
+                    <div style={{
+                      animation: "eldritchCoinFlip 1.6s cubic-bezier(.4,.0,.2,1) infinite",
+                      transformStyle: "preserve-3d",
+                      width: 96, height: 96,
+                      display:"flex", alignItems:"center", justifyContent:"center",
+                    }}>
+                      <CoinCanvas coin={betCoins[0]} size={96}/>
+                    </div>
+                  </div>
+                  <div style={{...FR, fontSize:18, color:E.violetHi, letterSpacing:6, textTransform:"uppercase", textShadow:`0 0 10px ${E.violet}88`, animation:"eldritchPulse 1.4s ease-in-out infinite" }}>
+                    casting…
+                  </div>
                 </div>
               )}
 
               {gambPhase==="result"&&gambResult&&(
-                <div className="py-6 text-center flex flex-col items-center gap-3.5">
-                  <div className="text-5xl">{gambResult.won?"✨":"💀"}</div>
-                  <div className="text-base font-extrabold uppercase tracking-[2px]"
-                       style={{...F,color:gambResult.won?"#7ad888":"#ff8080"}}>
+                <div className="py-6 text-center flex flex-col items-center gap-4">
+                  <div style={{
+                    fontSize:64,
+                    filter:`drop-shadow(0 0 20px ${gambResult.won?E.cyan:E.dread})`,
+                    animation:"eldritchPulse 1.6s ease-in-out infinite",
+                  }}>
+                    {gambResult.won?"✶":"☠"}
+                  </div>
+                  <div style={{
+                    ...FR, fontSize:20, fontWeight:700,
+                    color:gambResult.won?E.cyan:E.dread,
+                    letterSpacing:4, textTransform:"uppercase",
+                    textShadow:`0 0 12px ${gambResult.won?E.cyan:E.dread}aa`,
+                  }}>
                     {gambResult.msg}
                   </div>
                   {gambResult.add[0] && (
-                    <div className="flex flex-col items-center gap-1">
-                      <CoinCanvas coin={gambResult.add[0]} size={88}/>
-                      <div className="text-xs italic" style={mu}>New coin minted</div>
+                    <div className="flex flex-col items-center gap-1.5">
+                      <div style={{
+                        padding:6, borderRadius:"50%",
+                        background:`radial-gradient(circle, ${E.violet}44, transparent 70%)`,
+                        filter:`drop-shadow(0 0 16px ${E.cyan})`,
+                      }}>
+                        <CoinCanvas coin={gambResult.add[0]} size={88}/>
+                      </div>
+                      <div style={{...F, fontSize:11, color:E.muted, letterSpacing:2, textTransform:"uppercase"}}>The void returns this</div>
                     </div>
                   )}
                   <button
                     onClick={resetGamble}
-                    className="px-5 py-2 rounded-md font-bold uppercase tracking-[1.5px] text-xs border-none cursor-pointer"
-                    style={{...F, background:t.surface, color:t.muted, border:`1px solid ${t.border}` }}>
+                    className="px-5 py-2 rounded-md font-bold uppercase tracking-[2px] text-xs border-none cursor-pointer mt-1"
+                    style={{...F, background:"rgba(20,12,40,.6)", color:E.cyan, border:`1px solid ${E.borderHi}`, boxShadow:`0 0 10px ${E.violet}66` }}>
                     Bet again
                   </button>
                 </div>
@@ -409,17 +496,25 @@ export default function Tavern() {
             </div>
           )}
 
-          {/* ── Roulette UI ── */}
-          {gambMode==="roulette"&&(
-            <div className="p-4" style={card}>
-              <div className="text-[11px] uppercase tracking-[1.5px] font-bold mb-2.5" style={{...F,color:t.muted}}>
-                Roulette · stake one coin · 6 sectors
+          {/* ─── ROULETTE ──────────────────────────────────────────── */}
+          {/* Gated on (roulBetCoin || roulResult) so the result UI doesn't
+              collapse the moment onRoulResult removes the bet from
+              `coins` — that was the "breaks after spin" bug. */}
+          {gambMode==="roulette"&&(()=>{
+            const displayCoin = roulBetCoin || roulResult?.betCoin;
+            return (
+            <div style={eldritchPanel}>
+              <div style={{...FR, fontSize:18, color:E.violetHi, letterSpacing:".5px", textAlign:"center", marginBottom:4 }}>
+                The Wheel
+              </div>
+              <div style={{...F, fontSize:11, color:E.muted, letterSpacing:1.5, textTransform:"uppercase", textAlign:"center", marginBottom:14 }}>
+                One coin · six fates · the void decides
               </div>
 
-              {!roulBetCoin&&!roulDone&&(
+              {!displayCoin&&(
                 <>
-                  <div className="text-xs italic mb-3" style={mu}>
-                    Pick a coin to stake. The wheel spins. Outcomes range from <span style={{color:"#ff8080"}}>LOSE</span> (most common) to <span style={{color:"#d070ff"}}>JACKPOT</span> (rare).
+                  <div style={{...F, fontSize:12, fontStyle:"italic", color:E.ink, opacity:.75, textAlign:"center", marginBottom:14 }}>
+                    Choose your offering. The wheel will know.
                   </div>
                   <div className="grid grid-cols-4 gap-2 max-h-[240px] overflow-y-auto pr-1">
                     {coins.filter(c=>!c.locked).slice(0,80).map(c=>(
@@ -427,8 +522,9 @@ export default function Tavern() {
                         onClick={()=>setRoulBetId(c.id)}
                         className="p-1.5 rounded-md cursor-pointer transition-all"
                         style={{
-                          border:`2px solid ${roulBetId===c.id?t.accent:"transparent"}`,
-                          background:roulBetId===c.id?`${t.accent}22`:t.surface,
+                          border:`2px solid ${roulBetId===c.id?E.cyan:"transparent"}`,
+                          background:roulBetId===c.id ? `${E.violet}33` : "rgba(20,12,40,.4)",
+                          boxShadow:roulBetId===c.id ? `0 0 12px ${E.cyan}66` : "none",
                         }}>
                         <CoinCanvas coin={c} size={48}/>
                       </button>
@@ -437,24 +533,47 @@ export default function Tavern() {
                 </>
               )}
 
-              {roulBetCoin&&(
+              {displayCoin&&(
                 <div className="flex flex-col items-center gap-3 py-2">
-                  <RouletteWheel
-                    betCoin={roulBetCoin}
-                    onResult={onRoulResult}
-                    disabled={false}
-                    t={t}
-                  />
+                  <div style={{
+                    padding:12, borderRadius:"50%",
+                    background:`radial-gradient(circle, ${E.violet}22, transparent 70%)`,
+                    filter:`drop-shadow(0 0 24px ${E.violet}88)`,
+                  }}>
+                    <RouletteWheel
+                      betCoin={displayCoin}
+                      onResult={onRoulResult}
+                      disabled={!!roulResult}
+                      t={t}
+                    />
+                  </div>
                   {roulResult&&(
-                    <div className="text-center flex flex-col items-center gap-2">
-                      <div className="text-sm font-extrabold uppercase tracking-[2px]"
-                           style={{...F,color:t.fg}}>
-                        {roulResult.msg||roulResult.outcome}
+                    <div className="text-center flex flex-col items-center gap-2.5">
+                      <div style={{
+                        ...FR, fontSize:18, fontWeight:700,
+                        color:roulResult.won?E.cyan:E.dread,
+                        letterSpacing:4, textTransform:"uppercase",
+                        textShadow:`0 0 12px ${roulResult.won?E.cyan:E.dread}aa`,
+                      }}>
+                        {roulResult.msg||roulResult.sector?.outcome}
                       </div>
+                      {roulResult.add && roulResult.add.length > 0 && (
+                        <div className="flex gap-1.5">
+                          {roulResult.add.slice(0,4).map((c,i)=>(
+                            <div key={i} style={{
+                              padding:3, borderRadius:"50%",
+                              background:`radial-gradient(circle, ${E.cyan}33, transparent 70%)`,
+                              filter:`drop-shadow(0 0 8px ${E.cyan})`,
+                            }}>
+                              <CoinCanvas coin={c} size={44}/>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <button
                         onClick={resetRoulette}
-                        className="px-5 py-2 rounded-md font-bold uppercase tracking-[1.5px] text-xs border-none cursor-pointer mt-1"
-                        style={{...F, background:t.surface, color:t.muted, border:`1px solid ${t.border}` }}>
+                        className="px-5 py-2 rounded-md font-bold uppercase tracking-[2px] text-xs border-none cursor-pointer mt-1"
+                        style={{...F, background:"rgba(20,12,40,.6)", color:E.cyan, border:`1px solid ${E.borderHi}`, boxShadow:`0 0 10px ${E.violet}66` }}>
                         Spin again
                       </button>
                     </div>
@@ -462,9 +581,11 @@ export default function Tavern() {
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
         </div>
-      )}
+        );
+      })()}
 
       {/* ── REPAIR VIEW ── */}
       {tavernView==="repair"&&(()=>{
