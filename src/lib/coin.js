@@ -13,6 +13,7 @@ import {
   METALS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
   RARITIES, MAX_RARITY,
   ARTEFACT_GRADES, SHOVEL_MAX_DUR, TAROT_BY_ID,
+  activeTarotPair,
   TITLES, TITLE_LEVELS,
 } from "./data.js";
 
@@ -362,6 +363,30 @@ export function tarotBuffs(equippedIds) {
     if (c.rarityFloor)      buff.rarityFloor = Math.max(buff.rarityFloor, c.rarityFloor);
     if (c.forgeDiscount)    buff.forgeDiscount += c.forgeDiscount;
     if (c.shinyBonus)       buff.shinyBonus   += c.shinyBonus;
+  }
+
+  // ── PAIR BONUS ──────────────────────────────────────────────────────
+  // Equipping both cards in a TAROT_PAIRS entry layers a bonus on top of
+  // the per-card effects. Same field names — so a "pair adds +0.15 xpMul"
+  // simply sums with the cards' base xpMul values.
+  // Only one pair can be active at a time (you only have 2 slots).
+  const pair = activeTarotPair(equippedIds);
+  if (pair) {
+    if (pair.xpMul)        buff.xpMul        += pair.xpMul;
+    if (pair.marksMul)     buff.marksMul     += pair.marksMul;
+    if (pair.pinSlots)     buff.pinSlots     += pair.pinSlots;
+    if (pair.shinyBonus)   buff.shinyBonus   += pair.shinyBonus;
+    if (pair.rerollRarity) buff.rerollRarity += pair.rerollRarity;
+    if (pair.rarityFloor)  buff.rarityFloor  = Math.max(buff.rarityFloor, pair.rarityFloor);
+    // For guaranteedEvery, the pair value REPLACES the individual cards'
+    // value if it's lower (more frequent guarantees), since the buff
+    // reducer keeps the FIRST non-zero guaranteedEvery from the cards.
+    if (pair.guaranteedEvery && (!buff.guaranteedEvery || pair.guaranteedEvery < buff.guaranteedEvery)) {
+      buff.guaranteedEvery = pair.guaranteedEvery;
+    }
+    if (pair.guaranteedFloor) buff.guaranteedFloor = Math.max(buff.guaranteedFloor, pair.guaranteedFloor);
+    // Expose the active pair so UI can show a badge ("Path of Transcendence active")
+    buff.activePair = pair;
   }
   return buff;
 }

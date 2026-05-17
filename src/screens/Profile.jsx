@@ -1,6 +1,6 @@
 import { useGame } from "../lib/GameContext.js";
 import { rarityScore, unlockedTitles, rune } from "../lib/coin.js";
-import { bannerStyle } from "../lib/data.js";
+import { bannerStyle, activeTarotPair } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
 import TarotCard from "../components/TarotCard.jsx";
 
@@ -283,8 +283,12 @@ export default function Profile() {
         </div>
       ):(
         <>
-          <div className="flex gap-2 overflow-x-auto pb-1.5 px-0.5">
-            {Array.from({length:5}).map((_,i)=>{
+          {/* Equipped slots — exactly MAX_EQUIPPED_TAROTS (currently 2).
+              Previously hard-coded to 5 from an older deck size; now
+              tracks the constant so future tweaks to slot count flow
+              through automatically. */}
+          <div className="flex gap-2 overflow-x-auto pb-1.5 px-0.5 justify-center">
+            {Array.from({length:MAX_EQUIPPED_TAROTS}).map((_,i)=>{
               const cardId=equippedTarots[i];
               if(!cardId)return (
                 <div
@@ -299,7 +303,29 @@ export default function Profile() {
               return <div key={cardId} className="flex-shrink-0"><TarotCard card={tCard} owned equipped size="sm" t={t} onClick={()=>toggleTarot(cardId)}/></div>;
             })}
           </div>
-          {/* Active buffs summary */}
+
+          {/* Active pair badge — visible only when both equipped tarots
+              form one of the TAROT_PAIRS combinations. Mirrors the
+              eldritch-cyan/violet palette so it reads as a special
+              synergy effect not just another buff. */}
+          {(() => {
+            const pair = activeTarotPair(equippedTarots);
+            if (!pair) return null;
+            return (
+              <div className="px-3.5 py-2.5 mt-2.5 rounded-md text-center"
+                style={{
+                  background:"linear-gradient(135deg, rgba(122,76,255,.22), rgba(0,229,255,.18))",
+                  border:"1px solid rgba(0,229,255,.5)",
+                  boxShadow:"0 0 14px rgba(122,76,255,.4)",
+                }}>
+                <div className="text-[10px] font-bold uppercase tracking-[2px]" style={{ ...F, color:"#00e5ff" }}>Pair Active</div>
+                <div className="text-[14px] font-extrabold mt-1" style={{ ...FR, color:"#e8e0ff" }}>{pair.label}</div>
+                <div className="text-[11px] italic mt-0.5" style={{ ...F, color:"#a89ed0" }}>{pair.desc}</div>
+              </div>
+            );
+          })()}
+
+          {/* Active buffs summary (per-card descriptions) */}
           {equippedTarots.length>0&&(
             <div className="px-3.5 py-3 mt-2.5 flex flex-wrap gap-2" style={card}>
               {equippedTarots.map(cid=>{

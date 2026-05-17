@@ -179,61 +179,103 @@ export const MAX_BR = BRUSH_UPS.length - 1;
 export const SHOVEL_MAX_DUR = [null, 40, 60, 90, 130, 180, 250, 350, 500, 700];
 
 /* ─── TAROT ───────────────────────────────────────────────────────────────
-   Twelve cards ordered from least → most powerful. Max 2 equipped.
+   Twelve cards in Major Arcana order (I-XII). Power scales 1 → 12 with the
+   numerals — early cards give a single small passive, mid cards give
+   targeted boosts or QoL, late cards give run-shaping effects, and the
+   final two stack multiple effects.
 
    Effects use existing buff fields consumed by tarotBuffs() in coin.js:
      xpMul, marksMul, pinSlots, shinyBonus, revealRarity, allowSkip,
-     rerollRarity, guaranteedEvery+guaranteedFloor, rarityFloor,
-     forgeDiscount.
-
-   Scaling intent — early cards give a single small passive (XP %, marks %),
-   mid cards give targeted bonuses or QoL (extra display slot, shiny chance),
-   late cards give game-changing buffs (rarity floors, guaranteed rares,
-   forge discount) and the final two stack multiple effects. */
+     rerollRarity, guaranteedEvery+guaranteedFloor, rarityFloor. */
 export const TAROT_CARDS = [
-  // ── 1-4 — Common, single small passives ─────────────────────────────
+  // ── I-IV — Common (passive bonuses) ─────────────────────────────────
   { id:"magician",       title:"The Magician",       roman:"I",   rarity:"common", price:800,  minLvl:5,
     xpMul:0.05,
-    desc:"+5% XP from every find." },
+    desc:"Channel the will of the find. +5% XP from every coin." },
   { id:"high_priestess", title:"The High Priestess", roman:"II",  rarity:"common", price:1100, minLvl:7,
     xpMul:0.10,
-    desc:"+10% XP from every find." },
+    desc:"Hidden knowledge of value. +10% XP from every coin." },
   { id:"empress",        title:"The Empress",        roman:"III", rarity:"common", price:1400, minLvl:9,
-    marksMul:0.10,
-    desc:"+10% marks from selling coins." },
+    marksMul:0.15,
+    desc:"The abundance of the earth. +15% marks from selling." },
   { id:"emperor",        title:"The Emperor",        roman:"IV",  rarity:"common", price:1800, minLvl:11,
-    marksMul:0.20,
-    desc:"+20% marks from selling coins." },
+    marksMul:0.25,
+    desc:"The dominion of trade. +25% marks from selling." },
 
-  // ── 5-8 — Rare, targeted bonuses + QoL ──────────────────────────────
-  { id:"lovers",         title:"The Lovers",         roman:"VI",  rarity:"rare",   price:2200, minLvl:13,
+  // ── V-VIII — Rare (combos and QoL) ──────────────────────────────────
+  { id:"hierophant",     title:"The Hierophant",     roman:"V",   rarity:"rare",   price:2200, minLvl:13,
+    xpMul:0.15, marksMul:0.10,
+    desc:"The teacher's reward. +15% XP · +10% marks." },
+  { id:"lovers",         title:"The Lovers",         roman:"VI",  rarity:"rare",   price:2700, minLvl:15,
     pinSlots:1,
-    desc:"+1 display cabinet slot." },
-  { id:"strength",       title:"Strength",           roman:"VIII",rarity:"rare",   price:2700, minLvl:15,
-    shinyBonus:0.02,
-    desc:"+2% shiny chance when brushing." },
+    desc:"Bond two coins in your cabinet. +1 display slot." },
   { id:"chariot",        title:"The Chariot",        roman:"VII", rarity:"rare",   price:3200, minLvl:17,
-    shinyBonus:0.04, xpMul:0.10,
-    desc:"+4% shiny chance · +10% XP." },
-  { id:"hermit",         title:"The Hermit",         roman:"IX",  rarity:"rare",   price:3800, minLvl:19,
-    revealRarity:true, allowSkip:true,
-    desc:"Lantern reveals coin rarity before brushing. Skip any coin." },
+    shinyBonus:0.03, xpMul:0.05,
+    desc:"Charge the brush. +3% shiny chance · +5% XP." },
+  { id:"strength",       title:"Strength",           roman:"VIII",rarity:"rare",   price:3800, minLvl:19,
+    shinyBonus:0.05,
+    desc:"Brush with the strength of beasts. +5% shiny chance." },
 
-  // ── 9-12 — Legendary, game-changing ─────────────────────────────────
-  { id:"hanged_man",     title:"The Hanged Man",     roman:"XII", rarity:"legendary", price:4500, minLvl:22,
-    rerollRarity:1,
-    desc:"Once per day, reroll the rarity of a coin you just found." },
-  { id:"justice",        title:"Justice",            roman:"XI",  rarity:"legendary", price:5200, minLvl:25,
+  // ── IX-XII — Legendary (run-shaping) ────────────────────────────────
+  // Hermit re-themed around revelation / hidden value rather than the
+  // dig-grid "reveal rarity + skip" effects (which were tied to the
+  // old gameplay loop). 2 daily rerolls is the strongest single-card
+  // reroll effect; the +2% shiny tilts gambling-adjacent luck.
+  { id:"hermit",         title:"The Hermit",         roman:"IX",  rarity:"legendary", price:4500, minLvl:22,
+    rerollRarity:2, xpMul:0.10, shinyBonus:0.02,
+    desc:"The lantern reveals what is hidden. 2 daily rarity rerolls · +2% shiny · +10% XP." },
+  { id:"wheel_of_fortune",title:"Wheel of Fortune",  roman:"X",   rarity:"legendary", price:5200, minLvl:25,
     guaranteedEvery:5, guaranteedFloor:2,
-    desc:"Every 5th find guaranteed Rare or higher." },
-  { id:"wheel_of_fortune",title:"Wheel of Fortune",  roman:"X",   rarity:"legendary", price:5800, minLvl:28,
+    desc:"Fortune turns. Every 5th find guaranteed Rare or higher." },
+  { id:"justice",        title:"Justice",            roman:"XI",  rarity:"legendary", price:5800, minLvl:28,
     guaranteedEvery:3, guaranteedFloor:2, marksMul:0.15,
-    desc:"Every 3rd find guaranteed Rare or higher · +15% marks." },
-  { id:"hierophant",     title:"The Hierophant",     roman:"V",   rarity:"legendary", price:7000, minLvl:32,
-    rarityFloor:1, xpMul:0.20, marksMul:0.20,
-    desc:"All finds guaranteed at least Uncommon · +20% XP · +20% marks." },
+    desc:"The scales tilt your way. Every 3rd find ≥ Rare · +15% marks." },
+  // Hanged Man — apex tier. Rarity floor of 2 forces every find to Rare
+  // or higher (massive). Stacks with daily reroll + meaningful XP/marks.
+  { id:"hanged_man",     title:"The Hanged Man",     roman:"XII", rarity:"legendary", price:7000, minLvl:32,
+    rarityFloor:2, rerollRarity:1, xpMul:0.30, marksMul:0.20,
+    desc:"Sacrifice reshapes the world. All finds ≥ Rare · daily rarity reroll · +30% XP · +20% marks." },
 ];
 export const TAROT_BY_ID = Object.fromEntries(TAROT_CARDS.map(c => [c.id, c]));
+
+/* ─── TAROT PAIRS ─────────────────────────────────────────────────────────
+   Equipping BOTH cards in a pair activates a bonus buff on top of the base
+   effects. Since only 2 tarots can be equipped at a time, a pair fills both
+   slots — the player chooses to commit to a synergy or run two solo cards.
+
+   Buff fields here are layered on top of the individual cards' fields in
+   tarotBuffs() — same field names, same buff format. */
+export const TAROT_PAIRS = [
+  { id:"arcane_mastery",       a:"magician",       b:"high_priestess",
+    label:"Arcane Mastery",    desc:"+15% additional XP",
+    xpMul:0.15 },
+  { id:"imperial_mandate",     a:"empress",        b:"emperor",
+    label:"Imperial Mandate",  desc:"+15% additional marks",
+    marksMul:0.15 },
+  { id:"sacred_union",         a:"hierophant",     b:"lovers",
+    label:"Sacred Union",      desc:"+1 additional display slot",
+    pinSlots:1 },
+  { id:"victorious_resolve",   a:"chariot",        b:"strength",
+    label:"Victorious Resolve",desc:"+4% additional shiny",
+    shinyBonus:0.04 },
+  { id:"convergence_of_fate",  a:"wheel_of_fortune",b:"justice",
+    label:"Convergence of Fate",desc:"Every 2nd find ≥ Rare",
+    guaranteedEvery:2, guaranteedFloor:2 },
+  { id:"path_of_transcendence",a:"hermit",         b:"hanged_man",
+    label:"Path of Transcendence",desc:"+2 additional daily rerolls",
+    rerollRarity:2 },
+];
+export const TAROT_PAIR_BY_ID = Object.fromEntries(TAROT_PAIRS.map(p => [p.id, p]));
+
+// Helper: returns the active pair (if any) for a given equipped-card list.
+// Order of the two ids in `equippedIds` doesn't matter.
+export function activeTarotPair(equippedIds = []) {
+  if (!equippedIds || equippedIds.length < 2) return null;
+  for (const p of TAROT_PAIRS) {
+    if (equippedIds.includes(p.a) && equippedIds.includes(p.b)) return p;
+  }
+  return null;
+}
 // Two equipped at a time — combinations matter, but no card is "always-on".
 export const MAX_EQUIPPED_TAROTS = 2;
 

@@ -115,7 +115,12 @@ export default function Tavern() {
           {shopTab==="tarot"&&(
             <>
               <div className="text-xs mb-3 italic px-0.5" style={mu}>Tarot cards grant a single, build-defining effect while equipped. Maximum 2 active at a time — choose carefully. One copy each.</div>
-              <div className="grid gap-2.5" style={{ gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))" }}>
+              {/* Tarot grid — explicit 3 columns so the 12 cards lay out
+                  cleanly as 4 rows × 3 columns on mobile (rather than the
+                  old auto-fill which could give 2 or 5 columns depending
+                  on viewport width). Drops the gap slightly and shrinks
+                  card text on small screens. */}
+              <div className="grid grid-cols-3 gap-2">
                 {TAROT_CARDS.map(tc=>{
                   const owned=ownedTarots.includes(tc.id);
                   const equipped=equippedTarots.includes(tc.id);
