@@ -1,165 +1,96 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { GAMBLE } from "../../shared/tuning.js";
 
 /* ─── ROULETTE WHEEL ──────────────────────────────────────────────────────
- * Six-sector wheel for the optional gambling tab. Currently disabled in the
- * main flow but kept available for future tavern features. The component is
- * pure canvas — no DOM elements per sector — so it's cheap to animate. */
-/* Sector colour palette — eldritch / cosmic-void register so the wheel
-   matches the rest of the gamble UI. Outcomes from worst → best:
-     LOSE → dread crimson
-     SAME → muted void violet
-     TIER UP → eldritch cyan
-     ×2 → lavender ether
-     TIER +2 → royal cosmic violet
-     JACKPOT → prismatic pink-violet
-*/
-const WSECTORS = [
-  { label:"LOSE",    color:"#2a0814", text:"#ff4d6c", weight:38, outcome:"lose"    },
-  { label:"SAME",    color:"#14102a", text:"#8e7ec0", weight:24, outcome:"same"    },
-  { label:"TIER UP", color:"#06243a", text:"#00e5ff", weight:20, outcome:"up1"     },
-  { label:"×2 BACK", color:"#1a0a38", text:"#b48eff", weight:10, outcome:"x2"      },
-  { label:"TIER +2", color:"#2a1448", text:"#c89aff", weight:6,  outcome:"up2"     },
-  { label:"JACKPOT", color:"#380c44", text:"#ff70d0", weight:2,  outcome:"jackpot" },
-];
-const WTOT = WSECTORS.reduce((s, v) => s + v.weight, 0);
+ * Six weighted sectors. The server picks where it lands; this only shows
+ * the spin. It is rasterised per pixel at its current angle on a 96×96
+ * grid every frame and shown at 3× — the wheel turns, the pixels never
+ * do, which is the same rule pixelform follows for sprites.
+ *
+ *   spinning  true from the moment the stake is placed
+ *   target    null until the server answers, then the sector index
+ *   onLanded  called once the wheel has stopped on it                   */
+export const SECTOR_COLOURS = {
+  lose:    ["#3a1512", "#e98676"],
+  same:    ["#232833", "#98a19a"],
+  up1:     ["#13241c", "#8fd4b4"],
+  x2:      ["#12203a", "#80c0ff"],
+  up2:     ["#24143c", "#c080ff"],
+  jackpot: ["#3a2c10", "#e0b860"],
+};
+const N = 96, SCALE = 3;
+const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
-export default function RouletteWheel({ betCoin, onResult, disabled, t }) {
-  const cvRef  = useRef();
-  const rafRef = useRef();
-  const angRef = useRef(0);
-  const [spinning, setSpinning] = useState(false);
-  const [done, setDone]         = useState(false);
-  const WS = 280;
+export default function RouletteWheel({ spinning, target, onLanded }) {
+  const cvRef = useRef(null);
+  const st = useRef({ ang: 0, raf: 0, mode: "rest", from: 0, to: 0, t0: 0, landed: null });
 
   const secs = useMemo(() => {
+    const tot = GAMBLE.roulette.reduce((s, v) => s + v.weight, 0);
     let cum = 0;
-    return WSECTORS.map(s => {
-      const start = (cum / WTOT) * Math.PI * 2;
-      const span  = (s.weight / WTOT) * Math.PI * 2;
+    return GAMBLE.roulette.map(s => {
+      const start = (cum / tot) * Math.PI * 2, span = (s.weight / tot) * Math.PI * 2;
       cum += s.weight;
-      return { ...s, start, span };
+      return { ...s, start, span, fill: hex(SECTOR_COLOURS[s.outcome][0]), edge: hex(SECTOR_COLOURS[s.outcome][1]) };
     });
   }, []);
 
-  const drawW = useCallback((angle) => {
+  const draw = angle => {
     const cv = cvRef.current; if (!cv) return;
-    const ctx = cv.getContext("2d");
-    const cx = WS / 2, cy = WS / 2, R = WS / 2 - 16;
-    ctx.clearRect(0, 0, WS, WS);
-
-    // Outer eldritch rim — deep violet base with cyan/violet tinted gradient
-    // (matches the rest of the gamble UI). Cyan outline for the glow read.
-    ctx.beginPath(); ctx.arc(cx, cy, R + 12, 0, Math.PI * 2);
-    const br = ctx.createLinearGradient(0, 0, WS, WS);
-    br.addColorStop(0,  "#1a0a38");
-    br.addColorStop(.4, "#2e1a5a");
-    br.addColorStop(.6, "#0e0820");
-    br.addColorStop(1,  "#1a0a38");
-    ctx.fillStyle = br; ctx.fill();
-    ctx.strokeStyle = "#7a4cff"; ctx.lineWidth = 2; ctx.stroke();
-
-    // Tick marks — major ticks cyan, minor ticks dim violet
-    for (let i = 0; i < 48; i++) {
-      const a = angle + (i / 48) * Math.PI * 2;
-      const maj = i % 8 === 0;
-      ctx.beginPath();
-      ctx.moveTo(cx + (R + 2) * Math.cos(a), cy + (R + 2) * Math.sin(a));
-      ctx.lineTo(cx + (R + (maj ? 12 : 6)) * Math.cos(a), cy + (R + (maj ? 12 : 6)) * Math.sin(a));
-      ctx.strokeStyle = maj ? "#00e5ff" : "#5a3aa0";
-      ctx.lineWidth   = maj ? 2 : 1;
-      ctx.stroke();
-    }
-
-    // Sectors
-    for (const sec of secs) {
-      const a0 = angle + sec.start, a1 = a0 + sec.span;
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath();
-      ctx.fillStyle = sec.color; ctx.fill();
-      ctx.strokeStyle = "#08051c"; ctx.lineWidth = 1.5; ctx.stroke();
-      // Subtle highlight gradient — cooler tint for the eldritch look
-      const hg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-      hg.addColorStop(0, "rgba(122,76,255,.08)");
-      hg.addColorStop(1, "rgba(0,0,0,.18)");
-      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, a0, a1); ctx.closePath();
-      ctx.fillStyle = hg; ctx.fill();
-      // Sector label, rotated to follow the wheel
-      const mid = a0 + sec.span / 2;
-      const lx = cx + R * .65 * Math.cos(mid), ly = cy + R * .65 * Math.sin(mid);
-      ctx.save(); ctx.translate(lx, ly); ctx.rotate(mid + Math.PI / 2);
-      ctx.fillStyle = sec.text; ctx.font = "700 9px Outfit,sans-serif";
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(sec.label, 0, 0); ctx.restore();
-    }
-
-    // Hub — cosmic gradient (cyan core fading to deep void)
-    ctx.beginPath(); ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-    const hg2 = ctx.createRadialGradient(cx - 6, cy - 6, 0, cx, cy, 22);
-    hg2.addColorStop(0, "#3a1e8a");
-    hg2.addColorStop(1, "#08051c");
-    ctx.fillStyle = hg2; ctx.fill();
-    ctx.strokeStyle = "#00e5ff"; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = "#00e5ff"; ctx.font = "14px serif";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("✶", cx, cy + 1);
-
-    // Pointer arrow — cyan with violet halo
-    ctx.beginPath(); ctx.moveTo(cx - 10, 2); ctx.lineTo(cx + 10, 2); ctx.lineTo(cx, 22); ctx.closePath();
-    ctx.fillStyle = "#00e5ff"; ctx.fill();
-    ctx.strokeStyle = "#08051c"; ctx.lineWidth = 1.5; ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, 5, 4, 0, Math.PI * 2);
-    ctx.fillStyle = "#7a4cff"; ctx.fill();
-  }, [secs]);
-
-  useEffect(() => { drawW(0); }, [drawW]);
-  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
-
-  const doSpin = () => {
-    if (spinning || !betCoin || disabled) return;
-    setSpinning(true); setDone(false);
-    // Pick the outcome by weight, then animate to land on its mid-angle
-    const roll = Math.random() * WTOT;
-    let cum = 0, chosen = secs[0];
-    for (const sc of secs) { cum += sc.weight; if (roll <= cum) { chosen = sc; break; } }
-    const jitter      = (Math.random() - .5) * chosen.span * .65;
-    const sectorMid   = chosen.start + chosen.span / 2 + jitter;
-    const finalAng    = -Math.PI / 2 - sectorMid;
-    let delta = finalAng - angRef.current;
-    delta = ((delta % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    delta += (8 + Math.floor(Math.random() * 4)) * Math.PI * 2;  // 8–11 full rotations
-    const startA = angRef.current;
-    const dur    = 4600;
-    const t0     = performance.now();
-    const tick = (now) => {
-      const tt = Math.min(1, (now - t0) / dur);
-      const ease = 1 - Math.pow(1 - tt, 4);  // quartic ease-out
-      angRef.current = startA + delta * ease;
-      drawW(angRef.current);
-      if (tt < 1) {
-        rafRef.current = requestAnimationFrame(tick);
-      } else {
-        setSpinning(false); setDone(true); onResult(chosen);
+    const ctx = cv.getContext("2d"), img = ctx.createImageData(N, N), d = img.data;
+    const c = (N - 1) / 2, R = N / 2 - 6;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const dx = x - c, dy = y - c, r = Math.hypot(dx, dy), i = (y * N + x) * 4;
+      let col = null;
+      if (r <= R + 4 && r > R) col = r > R + 2 ? [0, 0, 0] : [74, 84, 102];           // the rim
+      else if (r <= 5) col = r > 3 ? [0, 0, 0] : [224, 184, 96];                       // the hub
+      else if (r <= R) {
+        const a = (((Math.atan2(dy, dx) - angle) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        const s = secs.find(q => a >= q.start && a < q.start + q.span) || secs[0];
+        const nearEdge = Math.min(a - s.start, s.start + s.span - a) * r < 0.8;
+        col = nearEdge ? [0, 0, 0] : r > R - 4 ? s.edge : s.fill;
       }
-    };
-    rafRef.current = requestAnimationFrame(tick);
+      if (col) { d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255; }
+    }
+    ctx.putImageData(img, 0, 0);
+    // the pointer, fixed at the top
+    ctx.fillStyle = "#000"; ctx.fillRect(c - 4, 0, 9, 9);
+    ctx.fillStyle = "#e0b860"; ctx.fillRect(c - 3, 0, 7, 3); ctx.fillRect(c - 2, 3, 5, 2); ctx.fillRect(c - 1, 5, 3, 2); ctx.fillRect(c, 7, 1, 1);
   };
 
-  const ready = !spinning && betCoin && !disabled;
-  return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:16 }}>
-      <canvas ref={cvRef} width={WS} height={WS} style={{ maxWidth:"100%", filter:"drop-shadow(0 12px 32px rgba(0,0,0,.5))" }}/>
-      <button onClick={doSpin} disabled={!ready} style={{
-          padding:"14px 40px", borderRadius:14,
-          border:`1px solid ${ready ? "#a06820" : t.border}`,
-          cursor:ready ? "pointer" : "not-allowed",
-          background:ready ? "linear-gradient(135deg,#3a1c08,#7a4a18)" : t.surfaceHi,
-          fontFamily:"Outfit,sans-serif", fontWeight:800, fontSize:15,
-          color:ready ? "#f0c850" : t.muted,
-          letterSpacing:2, textTransform:"uppercase",
-          transition:"all .18s",
-          boxShadow:ready ? "0 6px 18px rgba(212,160,23,.18)" : "none",
-        }}>
-        {spinning ? "⟳ Spinning…" : done ? "🎰 Spin Again" : "🎰 Spin the Wheel"}
-      </button>
-    </div>
-  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { draw(st.current.ang); }, []);
+
+  useEffect(() => {
+    const s = st.current;
+    const calm = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    cancelAnimationFrame(s.raf);
+    if (!spinning) { s.mode = "rest"; s.landed = null; return; }
+
+    if (target != null && s.landed !== target) {
+      const q = secs[target];
+      const final = -Math.PI / 2 - (q.start + q.span / 2 + (Math.random() - 0.5) * q.span * 0.6);
+      let delta = (((final - s.ang) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      delta += (calm ? 0 : 4) * Math.PI * 2;
+      s.mode = "land"; s.from = s.ang; s.to = s.ang + delta; s.t0 = performance.now(); s.landed = target;
+    } else if (target == null) s.mode = "free";
+
+    const dur = calm ? 300 : 3200;
+    const tick = now => {
+      if (s.mode === "free") s.ang += 0.22;
+      else if (s.mode === "land") {
+        const k = Math.min(1, (now - s.t0) / dur);
+        s.ang = s.from + (s.to - s.from) * (1 - Math.pow(1 - k, 4));
+        if (k >= 1) { s.mode = "rest"; draw(s.ang); onLanded?.(); return; }
+      } else return;
+      draw(s.ang);
+      s.raf = requestAnimationFrame(tick);
+    };
+    s.raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(s.raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spinning, target]);
+
+  return <canvas ref={cvRef} width={N} height={N} role="img" aria-label="Roulette wheel"
+                 style={{ width: N * SCALE, height: N * SCALE, maxWidth: "100%", imageRendering: "pixelated", display: "block" }}/>;
 }

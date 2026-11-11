@@ -1,641 +1,164 @@
+import { useMemo, useState } from "react";
 import { useGame } from "../lib/GameContext.js";
-import { bannerStyle } from "../lib/data.js";
+import { useUi } from "../ui/Overlay.jsx";
+import { feel } from "../lib/feel.js";
+import { coinRarity, mkCoin } from "../lib/coin.js";
+import { METALS, RARITIES, MAX_TIER } from "../lib/data.js";
+import { GAMBLE } from "../../shared/tuning.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
-import RouletteWheel from "../components/RouletteWheel.jsx";
+import RouletteWheel, { SECTOR_COLOURS } from "../components/RouletteWheel.jsx";
+import { CoinTile } from "./Vault.jsx";
 
 /* ─── TAVERN ──────────────────────────────────────────────────────────────
- * Three sub-tabs:
- *   shop   → Banners / Titles purchase grids
- *   duels  → Active duels list + create/accept/decline/flip
- *
- * Shop tab is the cosmetic store. Locked items show level/cost gates.
- * Duels show pending invitations (incoming need stake, outgoing are pending),
- * active duels (both staked, ready to flip), and resolved ones (with result).
- *
- * BUG FIX during migration: NEW_PICKAXE_COST was used but not destructured.
- * Now properly added to GameContext exposure and destructured here. */
+ * Three wagers, all staked in coins, all resolved by the server:
+ *   TOSS      one coin. It rises a metal, or it is gone.
+ *   CRUCIBLE  three of one metal. All rise, or you keep one.
+ *   ROULETTE  one coin on a six-sector wheel.
+ * The odds are printed. Locked coins cannot be staked. */
+const pct = p => Math.round(p * 100) + "%";
+const GAMES = {
+  toss:     { label: "TOSS",     need: 1, rule: `1 COIN · ${pct(GAMBLE.toss.win)} IT RISES A METAL · OTHERWISE IT IS LOST` },
+  crucible: { label: "CRUCIBLE", need: 3, rule: `3 COINS OF ONE METAL · ${pct(GAMBLE.crucible.win)} ALL THREE RISE · OTHERWISE YOU KEEP ONE` },
+  roulette: { label: "ROULETTE", need: 1, rule: "1 COIN ON THE WHEEL" },
+};
+const OUTCOME_LINE = {
+  lose: "IT IS GONE", same: "IT CAME BACK", up1: "IT ROSE A METAL", x2: "IT CAME BACK TWICE",
+  up2: "IT ROSE TWO METALS", jackpot: "JACKPOT",
+};
+const hydrate = r => Object.assign(mkCoin(r.seed, 1, r.metalIdx), { id: r.id, shiny: !!r.shiny, rarity: r.rarity });
+const wheelTotal = GAMBLE.roulette.reduce((s, v) => s + v.weight, 0);
+
 export default function Tavern() {
-  const {
-    coins, marks, tab, tavernView, shopTab,
-    frame, level,
-    selectedTitle, ownedFrames, ownedTitles,
-    duelsList,
-    setTavernView, setShopTab, setFrame, setSelectedTitle, setTab,
-    buyFrame, buyTitle, promptAcceptDuel, declineDuel, flipDuel,
-    // Gambling — wired in MintForge, presented in the Gamble sub-view
-    gambMode, setGambMode, betIds, betCoins, toggleBet,
-    gambPhase, gambResult, gamble, doGamble, gambOk, resetGamble,
-    roulBetId, setRoulBetId, roulBetCoin, roulResult, roulDone,
-    onRoulResult, resetRoulette,
-    METALS, FRAMES, BANNERS, TITLES, PREMIUM_TITLES,
-    t, isDark, F, FR, mu, microLabel, sectionTitle, card,
-  } = useGame();
+  const g = useGame(), ui = useUi();
+  const [game, setGame] = useState("toss");
+  const [ids, setIds] = useState([]);
+  const [phase, setPhase] = useState("pick");       // pick | working | result
+  const [stake, setStake] = useState([]);           // snapshot of the staked coins
+  const [res, setRes] = useState(null);
+  const def = GAMES[game];
+
+  const free = useMemo(() => g.coins.filter(c => !c.locked), [g.coins]);
+  const first = free.find(c => c.id === ids[0]);
+  // the crucible takes one metal: once the first coin is in, only its kin can follow
+  const eligible = game === "crucible" && first ? free.filter(c => c.metalIdx === first.metalIdx) : free;
+  const ready = ids.length === def.need;
+
+  const reset = () => { setIds([]); setPhase("pick"); setRes(null); setStake([]); };
+  const pick = id => {
+    feel("tap");
+    setIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length >= def.need ? [...prev.slice(1), id] : [...prev, id]);
+  };
+
+  const play = async () => {
+    const coins = ids.map(id => g.coins.find(c => c.id === id)).filter(Boolean);
+    if (coins.length !== def.need) return;
+    const prize = coins.find(c => c.shiny || coinRarity(c) >= 3);
+    if (prize && !(await ui.confirm({
+      title: "STAKE THIS ONE?",
+      body: `${prize.shiny ? "A SHINY " : "A "}${RARITIES[coinRarity(prize)].name} ${METALS[prize.metalIdx].name} COIN. YOU MAY NOT SEE IT AGAIN.`,
+      yes: "STAKE IT", tone: "danger",
+    }))) return;
+
+    setStake(coins); setPhase("working"); setRes(null); feel("offer");
+    const started = Date.now();
+    try {
+      const r = await g.act("gamble", { game, coinIds: ids });
+      const out = { ...r, minted: r.minted.map(hydrate), keptCoins: coins.filter(c => r.kept.includes(c.id)) };
+      setRes(out);
+      if (game !== "roulette") {
+        // let the toss or the pour play out before the answer shows
+        setTimeout(() => finish(out), Math.max(0, 1500 - (Date.now() - started)));
+      }
+    } catch (e) { ui.toast(e.message, "bad"); feel("error"); reset(); }
+  };
+  const finish = out => {
+    setPhase("result");
+    feel(out.won ? "win" : "lose");
+    ui.say(`${OUTCOME_LINE[out.outcome] || (out.won ? "YOU WON" : "YOU LOST")}.`);
+  };
+
   return (
-    <div className="animate-fadein">
-      {/* Hero banner — warm tavern firelight */}
-      <div
-        className="-mx-3.5 -mt-[18px] mb-4 px-[22px] pt-9 pb-5 relative overflow-hidden"
-        style={{
-          background:isDark?"linear-gradient(to bottom,#0e0604 0%,#1a0a04 40%,transparent 100%)":"linear-gradient(to bottom,#f0d8a8 0%,#e8c898 40%,transparent 100%)",
-          borderBottom:`1px solid ${isDark?"rgba(180,80,20,.18)":"rgba(180,80,20,.2)"}`,
-        }}>
-        <div
-          className="absolute bottom-0 left-[15%] w-[90px] h-[90px] rounded-full pointer-events-none animate-flicker"
-          style={{ background:`radial-gradient(circle,${isDark?"rgba(220,90,15,.32)":"rgba(220,90,15,.3)"},transparent 70%)`, filter:"blur(2px)", animationDuration:"2s" }}/>
-        <div
-          className="absolute bottom-0 right-[18%] w-[70px] h-[70px] rounded-full pointer-events-none animate-flicker"
-          style={{ background:`radial-gradient(circle,${isDark?"rgba(220,90,15,.26)":"rgba(220,90,15,.24)"},transparent 70%)`, filter:"blur(2px)", animationDuration:"1.6s" }}/>
-        <div className="flex gap-3.5 items-center relative">
-          <div className="text-[40px]" style={{ filter:"drop-shadow(0 2px 6px rgba(220,90,15,.4))" }}>🍺</div>
-          <div className="flex-1">
-            <div className="font-extrabold text-[22px] mb-[3px] -tracking-[0.3px]" style={{ ...FR, color:t.text }}>The Tavern</div>
-            <div className="text-xs italic" style={mu}>Trade with the merchant. Wager with the dealer. Mend your pickaxe.</div>
-          </div>
-          <div
-            className="text-[13px] font-extrabold tracking-[0.5px] tabular-nums flex items-center gap-1 px-[11px] py-1.5 rounded-lg"
-            style={{ ...F, color:t.accent, background:"rgba(212,160,23,.1)", border:`1px solid ${t.borderHi}` }}>
-            ◈ {marks.toLocaleString()}
-          </div>
+    <div className="page">
+      <div className="page-in">
+        <h1 className="t-big" style={{ margin: 0 }}>TAVERN</h1>
+        <div className="seg" role="tablist" aria-label="Game">
+          {Object.entries(GAMES).map(([id, d]) => (
+            <button key={id} role="tab" aria-selected={game === id} disabled={phase === "working"}
+                    onClick={() => { setGame(id); reset(); }}>{d.label}</button>
+          ))}
         </div>
-      </div>
 
-      {/* Top-level view switcher */}
-      <div
-        className="flex gap-1.5 mb-3.5 p-1 rounded-[11px]"
-        style={{ background:t.surface, border:`1px solid ${t.border}` }}>
-        {/* Duels hidden until friend-vs-friend coin battles are reworked.
-            Duel state, API, accept/decline/flip handlers, list — all preserved
-            in MintForge.jsx + functions/api/duels/. Just not navigable. */}
-        {[["shop","◈","Shop"],["gamble","🎲","Gamble"]].map(([id,ic,lbl])=>{
-          const active=tavernView===id;
-          return (
-            <button
-              key={id}
-              onClick={()=>setTavernView(id)}
-              className="flex-1 py-[9px] rounded-lg border-none cursor-pointer text-[11px] font-extrabold uppercase tracking-[1.5px] transition-all duration-200 flex items-center justify-center gap-[5px] relative"
-              style={{
-                ...F,
-                background:active?`linear-gradient(135deg,${t.accentHi},${t.accent})`:"transparent",
-                color:active?t.accentInk:t.muted,
-              }}>
-              <span className="text-[13px]">{ic}</span>{lbl}
-            </button>
-          );
-        })}
-      </div>
+        <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+          <p className="t-dim" style={{ margin: 0 }}>{def.rule}</p>
 
-      {/* ── SHOP VIEW ── */}
-      {tavernView==="shop"&&(
-        <div className="animate-fadein">
-          {/* Shop sub-tab picker */}
-          <div
-            className="flex gap-[5px] mb-3 p-[3px] rounded-[9px]"
-            style={{ background:t.surfaceHi, border:`1px solid ${t.border}` }}>
-            {[["banners","🖼","Banners"],["titles","✦","Titles"]].map(([id,ic,lbl])=>{
-              const active=shopTab===id;
-              return (
-                <button
-                  key={id}
-                  onClick={()=>setShopTab(id)}
-                  className="flex-1 py-[7px] rounded-[7px] border-none cursor-pointer text-[10px] font-extrabold uppercase tracking-[1.5px] transition-all duration-150 flex items-center justify-center gap-[5px]"
-                  style={{ ...F, background:active?(isDark?"#2a1a08":"#f0e0c0"):"transparent", color:active?t.accent:t.muted }}>
-                  <span className="text-xs">{ic}</span>{lbl}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* ── TAROT SUB-TAB ── */}
-          {/* The tarot shop went with the tarot system. */}
-          {shopTab==="banners"&&(
+          {game === "roulette" && (
             <>
-              <div className="text-xs mb-3 italic px-0.5" style={mu}>Premium banners — once owned, equip them in your Profile. Standard frames are XP-unlocked separately.</div>
-              <div className="flex flex-col gap-3">
-                {Object.entries(FRAMES).filter(([,f])=>f.premium).map(([id,f])=>{
-                  const owned=ownedFrames.includes(id);
-                  const equipped=frame===id;
-                  const lvlMet=level>=f.minLvl;
-                  const canBuy=!owned&&lvlMet&&marks>=f.price;
-                  return (
-                    <div
-                      key={id}
-                      className="rounded-xl overflow-hidden"
-                      style={{
-                        border:`1px solid ${equipped?f.accent:t.border}`,
-                        background:t.surface,
-                        boxShadow:equipped?`0 0 14px ${f.accent}55`:"none",
-                      }}>
-                      <div
-                        className="h-[120px] relative"
-                        style={{ ...bannerStyle(id), filter:owned?"none":"grayscale(.4) brightness(.75)" }}>
-                        <div className="absolute inset-0" style={{ background:"linear-gradient(to bottom,transparent 30%,rgba(0,0,0,.55) 100%)" }}/>
-                        <div className="absolute bottom-2 left-3 right-3 flex items-end justify-between gap-2.5">
-                          <div>
-                            <div className="font-extrabold text-lg text-white -tracking-[0.3px]" style={{ ...FR, textShadow:"0 2px 6px rgba(0,0,0,.8)" }}>{f.lbl}</div>
-                            <div className="text-[10px] italic tracking-[0.3px]" style={{ ...F, color:"#e0d0a0", textShadow:"0 1px 3px rgba(0,0,0,.9)" }}>{f.desc}</div>
-                          </div>
-                          <div
-                            className="text-[9px] font-bold px-2 py-[3px] rounded-[5px] tracking-[1.5px] uppercase whitespace-nowrap"
-                            style={{ ...F, color:lvlMet?"#fff":"#f0a060", background:"rgba(0,0,0,.55)" }}>
-                            Lv {f.minLvl}+
-                          </div>
-                        </div>
-                      </div>
-                      <div className="px-3 py-2.5">
-                        {!owned?(
-                          <button
-                            onClick={()=>{ if(canBuy&&confirm(`Purchase ${f.lbl} banner for ◈${f.price}?`))buyFrame(id); }}
-                            disabled={!canBuy}
-                            className="w-full py-[9px] rounded-lg text-[11px] font-extrabold uppercase tracking-[1.5px]"
-                            style={{
-                              ...F,
-                              border:`1px solid ${canBuy?t.accent:t.border}`,
-                              background:canBuy?`linear-gradient(135deg,${t.accentHi},${t.accent})`:t.surfaceHi,
-                              cursor:canBuy?"pointer":"not-allowed",
-                              color:canBuy?t.accentInk:t.muted,
-                            }}>
-                            {!lvlMet?`Reach Lv ${f.minLvl}`:marks<f.price?`Need ◈ ${f.price.toLocaleString()}`:`Purchase · ◈ ${f.price.toLocaleString()}`}
-                          </button>
-                        ):equipped?(
-                          <div className="text-[11px] font-extrabold text-center uppercase tracking-[1.5px] py-[9px]" style={{ ...F, color:t.success }}>✓ Currently equipped</div>
-                        ):(
-                          <button
-                            onClick={()=>setFrame(id)}
-                            className="w-full py-[9px] rounded-lg cursor-pointer text-[11px] font-extrabold uppercase tracking-[1.5px]"
-                            style={{ ...F, border:`1px solid ${t.borderHi}`, background:t.surfaceHi, color:t.text }}>
-                            Equip
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <RouletteWheel spinning={phase === "working"} target={res ? res.sector : null} onLanded={() => res && finish(res)}/>
               </div>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px" }}>
+                {GAMBLE.roulette.map(s => (
+                  <li key={s.outcome} className="between" style={{ color: SECTOR_COLOURS[s.outcome][1] }}>
+                    <span className="row"><i aria-hidden style={{ width: 8, height: 8, background: SECTOR_COLOURS[s.outcome][1] }}/>{s.label}</span>
+                    <span>{pct(s.weight / wheelTotal)}</span>
+                  </li>
+                ))}
+              </ul>
             </>
           )}
 
-          {/* ── TITLES SUB-TAB ── */}
-          {shopTab==="titles"&&(
-            <>
-              <div className="text-xs mb-3 italic px-0.5" style={mu}>Premium titles with animated text effects. Equip in your Profile after purchase.</div>
-              <div className="flex flex-col gap-2.5">
-                {PREMIUM_TITLES.map(ti=>{
-                  const owned=ownedTitles.includes(ti.id);
-                  const equipped=selectedTitle===ti.label;
-                  const lvlMet=level>=ti.minLvl;
-                  const canBuy=!owned&&lvlMet&&marks>=ti.price;
-                  return (
-                    <div
-                      key={ti.id}
-                      className="px-4 py-3.5"
-                      style={{
-                        ...card,
-                        border:`1px solid ${equipped?t.accent:t.border}`,
-                        boxShadow:equipped?`0 0 12px ${t.accent}33`:"none",
-                      }}>
-                      <div className="flex items-center justify-between gap-3 mb-2.5">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-lg -tracking-[0.2px] mb-1" style={FR}><span className={`title-${ti.effect}`}>{ti.label}</span></div>
-                          <div className="text-[10px] uppercase tracking-[1.5px] font-bold" style={{ ...F, color:t.muted }}>Lv {ti.minLvl}+ · ◈ {ti.price.toLocaleString()}</div>
-                        </div>
-                      </div>
-                      {!owned?(
-                        <button
-                          onClick={()=>{ if(canBuy&&confirm(`Purchase title "${ti.label}" for ◈${ti.price}?`))buyTitle(ti.id); }}
-                          disabled={!canBuy}
-                          className="w-full py-2 rounded-[7px] text-[10px] font-extrabold uppercase tracking-[1.5px]"
-                          style={{
-                            ...F,
-                            border:`1px solid ${canBuy?t.accent:t.border}`,
-                            background:canBuy?`linear-gradient(135deg,${t.accentHi},${t.accent})`:t.surfaceHi,
-                            cursor:canBuy?"pointer":"not-allowed",
-                            color:canBuy?t.accentInk:t.muted,
-                          }}>
-                          {!lvlMet?`Reach Lv ${ti.minLvl}`:marks<ti.price?`Need ◈ ${ti.price.toLocaleString()}`:`Purchase`}
-                        </button>
-                      ):equipped?(
-                        <div className="text-[10px] font-extrabold text-center uppercase tracking-[1.5px] py-2" style={{ ...F, color:t.success }}>✓ Currently equipped</div>
-                      ):(
-                        <button
-                          onClick={()=>setSelectedTitle(ti.label)}
-                          className="w-full py-2 rounded-[7px] cursor-pointer text-[10px] font-extrabold uppercase tracking-[1.5px]"
-                          style={{ ...F, border:`1px solid ${t.borderHi}`, background:t.surfaceHi, color:t.text }}>
-                          Equip
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
+          {phase === "working" && game !== "roulette" && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "16px 0" }} role="status" aria-label="Working">
+              {stake.map((c, i) => (
+                <div key={c.id} style={{ animation: `coinFlip .5s steps(8) ${i * 0.12}s infinite` }}><CoinCanvas coin={c} size={64}/></div>
+              ))}
+            </div>
           )}
-        </div>
-      )}
 
-      {/* ── GAMBLE VIEW ──────────────────────────────────────────────────
-          Two minigames: Coin Toss and the Roulette wheel. Coin Toss is a
-          50/50 — win → coin's metal tier bumps up one, lose → coin lost.
-          Roulette is six-sector weighted: most likely outcomes punish you,
-          rare outcomes are big upside. All state lives in MintForge so this
-          view is mostly presentation. */}
-      {/* ════════════════════════════════════════════════════════════════
-            ELDRITCH GAMBLE VIEW
-            ───────────────────────────────────────────────────────────────
-            Deliberate visual departure from the rest of the tavern: the
-            gambling games are framed as cosmic offerings to an indifferent
-            god. Deep void backdrops, violet/cyan glow, drifting starfield,
-            pixel-art ornament corners, and the actual coin you're betting
-            renders via CoinCanvas mid-flip instead of a generic emoji. */}
-      {tavernView==="gamble"&&(()=>{
-        // Eldritch palette — kept inline so it doesn't leak to the rest
-        // of the tavern's warmer brown/tan look.
-        const E = {
-          bg:"#08051c", bgPanel:"rgba(14,8,40,.65)",
-          violet:"#7a4cff", violetHi:"#9a72ff",
-          cyan:"#00e5ff", gold:"#f0c850",
-          dread:"#ff3d6c", ink:"#e8e0ff", muted:"#8278b0",
-          border:"rgba(122,76,255,.35)", borderHi:"rgba(0,229,255,.6)",
-        };
-        // Reusable cosmic-void panel. Multi-layer radial-gradient star
-        // pattern is pure CSS, no JS, no images — keeps the deploy lean.
-        const eldritchPanel = {
-          background:
-            "radial-gradient(1px 1px at 12% 18%, rgba(255,255,255,.6) 50%, transparent 51%), "+
-            "radial-gradient(1px 1px at 78% 32%, rgba(180,200,255,.5) 50%, transparent 51%), "+
-            "radial-gradient(1px 1px at 41% 67%, rgba(220,180,255,.6) 50%, transparent 51%), "+
-            "radial-gradient(1px 1px at 86% 81%, rgba(255,200,220,.4) 50%, transparent 51%), "+
-            "radial-gradient(1px 1px at 24% 88%, rgba(160,200,255,.5) 50%, transparent 51%), "+
-            "radial-gradient(2px 2px at 60% 12%, rgba(255,255,255,.3) 50%, transparent 51%), "+
-            "radial-gradient(ellipse at 50% 50%, rgba(40,20,80,.4), rgba(8,5,28,.95) 70%), "+
-            E.bg,
-          border:`1px solid ${E.border}`, borderRadius:14, padding:18,
-          boxShadow:`0 0 24px rgba(122,76,255,.18), inset 0 0 32px rgba(0,229,255,.04)`,
-          position:"relative", overflow:"hidden",
-        };
-        return (
-        <div className="animate-fadein flex flex-col gap-3.5">
-          <style>{`
-            @keyframes eldritchCoinFlip {
-              0%   { transform: perspective(600px) rotateY(0deg)   scale(0.9); filter: brightness(1) drop-shadow(0 0 12px #00e5ff); }
-              25%  { transform: perspective(600px) rotateY(450deg) scaleX(0.15) scale(1.05); filter: brightness(1.4) drop-shadow(0 0 18px #9a72ff); }
-              50%  { transform: perspective(600px) rotateY(900deg) scale(1.1); filter: brightness(1.6) drop-shadow(0 0 22px #00e5ff); }
-              75%  { transform: perspective(600px) rotateY(1350deg) scaleX(0.15) scale(1.05); filter: brightness(1.4) drop-shadow(0 0 18px #9a72ff); }
-              100% { transform: perspective(600px) rotateY(1800deg) scale(0.95); filter: brightness(1) drop-shadow(0 0 12px #f0c850); }
-            }
-            @keyframes eldritchPulse {
-              0%, 100% { opacity: 0.5; transform: scale(1); }
-              50%      { opacity: 1;   transform: scale(1.04); }
-            }
-          `}</style>
+          {phase === "result" && res && (
+            <div className="rise" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, textAlign: "center" }}>
+              <div className="t-big" style={{ color: res.won ? "var(--magic)" : "var(--blood)" }}>{OUTCOME_LINE[res.outcome]}</div>
+              {(res.minted.length > 0 || res.keptCoins.length > 0) && (
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+                  {[...res.minted, ...res.keptCoins].map(c => (
+                    <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                      <CoinCanvas coin={c} size={64}/>
+                      <span style={{ color: METALS[c.metalIdx].hl }}>{METALS[c.metalIdx].name}</span>
+                      <span style={{ color: RARITIES[coinRarity(c)].color }}>{RARITIES[coinRarity(c)].name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!res.won && res.keptCoins.length > 0 && <div className="t-dim">YOU KEPT ONE.</div>}
+              <div className="t-magic">+{res.xp} XP</div>
+              <button className="btn btn-gold" style={{ minWidth: 200 }} onClick={reset}>AGAIN</button>
+            </div>
+          )}
 
-          {/* Mode picker (eldritch) */}
-          <div className="flex gap-1.5 p-1 rounded-[10px]"
-               style={{ background:E.bgPanel, border:`1px solid ${E.border}` }}>
-            {[["toss","◐","Coin Toss"],["roulette","✶","Roulette"]].map(([id,ic,lbl])=>{
-              const active=gambMode===id;
-              return (
-                <button key={id}
-                  onClick={()=>{ setGambMode(id); resetGamble(); resetRoulette(); }}
-                  className="flex-1 py-2 rounded-md border-none cursor-pointer text-[11px] font-bold uppercase tracking-[1.5px] transition-all flex items-center justify-center gap-1.5"
-                  style={{
-                    ...F,
-                    background:active?`linear-gradient(135deg,${E.violet},${E.cyan})`:"transparent",
-                    color:active?"#08051c":E.muted,
-                    boxShadow: active ? `0 0 16px ${E.violet}88` : "none",
-                  }}>
-                  <span style={{ fontSize: 16, color: active ? "#08051c" : E.cyan }}>{ic}</span>{lbl}
+          {phase === "pick" && (
+            free.length < def.need ? (
+              <p style={{ margin: 0 }}>{g.coins.length ? "NOT ENOUGH UNLOCKED COINS TO STAKE." : "YOU HAVE NO COINS TO STAKE."}</p>
+            ) : (
+              <>
+                <div className="between">
+                  <span className="t-label">STAKE {ids.length} / {def.need}</span>
+                  {game === "crucible" && first && <span style={{ color: METALS[first.metalIdx].hl }}>{METALS[first.metalIdx].name} ONLY</span>}
+                  {first && first.metalIdx >= MAX_TIER && game !== "roulette" && <span className="t-blood">ALREADY THE HIGHEST METAL</span>}
+                </div>
+                <div className="grid-coins" style={{ maxHeight: 300, overflowY: "auto", padding: 2 }}>
+                  {eligible.slice(0, 120).map(c => (
+                    <CoinTile key={c.id} coin={c} selected={ids.includes(c.id)} onClick={() => pick(c.id)}/>
+                  ))}
+                </div>
+                <button className="btn btn-danger btn-block" disabled={!ready} onClick={play}>
+                  {ready ? (game === "roulette" ? "SPIN" : game === "toss" ? "TOSS IT" : "POUR THEM IN") : `PICK ${def.need - ids.length} MORE`}
                 </button>
-              );
-            })}
-          </div>
-
-          {/* ─── COIN TOSS ─────────────────────────────────────────── */}
-          {gambMode==="toss"&&(
-            <div style={eldritchPanel}>
-              <div style={{...FR, fontSize:18, color:E.violetHi, letterSpacing:".5px", textAlign:"center", marginBottom:4 }}>
-                {gamble.label}
-              </div>
-              <div style={{...F, fontSize:11, color:E.muted, letterSpacing:1.5, textTransform:"uppercase", textAlign:"center", marginBottom:14 }}>
-                {gamble.desc}
-              </div>
-
-              {gambPhase==="select"&&(
-                <>
-                  <div style={{...F, fontSize:12, fontStyle:"italic", color:E.ink, opacity:.75, textAlign:"center", marginBottom:14 }}>
-                    Offer a coin to the void. Heads — its metal ascends. Tails — it is consumed.
-                  </div>
-                  <div className="grid grid-cols-4 gap-2 max-h-[260px] overflow-y-auto pr-1 mb-3">
-                    {coins.filter(c=>!c.locked).slice(0,80).map(c=>{
-                      const selected=betIds.includes(c.id);
-                      return (
-                        <button key={c.id}
-                          onClick={()=>toggleBet(c.id)}
-                          className="p-1.5 rounded-md cursor-pointer transition-all"
-                          style={{
-                            border:`2px solid ${selected?E.cyan:"transparent"}`,
-                            background:selected ? `${E.violet}33` : "rgba(20,12,40,.4)",
-                            boxShadow:selected ? `0 0 12px ${E.cyan}66` : "none",
-                          }}>
-                          <CoinCanvas coin={c} size={48}/>
-                        </button>
-                      );
-                    })}
-                    {coins.filter(c=>!c.locked).length===0 && (
-                      <div className="col-span-4 text-xs italic py-6 text-center" style={{...F, color:E.muted}}>
-                        Your vault is empty. The void hungers regardless.
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    disabled={!gambOk}
-                    onClick={doGamble}
-                    className="w-full py-2.5 rounded-md font-bold uppercase tracking-[2px] text-xs border-none transition-all"
-                    style={{
-                      ...F,
-                      background:gambOk ? `linear-gradient(135deg,${E.violet},${E.cyan})` : "rgba(20,12,40,.5)",
-                      color:gambOk ? "#08051c" : E.muted,
-                      cursor:gambOk ? "pointer" : "not-allowed",
-                      opacity:gambOk ? 1 : 0.5,
-                      boxShadow:gambOk ? `0 0 18px ${E.violet}88` : "none",
-                    }}>
-                    {gambOk ? "⟁  Offer to the Void  ⟁" : `Select ${gamble.count} coin${gamble.count>1?"s":""}`}
-                  </button>
-                </>
-              )}
-
-              {/* Spinning — actual selected coin via CoinCanvas in a 3D flip */}
-              {gambPhase==="spinning"&&betCoins[0]&&(
-                <div className="py-10 flex flex-col items-center justify-center gap-4">
-                  <div style={{ width:110, height:110, position:"relative", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    <div style={{
-                      position:"absolute", inset:-20, borderRadius:"50%",
-                      background:`radial-gradient(circle, ${E.violet}66, transparent 70%)`,
-                      animation:"eldritchPulse 1.4s ease-in-out infinite",
-                      pointerEvents:"none",
-                    }}/>
-                    <div style={{
-                      animation: "eldritchCoinFlip 1.6s cubic-bezier(.4,.0,.2,1) infinite",
-                      transformStyle: "preserve-3d",
-                      width: 96, height: 96,
-                      display:"flex", alignItems:"center", justifyContent:"center",
-                    }}>
-                      <CoinCanvas coin={betCoins[0]} size={96}/>
-                    </div>
-                  </div>
-                  <div style={{...FR, fontSize:18, color:E.violetHi, letterSpacing:6, textTransform:"uppercase", textShadow:`0 0 10px ${E.violet}88`, animation:"eldritchPulse 1.4s ease-in-out infinite" }}>
-                    casting…
-                  </div>
-                </div>
-              )}
-
-              {gambPhase==="result"&&gambResult&&(
-                <div className="py-6 text-center flex flex-col items-center gap-4">
-                  <div style={{
-                    fontSize:64,
-                    filter:`drop-shadow(0 0 20px ${gambResult.won?E.cyan:E.dread})`,
-                    animation:"eldritchPulse 1.6s ease-in-out infinite",
-                  }}>
-                    {gambResult.won?"✶":"☠"}
-                  </div>
-                  <div style={{
-                    ...FR, fontSize:20, fontWeight:700,
-                    color:gambResult.won?E.cyan:E.dread,
-                    letterSpacing:4, textTransform:"uppercase",
-                    textShadow:`0 0 12px ${gambResult.won?E.cyan:E.dread}aa`,
-                  }}>
-                    {gambResult.msg}
-                  </div>
-                  {gambResult.add[0] && (
-                    <div className="flex flex-col items-center gap-1.5">
-                      <div style={{
-                        padding:6, borderRadius:"50%",
-                        background:`radial-gradient(circle, ${E.violet}44, transparent 70%)`,
-                        filter:`drop-shadow(0 0 16px ${E.cyan})`,
-                      }}>
-                        <CoinCanvas coin={gambResult.add[0]} size={88}/>
-                      </div>
-                      <div style={{...F, fontSize:11, color:E.muted, letterSpacing:2, textTransform:"uppercase"}}>The void returns this</div>
-                    </div>
-                  )}
-                  <button
-                    onClick={resetGamble}
-                    className="px-5 py-2 rounded-md font-bold uppercase tracking-[2px] text-xs border-none cursor-pointer mt-1"
-                    style={{...F, background:"rgba(20,12,40,.6)", color:E.cyan, border:`1px solid ${E.borderHi}`, boxShadow:`0 0 10px ${E.violet}66` }}>
-                    Bet again
-                  </button>
-                </div>
-              )}
-            </div>
+              </>
+            )
           )}
-
-          {/* ─── ROULETTE ──────────────────────────────────────────── */}
-          {/* Gated on (roulBetCoin || roulResult) so the result UI doesn't
-              collapse the moment onRoulResult removes the bet from
-              `coins` — that was the "breaks after spin" bug. */}
-          {gambMode==="roulette"&&(()=>{
-            const displayCoin = roulBetCoin || roulResult?.betCoin;
-            return (
-            <div style={eldritchPanel}>
-              <div style={{...FR, fontSize:18, color:E.violetHi, letterSpacing:".5px", textAlign:"center", marginBottom:4 }}>
-                The Wheel
-              </div>
-              <div style={{...F, fontSize:11, color:E.muted, letterSpacing:1.5, textTransform:"uppercase", textAlign:"center", marginBottom:14 }}>
-                One coin · six fates · the void decides
-              </div>
-
-              {!displayCoin&&(
-                <>
-                  <div style={{...F, fontSize:12, fontStyle:"italic", color:E.ink, opacity:.75, textAlign:"center", marginBottom:14 }}>
-                    Choose your offering. The wheel will know.
-                  </div>
-                  <div className="grid grid-cols-4 gap-2 max-h-[240px] overflow-y-auto pr-1">
-                    {coins.filter(c=>!c.locked).slice(0,80).map(c=>(
-                      <button key={c.id}
-                        onClick={()=>setRoulBetId(c.id)}
-                        className="p-1.5 rounded-md cursor-pointer transition-all"
-                        style={{
-                          border:`2px solid ${roulBetId===c.id?E.cyan:"transparent"}`,
-                          background:roulBetId===c.id ? `${E.violet}33` : "rgba(20,12,40,.4)",
-                          boxShadow:roulBetId===c.id ? `0 0 12px ${E.cyan}66` : "none",
-                        }}>
-                        <CoinCanvas coin={c} size={48}/>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {displayCoin&&(
-                <div className="flex flex-col items-center gap-3 py-2">
-                  <div style={{
-                    padding:12, borderRadius:"50%",
-                    background:`radial-gradient(circle, ${E.violet}22, transparent 70%)`,
-                    filter:`drop-shadow(0 0 24px ${E.violet}88)`,
-                  }}>
-                    <RouletteWheel
-                      betCoin={displayCoin}
-                      onResult={onRoulResult}
-                      disabled={!!roulResult}
-                      t={t}
-                    />
-                  </div>
-                  {roulResult&&(
-                    <div className="text-center flex flex-col items-center gap-2.5">
-                      <div style={{
-                        ...FR, fontSize:18, fontWeight:700,
-                        color:roulResult.won?E.cyan:E.dread,
-                        letterSpacing:4, textTransform:"uppercase",
-                        textShadow:`0 0 12px ${roulResult.won?E.cyan:E.dread}aa`,
-                      }}>
-                        {roulResult.msg||roulResult.sector?.outcome}
-                      </div>
-                      {roulResult.add && roulResult.add.length > 0 && (
-                        <div className="flex gap-1.5">
-                          {roulResult.add.slice(0,4).map((c,i)=>(
-                            <div key={i} style={{
-                              padding:3, borderRadius:"50%",
-                              background:`radial-gradient(circle, ${E.cyan}33, transparent 70%)`,
-                              filter:`drop-shadow(0 0 8px ${E.cyan})`,
-                            }}>
-                              <CoinCanvas coin={c} size={44}/>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <button
-                        onClick={resetRoulette}
-                        className="px-5 py-2 rounded-md font-bold uppercase tracking-[2px] text-xs border-none cursor-pointer mt-1"
-                        style={{...F, background:"rgba(20,12,40,.6)", color:E.cyan, border:`1px solid ${E.borderHi}`, boxShadow:`0 0 10px ${E.violet}66` }}>
-                        Spin again
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            );
-          })()}
-        </div>
-        );
-      })()}
-
-      {/* ── REPAIR VIEW ── */}
-      {/* The repair tab went with the pickaxe durability system. */}
-
-      {/* ── DUELS VIEW ── friend coin battles */}
-      {tavernView==="duels"&&(
-        <div className="animate-fadein">
-          <div className="px-1 pb-3.5 text-xs italic leading-[1.55]" style={mu}>
-            Stake a coin against a friend's. Best of three flips. Winner takes both.
-            <br/><span className="opacity-70">Visit a friend's profile to send a challenge.</span>
-          </div>
-          {duelsList.length===0?(
-            <div className="text-center px-[18px] py-8" style={{ ...card, borderStyle:"dashed" }}>
-              <div className="text-[36px] mb-2 opacity-40">⚔</div>
-              <div className="text-[13px] max-w-[280px] mx-auto leading-[1.55]" style={mu}>No active duels. Find a friend in the Social tab and challenge them to a coin battle.</div>
-              <button
-                onClick={()=>setTab("social")}
-                className="mt-3.5 px-[18px] py-2 rounded-[9px] cursor-pointer font-bold text-[11px] uppercase tracking-[2px]"
-                style={{ ...F, border:`1px solid ${t.borderHi}`, background:`${t.accent}1a`, color:t.accent }}>
-                Find Friend →
-              </button>
-            </div>
-          ):(
-            <div className="flex flex-col gap-2.5">
-              {duelsList.map(d=>{
-                const isChallenger=d.role==="challenger";
-                const myCoin=isChallenger?d.challengerCoin:d.challengedCoin;
-                const theirCoin=isChallenger?d.challengedCoin:d.challengerCoin;
-                const theirName=isChallenger?d.challengedUsername:d.challengerUsername;
-                const theirFrame=isChallenger?d.challengedFrame:d.challengerFrame;
-                const needsMyStake=d.status==="pending"&&!isChallenger;
-                const awaitingTheirStake=d.status==="pending"&&isChallenger;
-                const readyToFlip=d.status==="ready";
-                const hoursLeft=Math.max(0,Math.ceil((d.expiresAt-Date.now())/(60*60*1000)));
-                return (
-                  <div
-                    key={d.id}
-                    className="p-[13px] flex flex-col gap-[11px]"
-                    style={{ ...card, borderColor:readyToFlip?t.success+"66":needsMyStake?t.accent+"66":t.border }}>
-                    {/* Header: friend's identity + status pill */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[9px]" style={{ ...microLabel, color:t.muted }}>{isChallenger?"You vs":"Challenged by"}</span>
-                        <span className="text-[13px] font-extrabold tracking-[0.3px] overflow-hidden text-ellipsis whitespace-nowrap" style={{ ...F, color:t.text }}>{theirName}</span>
-                      </div>
-                      <span
-                        className="text-[8px] px-2 py-[3px] rounded-md tracking-[1.5px]"
-                        style={{
-                          ...microLabel,
-                          background:readyToFlip?(isDark?"#0e2810":"#e8f8ee"):needsMyStake?(isDark?"#1a1408":"#fff5e8"):(isDark?"#1a1408":"#f4ebd8"),
-                          color:readyToFlip?t.success:needsMyStake?t.accent:t.muted,
-                        }}>
-                        {readyToFlip?"Ready":needsMyStake?"Your move":"Pending"}
-                      </span>
-                    </div>
-                    {/* Stakes — your coin vs theirs */}
-                    <div className="flex items-center justify-center gap-3.5 py-1.5">
-                      <div className="flex flex-col items-center gap-[5px]">
-                        <span className="text-[8px]" style={{ ...microLabel, color:t.muted }}>YOU STAKE</span>
-                        {myCoin?<CoinCanvas coin={myCoin} size={56}/>:(
-                          <div
-                            className="w-[56px] h-[56px] rounded-full flex items-center justify-center text-lg"
-                            style={{ border:`2px dashed ${t.border}`, color:t.muted }}>?</div>
-                        )}
-                      </div>
-                      <span className="text-lg opacity-50 font-bold" style={{ ...F, color:t.muted }}>vs</span>
-                      <div className="flex flex-col items-center gap-[5px]">
-                        <span className="text-[8px]" style={{ ...microLabel, color:t.muted }}>THEY STAKE</span>
-                        {theirCoin?<CoinCanvas coin={theirCoin} size={56}/>:(
-                          <div
-                            className="w-[56px] h-[56px] rounded-full flex items-center justify-center text-lg"
-                            style={{ border:`2px dashed ${t.border}`, color:t.muted }}>?</div>
-                        )}
-                      </div>
-                    </div>
-                    {/* Action row */}
-                    <div className="flex gap-[7px] items-center">
-                      {needsMyStake&&(
-                        <button
-                          onClick={()=>promptAcceptDuel(d)}
-                          className="flex-1 py-[9px] rounded-lg text-[11px] font-extrabold uppercase tracking-[1.5px]"
-                          style={{ ...F, border:`1px solid ${t.accent}`, background:`linear-gradient(135deg,${t.accentHi},${t.accent})`, cursor:"pointer", color:t.accentInk }}>
-                          Accept · Set Stake
-                        </button>
-                      )}
-                      {readyToFlip&&(
-                        <button
-                          onClick={()=>flipDuel(d)}
-                          className="flex-1 py-[9px] rounded-lg text-[11px] font-extrabold uppercase tracking-[1.5px]"
-                          style={{
-                            ...F,
-                            border:`1px solid ${t.success}`,
-                            background:isDark?"linear-gradient(135deg,#0e3818,#1e6028)":"linear-gradient(135deg,#d8f5e0,#a8e8c0)",
-                            cursor:"pointer",
-                            color:t.success,
-                          }}>
-                          ⚔ Flip the Coins
-                        </button>
-                      )}
-                      {awaitingTheirStake&&(
-                        <div className="flex-1 py-[9px] text-center text-[9px] tracking-[1.5px]" style={{ ...microLabel, color:t.muted }}>
-                          Awaiting their stake · {hoursLeft}h left
-                        </div>
-                      )}
-                      <button
-                        onClick={()=>{ if(confirm("Decline this duel?"))declineDuel(d.id); }}
-                        className="px-3.5 py-[9px] rounded-lg text-[10px] font-bold uppercase tracking-[1.5px] cursor-pointer"
-                        style={{ ...F, border:`1px solid ${t.border}`, background:"transparent", color:t.muted }}>
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+        </section>
+        <p className="t-label" style={{ margin: 0, textAlign: "center" }}>WAGERS ARE COINS ONLY. NOTHING HERE COSTS OR PAYS REAL MONEY.</p>
+      </div>
     </div>
   );
 }

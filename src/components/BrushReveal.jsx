@@ -1,11 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { drawCoin, RNG } from "../lib/coin.js";
 import { METALS, BA } from "../lib/data.js";
+import { brush as brushSprite } from "../lib/forms.js";
+import Sprite from "../ui/Sprite.jsx";
 
 /* Local rendering constants — only used inside BrushReveal so they live here.
  *   RS = render size of the coin/dirt canvas (180px square)
  *   BW/BH = brush ellipse width/height
- *   SS = sampling stride for measuring how much dirt is cleared */
+ *   SS = sampling stride for measuring how much dirt is cleared
+ *
+ * THE BRUSHING ITSELF IS UNCHANGED from the original game: the same dirt,
+ * the same brush, the same 78% threshold. Two things differ around it.
+ * Whether the coin is shiny was decided by the server when the chest was
+ * opened, so nothing is rolled here; and the cursor is a pixel brush
+ * rather than an emoji. */
 const RS = 180;
 const BW = 28;
 const BH = 10;
@@ -14,12 +22,13 @@ const SS = 4;
 /* Two-canvas reveal: bottom canvas is the painted coin, top canvas is dirt
  * that the player brushes away. Sampling at stride SS measures what fraction
  * of dirt remains; once below ~22% transparent we trigger the reveal. */
-export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, onRevealed, t }) {
+export default function BrushReveal({ coin, brushAlpha = BA, onRevealed, onProgress }) {
   const coinRef = useRef();
   const dirtRef = useRef();
   const prevRef = useRef(null);
   const downRef = useRef(false);
   const chkRef  = useRef(0);
+  const doneRef = useRef(false);
   const m       = METALS[coin.metalIdx];
 
   const [pct, setPct]       = useState(0);
@@ -33,24 +42,20 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
   const [cursor, setCursor] = useState({ x: -100, y: -100 });
   const [hovering, setHovering] = useState(false);
 
-  // Paint the coin once. Prefer the high-res illustrated coin image
-  // (matches what's shown elsewhere in the game), fall back to the
-  // procedural canvas painter if the image fails to load (404, etc).
+  // Paint the coin once, with the same generator the vault uses, so the
+  // coin you brush is the coin you keep. Its shine waits for the reveal.
   useEffect(() => {
     const cv = coinRef.current;
     if (!cv) return;
-    cv.width = RS; cv.height = RS;
-    const ctx = cv.getContext("2d");
-    // The coin is painted by the procedural generator, the same one the
-    // vault and the profile use. There is no image variant any more —
-    // one renderer, so the coin you brush is the coin you keep.
-    drawCoin(cv, coin, RS);
+    drawCoin(cv, { ...coin, shiny: false }, RS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coin.seed, coin.metalIdx]);
 
   // Paint the dirt overlay — pseudo-random rocks, particles, scratches
   useEffect(() => {
     const cv = dirtRef.current; if (!cv) return;
     const ctx = cv.getContext("2d");
+    doneRef.current = false;
     ctx.clearRect(0, 0, RS, RS);
     ctx.save(); ctx.beginPath(); ctx.arc(RS/2, RS/2, RS/2 - 1, 0, Math.PI*2); ctx.clip();
     ctx.fillStyle = "#1e1208"; ctx.fillRect(0, 0, RS, RS);
@@ -74,6 +79,14 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
     ctx.restore();
   }, [coin.seed]);
 
+  const finish = useCallback(() => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    dirtRef.current?.getContext("2d").clearRect(0, 0, RS, RS);
+    setPct(1); setGleam(true);
+    setTimeout(() => onRevealed(), 950);
+  }, [onRevealed]);
+
   const sample = useCallback(() => {
     const cv = dirtRef.current; if (!cv) return;
     const ctx = cv.getContext("2d"); const half = RS / 2;
@@ -87,13 +100,10 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
     }
     const p = Math.min(1, tr / Math.max(1, tot));
     setPct(p);
-    if (p > .78) {
-      const isShiny = Math.random() < shinyChance;
-      ctx.clearRect(0, 0, RS, RS);
-      setPct(1); setGleam(true);
-      setTimeout(() => onRevealed(isShiny), 950);
-    }
-  }, [onRevealed, shinyChance]);
+    onProgress?.(p);
+    if (p > .78 && !doneRef.current) finish();
+  }, [onProgress, finish]);
+
 
   const stroke = useCallback((x, y, px, py) => {
     const cv = dirtRef.current; if (!cv) return;
@@ -162,45 +172,39 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
     setHovering(false);
   }, []);
 
-  const hint = pct < .12 ? "Hold and drag to brush"
-             : pct < .45 ? "Keep brushing..."
-             : pct < .78 ? "Almost clean!"
+  const hint = pct < .12 ? "HOLD AND DRAG TO BRUSH"
+             : pct < .45 ? "KEEP BRUSHING"
+             : pct < .78 ? "ALMOST CLEAN"
              : "";
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:14, userSelect:"none" }}>
-      <div style={{ position:"relative", width:RS, height:RS, borderRadius:"50%", overflow:"visible", flexShrink:0, cursor:"none", boxShadow:`0 0 0 6px ${t.surface},0 0 0 7px ${t.borderHi},0 18px 40px rgba(0,0,0,.5),inset 0 0 30px rgba(0,0,0,.4)` }}>
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:16, userSelect:"none" }}>
+      <div style={{ position:"relative", width:RS, height:RS, borderRadius:"50%", overflow:"visible", flexShrink:0, cursor:"none", boxShadow:"0 0 0 4px #000, 0 0 0 6px var(--line-hi)" }}>
         <div style={{ position:"absolute", inset:0, borderRadius:"50%", overflow:"hidden" }}>
-          <canvas ref={coinRef} style={{ imageRendering:"pixelated", position:"absolute", top:0, left:0, width:RS, height:RS }}/>
-          <canvas ref={dirtRef} width={RS} height={RS}
-                  style={{ position:"absolute", top:0, left:0, touchAction:"none" }}
+          <canvas ref={coinRef} aria-hidden style={{ imageRendering:"pixelated", position:"absolute", top:0, left:0, width:RS, height:RS }}/>
+          <canvas ref={dirtRef} width={RS} height={RS} role="img" aria-label="A coin under a crust of dirt"
+                  style={{ position:"absolute", top:0, left:0, touchAction:"none", imageRendering:"auto" }}
                   onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp} onMouseLeave={onUp}
                   onMouseEnter={() => setHovering(true)}
                   onTouchMove={onMove} onTouchStart={onDown} onTouchEnd={onUp}/>
-          {gleam && <div style={{ position:"absolute", top:0, left:0, width:"60%", height:"100%", background:`linear-gradient(108deg,transparent,${m.hl}dd 50%,transparent)`, animation:"gleam .9s ease-out forwards", pointerEvents:"none", mixBlendMode:"screen" }}/>}
-          <div style={{ position:"absolute", inset:0, borderRadius:"50%", border:`2px solid rgba(255,255,255,${pct*.18+.04})`, pointerEvents:"none" }}/>
+          {gleam && <div style={{ position:"absolute", top:0, left:0, width:"60%", height:"100%", background:`linear-gradient(108deg,transparent,${m.hl}dd 50%,transparent)`, animation:"gleam .9s ease-out forwards", pointerEvents:"none" }}/>}
         </div>
-        {/* Brush cursor: positioned in canvas-local coords. Visible only
-            while pointer is over the canvas (mouse hover OR active touch).
-            Renders OUTSIDE the overflow:hidden circle so the brush handle
-            can extend past the round window naturally. */}
-        {hovering && (
-          <div style={{
-            position:"absolute",
-            left: cursor.x, top: cursor.y,
-            pointerEvents:"none",
-            transform:"translate(-50%,-50%)",
-            fontSize:28,
-            filter:"drop-shadow(0 1px 2px rgba(0,0,0,.6))",
-          }}>🖌️</div>
+        {/* The brush: positioned in canvas-local coords and drawn outside
+            the round window so its handle can run past the edge. */}
+        {hovering && pct < 1 && (
+          <div style={{ position:"absolute", left:cursor.x, top:cursor.y, pointerEvents:"none", transform:"translate(-20%,-80%)" }}>
+            <Sprite make={brushSprite} dep="brush" scale={2}/>
+          </div>
         )}
       </div>
       {pct < 1 && (
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:6, width:RS }}>
-          <div style={{ width:"100%", height:5, background:t.faint, borderRadius:3, overflow:"hidden", border:`1px solid ${t.border}` }}>
-            <div style={{ width:`${pct*100}%`, height:"100%", background:`linear-gradient(to right,${t.accentDim},${m.hl})`, transition:"width .08s", boxShadow:`0 0 8px ${m.hl}66` }}/>
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8, width:RS }}>
+          <div className="meter" style={{ width:"100%" }} role="progressbar" aria-label="Dirt cleared" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct*100)}>
+            <i style={{ width:`${Math.min(100, pct / .78 * 100)}%`, background:m.hl }}/>
           </div>
-          {hint && <div style={{ fontFamily:"Outfit,sans-serif", fontSize:12, color:t.muted, fontWeight:500, letterSpacing:.5 }}>{hint}</div>}
+          <div className="t-label" style={{ minHeight:18 }}>{hint}</div>
+          {/* brushing is a drag; this is the way through for anyone who cannot drag */}
+          <button className="sr-only" onClick={finish}>Brush the coin clean</button>
         </div>
       )}
     </div>

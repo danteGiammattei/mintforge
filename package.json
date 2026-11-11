@@ -1,24 +1,35 @@
 {
   "name": "mintforge",
   "private": true,
-  "version": "2.0.0",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "slice-coins": "node tools/slice-coins.mjs"
+    "lint": "eslint .",
+    "test": "node --test \"tests/*.test.js\"",
+    "sim": "node tools/simulate.mjs",
+    "db:local": "wrangler d1 execute mintforge --local --file=schema.sql",
+    "serve": "wrangler pages dev dist --port 8788",
+    "check": "npm run lint && npm test && npm run build"
   },
   "dependencies": {
+    "@fontsource/silkscreen": "^5.3.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.5.0",
-    "postcss": "^8.5.14",
-    "tailwindcss": "^3.4.19",
-    "vite": "^5.4.11"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "sharp": "^0.34.5"
+    "@eslint/js": "^9.39.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^17.14.0",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^3.4.19",
+    "vite": "^5.4.11",
+    "wrangler": "^4.160.1"
   }
 }

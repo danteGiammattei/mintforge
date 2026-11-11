@@ -1,198 +1,145 @@
+import { useMemo, useState } from "react";
 import { useGame } from "../lib/GameContext.js";
-import { coinRarity } from "../lib/coin.js";
+import { useUi } from "../ui/Overlay.jsx";
+import { feel } from "../lib/feel.js";
+import { coinRarity, coinValue } from "../lib/coin.js";
+import { METALS, RARITIES } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
+import CoinModal from "../components/CoinModal.jsx";
+import PixelIcon from "../ui/PixelIcon.jsx";
 
 /* ─── VAULT ───────────────────────────────────────────────────────────────
- * Grid of all owned coins, with metal-tier filter pills and a select-mode
- * for bulk operations. Pinned coins (manually pinned or auto-top by rarity)
- * get a metal-toned background gradient.
- *
- * Interactions:
- *  - Click          → open CoinModal
- *  - Double-tap     → toggle pin
- *  - Select mode    → multi-select for bulk-sell (skips locked)
- *
- * State + actions come entirely from GameContext; this component is a pure
- * view layer.
- *
- * STYLING NOTES (Tailwind migration):
- *  - Static layout/typography → Tailwind classes (flex, gap, font-*, etc.)
- *  - Theme-token colors      → still via inline `t.X` for now (mixed-mode)
- *  - Dynamic per-metal/rarity colors → inline style (the true variables)
- *  - One-off arbitrary values → Tailwind arbitrary syntax `text-[11px]`
- *  - Animations              → Tailwind animation utilities (animate-fadein)
- */
-export default function Vault() {
-  const {
-    coins, filter, pinnedIds,
-    selectMode, selectedIds, selectedTotal, visCoins, autoTop,
-    setSelectMode, setSelectedIds, setFilter, setSelectedCoin, setTab,
-    togglePin, bulkSell,
-    METALS, RARITIES,
-    t, F, VT, FR, mu, microLabel, sectionTitle, card, isDark,
-  } = useGame();
+ * Every clean coin you own. Filter by metal, sort, tap to inspect; SELECT
+ * turns taps into a multi-select for selling several at once. Selling is
+ * decided by the server — the figures here are what it will pay. */
+const SORTS = [
+  ["new",    "NEWEST", null],
+  ["rarity", "RAREST", (a, b) => coinRarity(b) - coinRarity(a) || b.metalIdx - a.metalIdx],
+  ["value",  "VALUE",  (a, b) => coinValue(b) - coinValue(a)],
+];
+
+export function CoinTile({ coin, selected, pinned, disabled, onClick, label }) {
+  const m = METALS[coin.metalIdx], r = RARITIES[coinRarity(coin)];
   return (
-    <div className="animate-fadein">
-      {/* Header bar — title + count + select toggle */}
-      <div className="flex items-baseline justify-between mb-3.5 px-0.5 gap-2">
-        <div style={sectionTitle}>The Vault</div>
-        <div className="flex items-center gap-2">
-          <div style={microLabel}>{coins.length} {coins.length===1?"coin":"coins"}</div>
-          {coins.length>0&&(
-            <button
-              onClick={()=>{setSelectMode(s=>!s);setSelectedIds(new Set());}}
-              className="px-2.5 py-1 rounded-md cursor-pointer text-[10px] font-bold uppercase tracking-[1.5px] transition-all duration-150"
-              style={{
-                fontFamily:"Outfit,sans-serif",
-                border:`1px solid ${selectMode?t.accent:t.border}`,
-                background:selectMode?`${t.accent}22`:t.surface,
-                color:selectMode?t.accent:t.muted,
-              }}>
-              {selectMode?"Cancel":"Select"}
+    <button className="tile" aria-pressed={selected ? true : undefined} disabled={disabled} onClick={onClick}
+            style={{ borderTopColor: r.color }}
+            aria-label={label || `${r.name} ${m.name} coin, ${coin.raw}${coin.shiny ? ", shiny" : ""}${coin.locked ? ", locked" : ""}`}>
+      <CoinCanvas coin={coin} size={64}/>
+      <span aria-hidden style={{ color: m.hl, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{coin.raw}</span>
+      <span aria-hidden style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 4, color: "var(--candle)" }}>
+        {coin.shiny && <PixelIcon name="spark" size={11}/>}
+        {coin.locked && <PixelIcon name="lock" size={11}/>}
+        {pinned && <PixelIcon name="pin" size={11}/>}
+      </span>
+    </button>
+  );
+}
+
+export default function Vault() {
+  const g = useGame(), ui = useUi();
+  const [filter, setFilter] = useState(-1);
+  const [sort, setSort] = useState("new");
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState(() => new Set());
+  const [openId, setOpenId] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const pinnedSet = useMemo(() => new Set(g.showcase.filter(Boolean).map(c => c.id)), [g.showcase]);
+  const counts = useMemo(() => METALS.map((_, i) => g.coins.filter(c => c.metalIdx === i).length), [g.coins]);
+  const shown = useMemo(() => {
+    const list = filter === -1 ? g.coins : g.coins.filter(c => c.metalIdx === filter);
+    const cmp = SORTS.find(s => s[0] === sort)?.[2];
+    return cmp ? [...list].sort(cmp) : list;
+  }, [g.coins, filter, sort]);
+  const open = g.coins.find(c => c.id === openId) || null;
+  const pickedCoins = g.coins.filter(c => picked.has(c.id) && !c.locked);
+  const pickedTotal = pickedCoins.reduce((s, c) => s + coinValue(c), 0);
+
+  const sell = async (coins) => {
+    const total = coins.reduce((s, c) => s + coinValue(c), 0);
+    const ok = await ui.confirm({
+      title: coins.length === 1 ? "SELL THIS COIN?" : `SELL ${coins.length} COINS?`,
+      body: `FOR ${total.toLocaleString()} MARKS. THIS CANNOT BE UNDONE.`, yes: "SELL", tone: "danger",
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const r = await g.sell(coins.map(c => c.id));
+      feel("sell");
+      ui.toast(`SOLD FOR ${r.marks.toLocaleString()} MARKS`);
+      setOpenId(null); setPicked(new Set()); setSelecting(false);
+    } catch (e) { ui.toast(e.message, "bad"); feel("error"); }
+    setBusy(false);
+  };
+
+  const tap = coin => {
+    if (!selecting) { feel("tap"); setOpenId(coin.id); return; }
+    setPicked(prev => { const n = new Set(prev); n.has(coin.id) ? n.delete(coin.id) : n.add(coin.id); return n; });
+  };
+
+  return (
+    <div className="page">
+      <div className="page-in" style={{ paddingBottom: selecting ? 96 : 24 }}>
+        <div className="between">
+          <h1 className="t-big" style={{ margin: 0 }}>VAULT</h1>
+          <div className="row">
+            <span className="t-label">{g.coins.length} {g.coins.length === 1 ? "COIN" : "COINS"}</span>
+            {g.coins.length > 0 && (
+              <button className={`btn ${selecting ? "btn-gold" : ""}`} aria-pressed={selecting}
+                      onClick={() => { setSelecting(s => !s); setPicked(new Set()); }}>{selecting ? "DONE" : "SELECT"}</button>
+            )}
+          </div>
+        </div>
+
+        {g.coins.length === 0 ? (
+          <div className="panel" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="t-title">THE VAULT IS EMPTY</div>
+            <p className="t-dim" style={{ margin: 0 }}>
+              {g.dusty.length ? "THERE IS A COIN IN YOUR SATCHEL WAITING TO BE BRUSHED."
+                : g.chests.length ? "THERE IS A CHEST IN YOUR SATCHEL WAITING TO BE OPENED."
+                : "COINS COME OUT OF CHESTS. CHESTS COME FROM THE DOOR."}
+            </p>
+            <button className="btn btn-gold" onClick={() => g.setTab(g.dusty.length || g.chests.length ? "satchel" : "door")}>
+              {g.dusty.length || g.chests.length ? "TO THE SATCHEL" : "TO THE DOOR"}
             </button>
-          )}
-        </div>
-      </div>
-      {coins.length===0?(
-        // Empty-state card
-        <div className="text-center px-5 py-14" style={card}>
-          <div className="text-[54px] mb-3.5 opacity-50" style={{filter:"drop-shadow(0 4px 8px rgba(0,0,0,.3))"}}>⛏</div>
-          <div className="font-bold text-[19px] mb-2 -tracking-[0.3px]" style={{fontFamily:"'Fraunces',serif"}}>The Vault is empty</div>
-          <div className="max-w-[260px] mx-auto leading-[1.55]" style={mu}>Visit the Hunt to unearth your first coin from the soil of forgotten ages.</div>
-          <button
-            onClick={()=>setTab("hunt")}
-            className="mt-[18px] px-[26px] py-2.5 rounded-[10px] cursor-pointer text-xs font-bold uppercase tracking-[2px]"
-            style={{
-              fontFamily:"Outfit,sans-serif",
-              border:`1px solid ${t.borderHi}`,
-              background:`${t.accent}22`,
-              color:t.accent,
-            }}>
-            Begin Hunting →
-          </button>
-        </div>
-      ):(
-        <>
-          {/* Metal-tier filter pills */}
-          <div className="flex gap-1.5 flex-wrap mb-3.5 items-center">
-            {[[-1,"All",coins.length],...METALS.map((m,i)=>[i,m.name,coins.filter(c=>c.metalIdx===i).length]).filter(x=>x[2]>0)].map(([idx,lbl,cnt])=>{
-              const active=filter===idx;
-              const mt=idx>=0?METALS[idx]:null;
-              return (
-                <button
-                  key={idx}
-                  onClick={()=>setFilter(idx)}
-                  className="px-3 py-1.5 rounded-full text-[11px] font-semibold cursor-pointer transition-all duration-150 tracking-[0.5px]"
-                  style={{
-                    fontFamily:"Outfit,sans-serif",
-                    border:`1px solid ${active?(mt?.eng||t.accent):t.border}`,
-                    background:active?(mt?`${mt.dark}55`:t.surfaceHi):"transparent",
-                    color:active?(mt?.hl||t.accent):t.muted,
-                  }}>
-                  {lbl}
-                  <span className="ml-1 opacity-65 font-medium tabular-nums">{cnt}</span>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="group" aria-label="Filter by metal">
+              <button className="chip" aria-pressed={filter === -1} onClick={() => setFilter(-1)}>ALL {g.coins.length}</button>
+              {METALS.map((m, i) => counts[i] > 0 && (
+                <button key={i} className="chip" aria-pressed={filter === i} onClick={() => setFilter(i)}
+                        style={filter === i ? { borderColor: m.hl, color: m.hl, background: "var(--stone-2)" } : { color: m.hl }}>
+                  {m.name} {counts[i]}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+            <div className="seg" role="group" aria-label="Sort">
+              {SORTS.map(([id, label]) => <button key={id} aria-pressed={sort === id} onClick={() => setSort(id)}>{label}</button>)}
+            </div>
+            <div className="grid-coins">
+              {shown.map(coin => (
+                <CoinTile key={coin.id} coin={coin} pinned={pinnedSet.has(coin.id)}
+                          selected={selecting && picked.has(coin.id)} disabled={selecting && coin.locked} onClick={() => tap(coin)}/>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {selecting && (
+        <div className="panel panel-hi" style={{ position: "fixed", left: 8, right: 8, bottom: "calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 12px)", zIndex: 80, padding: 8, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ flex: 1, paddingLeft: 4 }}>
+            <div>{pickedCoins.length} PICKED</div>
+            <div className="t-gold row" style={{ gap: 6 }}><PixelIcon name="mark" size={11}/>{pickedTotal.toLocaleString()}</div>
           </div>
-          <div className="text-[11px] mb-2.5 italic" style={mu}>Tap to inspect · double-tap to pin</div>
-          <div className="grid grid-cols-3 gap-[9px]">
-            {visCoins.map(coin=>{
-              const m=METALS[coin.metalIdx];
-              const r=RARITIES[coinRarity(coin)];
-              const pinned=pinnedIds?pinnedIds.includes(coin.id):autoTop.some(c=>c.id===coin.id);
-              const isSel=selectedIds.has(coin.id);
-              return (
-                <div
-                  key={coin.id}
-                  className={`text-center cursor-pointer relative${coin.shiny?" shiny-card":""}`}
-                  style={{
-                    ...card,
-                    padding:"13px 8px 10px",
-                    border:`1px solid ${isSel?t.accent:pinned?m.eng+"66":t.border}`,
-                    borderTop:`2px solid ${isSel?t.accent:r.color}`,
-                    background:isSel?`${t.accent}11`:pinned?(isDark?`linear-gradient(160deg,${m.dark}30,${t.surface})`:t.surface):t.surface,
-                    transition:"transform .18s, border-color .18s, background .15s",
-                    boxShadow:isSel?`0 0 0 2px ${t.accent}55`:r.id>=3?`0 0 0 1px ${r.color}33`:"none",
-                    opacity:selectMode&&coin.locked?0.45:1,
-                  }}
-                  onMouseEnter={e=>{if(!selectMode){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.borderColor=m.eng;e.currentTarget.style.borderTopColor=r.color;}}}
-                  onMouseLeave={e=>{if(!selectMode){e.currentTarget.style.transform="";e.currentTarget.style.borderColor=pinned?m.eng+"66":t.border;e.currentTarget.style.borderTopColor=r.color;}}}
-                  onClick={e=>{
-                    // Select mode: toggle selection (skips locked coins)
-                    if(selectMode){
-                      if(coin.locked)return;
-                      setSelectedIds(prev=>{
-                        const next=new Set(prev);
-                        if(next.has(coin.id))next.delete(coin.id);
-                        else next.add(coin.id);
-                        return next;
-                      });
-                      return;
-                    }
-                    // Normal: double-tap pins, single-tap opens detail
-                    const now=Date.now();
-                    const last=e.currentTarget._lastTap||0;
-                    if(now-last<350){
-                      clearTimeout(e.currentTarget._tapT);
-                      e.currentTarget._lastTap=0;
-                      togglePin(coin.id);
-                    }else{
-                      e.currentTarget._lastTap=now;
-                      const target=e.currentTarget;
-                      e.currentTarget._tapT=setTimeout(()=>{
-                        target._lastTap=0;
-                        setSelectedCoin(coin);
-                      },280);
-                    }
-                  }}>
-                  {coin.shiny&&<div className="shiny-aura"/>}
-                  {coin.metalIdx>=7&&<div className={`ambient-particles ${coin.metalIdx===8?"astral":"eldritch"}`}><span/><span/><span/></div>}
-                  {pinned&&!isSel&&<div className="absolute top-[7px] right-[7px] w-1.5 h-1.5 rounded-full" style={{background:m.hl,boxShadow:`0 0 6px ${m.hl}`}}/>}
-                  {isSel&&<div className="absolute top-[5px] right-[5px] w-[18px] h-[18px] rounded-full text-[11px] font-black flex items-center justify-center z-[3]" style={{background:t.accent,color:t.accentInk,fontFamily:"Outfit,sans-serif",boxShadow:`0 0 8px ${t.accent}88`}}>✓</div>}
-                  {coin.shiny&&<div className="absolute top-1.5 left-[7px] text-[10px]" style={{color:"#ffe060",textShadow:"0 0 6px #ffe06088"}}>✦</div>}
-                  {coin.locked&&<div className="absolute bottom-1.5 right-[7px] text-[10px] opacity-85" style={{filter:"drop-shadow(0 0 4px rgba(0,0,0,.6))"}}>🔒</div>}
-                  <div className="flex justify-center mb-[7px]"><CoinCanvas coin={coin} size={64}/></div>
-                  <div className="text-[14px] tracking-[3px] leading-[1.1]" style={{fontFamily:"VT323,monospace",color:m.hl}}>{coin.runes}</div>
-                  <div className="text-[7.5px] mt-[3px] font-bold opacity-85 uppercase tracking-[2.5px]" style={{fontFamily:"Outfit,sans-serif",color:r.color}}>{r.name}</div>
-                  <div className="text-[7px] mt-[1px] opacity-45 uppercase tracking-[2.5px] font-bold" style={{fontFamily:"Outfit,sans-serif",color:m.hl}}>{m.name}{coin.shiny?" ✦":""}</div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-      {/* Bulk-sell action bar — appears when in select mode with at least one selection */}
-      {selectMode&&selectedIds.size>0&&(
-        <div
-          className="fixed left-1/2 -translate-x-1/2 z-[90] flex items-center gap-2.5 px-3.5 py-2.5 rounded-[14px] animate-fadein"
-          style={{
-            bottom:"calc(82px + env(safe-area-inset-bottom,0px))",
-            background:t.surface,
-            border:`1px solid ${t.borderHi}`,
-            boxShadow:"0 8px 28px rgba(0,0,0,.5)",
-            maxWidth:"calc(100vw - 24px)",
-          }}>
-          <div className="min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-[1.5px]" style={{fontFamily:"Outfit,sans-serif",color:t.muted}}>{selectedTotal.sellable} selected</div>
-            <div className="text-[14px] font-extrabold tracking-[0.5px] tabular-nums" style={{fontFamily:"Outfit,sans-serif",color:t.accent}}>◈ {selectedTotal.total.toLocaleString()}</div>
-            {selectedTotal.locked>0&&<div className="text-[9px] mt-px italic" style={mu}>{selectedTotal.locked} locked · skipped</div>}
-          </div>
-          <button
-            onClick={()=>{if(confirm(`Sell ${selectedTotal.sellable} coin${selectedTotal.sellable===1?"":"s"} for ◈${selectedTotal.total.toLocaleString()}?`))bulkSell();}}
-            disabled={selectedTotal.sellable===0}
-            className="px-[18px] py-2.5 rounded-[10px] text-[12px] font-extrabold uppercase tracking-[1.5px] whitespace-nowrap"
-            style={{
-              fontFamily:"Outfit,sans-serif",
-              border:`1px solid ${t.accent}`,
-              background:`linear-gradient(135deg,${t.accentHi},${t.accent})`,
-              cursor:selectedTotal.sellable?"pointer":"not-allowed",
-              opacity:selectedTotal.sellable?1:0.5,
-              color:t.accentInk,
-            }}>
-            Sell All
-          </button>
+          <button className="btn btn-danger" disabled={!pickedCoins.length || busy} onClick={() => sell(pickedCoins)}>SELL</button>
         </div>
+      )}
+
+      {open && (
+        <CoinModal coin={open} busy={busy} onClose={() => setOpenId(null)} onToggleLock={g.toggleLock} onSell={c => sell([c])}
+                   pinned={pinnedSet.has(open.id)} onTogglePin={id => { g.togglePin(id); feel("tap"); }}/>
       )}
     </div>
   );

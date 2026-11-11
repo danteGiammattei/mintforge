@@ -1,269 +1,193 @@
+import { useState } from "react";
 import { useGame } from "../lib/GameContext.js";
+import { useUi } from "../ui/Overlay.jsx";
+import { feel, isMuted, setMuted } from "../lib/feel.js";
 import { rarityScore, unlockedTitles, rune } from "../lib/coin.js";
-import { bannerStyle } from "../lib/data.js";
+import { FRAMES, METALS, PREMIUM_TITLE_BY_ID, TITLES, TITLE_LEVELS, BRUSH_UPS } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
+import CoinModal from "../components/CoinModal.jsx";
+import PixelBanner from "../components/PixelBanner.jsx";
+import PixelIcon from "../ui/PixelIcon.jsx";
+import Friends, { TitleText } from "./Friends.jsx";
+import { CoinTile } from "./Vault.jsx";
 
 /* ─── PROFILE ─────────────────────────────────────────────────────────────
- * The player's home page. Banner + avatar + stats grid + display cabinet
- * (pinned coins) + title selector. Banner choice and title
- * choice persist via setFrame/setSelectedTitle.
- *
- * Avatar shows the highest-scoring showcase coin. Display cabinet has
- * `maxPins` slots. Empty slots are
- * tappable to open a coin picker.
- *
- * BUG FIX during migration: `username` was used but not destructured from
- * useGame(). Now properly declared. */
-export default function Profile() {
-  const {
-    coins, frame, filter, pinnedIds, showcaseCoins, level,
-    bio, selectedTitle, maxPins, fr, username,
-    ownedFrames, ownedTitles, 
-    editingProfile,
-    setBio, setFrame, setSelectedTitle, setPinnedIds, setSelectedCoin,
-    setEditingProfile, setPickerSlot, setTab, setTavernView,
-    togglePin,
-    METALS, FRAMES, PREMIUM_TITLE_BY_ID, RARITY_COLOR, TITLE_LEVELS,
-    t, isDark, F, VT, FR, mu, microLabel, sectionTitle, card,
-  } = useGame();
+ * Who you are to other players: banner, title, bio and the cabinet of six
+ * coins. Banners and titles you have earned by level are listed with the
+ * level that unlocks the next; the ones the goblin gives are not listed
+ * at all until he has given them. FRIENDS is the second view. */
+
+function Cabinet({ g }) {
+  const ui = useUi();
+  const [slot, setSlot] = useState(null);         // picking a coin for this slot
+  const [open, setOpen] = useState(null);         // { coin, slot }
+  const slots = Array.from({ length: g.maxPins }, (_, i) => g.showcase[i] || null);
+  const reset = async () => {
+    if (await ui.confirm({ title: "RESET THE CABINET?", body: "IT WILL SHOW YOUR SIX BEST COINS AGAIN.", yes: "RESET" })) g.setPinnedIds(null);
+  };
   return (
-    <div className="animate-fadein">
-      {/* Banner — bleeds to the page edges */}
-      <div
-        className="h-[130px] rounded-b-[20px] -mx-3.5 -mt-[18px] relative overflow-hidden"
-        style={{ ...bannerStyle(frame), border:`1px solid ${t.border}`, borderTop:"none" }}>
-        <div className="absolute inset-0" style={{ background:"radial-gradient(ellipse at 30% 60%,rgba(255,255,255,.06),transparent 65%)" }}/>
-        <div className="absolute inset-0" style={{ background:"radial-gradient(ellipse at 70% 30%,rgba(212,160,23,.08),transparent 60%)" }}/>
-        {/* Image banners get a subtle darkening overlay for text legibility */}
-        {FRAMES[frame]?.premium&&<div className="absolute inset-0" style={{ background:"linear-gradient(to bottom,rgba(0,0,0,.15) 0%,rgba(0,0,0,0) 30%,rgba(0,0,0,0) 70%,rgba(0,0,0,.45) 100%)" }}/>}
-        <div className="noise-overlay" style={{ opacity:.06 }}/>
-        <div className="absolute top-3 right-3.5">
-          <select
-            value={frame}
-            onChange={e=>setFrame(e.target.value)}
-            className="px-2.5 py-1 rounded-md text-[11px] cursor-pointer font-semibold tracking-[0.5px]"
-            style={{ ...F, background:"rgba(0,0,0,.6)", border:`1px solid rgba(255,255,255,.16)`, color:"#c8b89a" }}>
-            {Object.entries(FRAMES).filter(([k,f])=>!f.premium||ownedFrames.includes(k)).map(([k,f])=>(
-              <option key={k} value={k} disabled={level<f.minLvl}>{f.lbl}{level<f.minLvl?` · Lv${f.minLvl}`:""}</option>
-            ))}
-          </select>
-        </div>
-        <div className="absolute bottom-2 left-4 text-[9px] opacity-85" style={{ ...microLabel, color:fr.accent, textShadow:"0 1px 3px rgba(0,0,0,.7)" }}>{fr.lbl}</div>
+    <section className="panel" style={{ padding: 12 }} aria-label="Display cabinet">
+      <div className="between" style={{ marginBottom: 12 }}>
+        <h2 className="t-title" style={{ margin: 0 }}>CABINET</h2>
+        {g.pinnedIds != null ? <button className="btn btn-ghost" onClick={reset}>RESET</button> : <span className="t-label">YOUR BEST SIX</span>}
+      </div>
+      <div className="grid-3">
+        {slots.map((c, i) => c
+          ? <CoinTile key={c.id} coin={c} onClick={() => setOpen({ coin: c, slot: i })}/>
+          : <button key={"e" + i} className="tile" style={{ minHeight: 104, justifyContent: "center", color: "var(--bone-dim)", borderStyle: "dashed" }}
+                    disabled={!g.coins.length} onClick={() => setSlot(i)} aria-label={`Empty slot ${i + 1}. Choose a coin.`}>
+              <PixelIcon name="pin" size={22}/><span aria-hidden>EMPTY</span>
+            </button>)}
       </div>
 
-      {/* Avatar sits fully below banner now (no overlap) */}
-      <div className="mt-3.5 mb-3 px-1 flex justify-start">
-        <div
-          className="w-[88px] h-[88px] rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
-          style={{
-            border:`3px solid ${fr.accent}`,
-            background:t.surface,
-            boxShadow:`0 6px 18px rgba(0,0,0,.35),inset 0 0 0 2px ${t.surface}`,
-          }}>
-          {showcaseCoins[0]?<CoinCanvas coin={showcaseCoins[0]} size={80}/>:<span className="text-[30px] opacity-30">⚒</span>}
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-2 mb-3.5 px-1">
-        {[["Coins",coins.length],["Score",rarityScore(coins).toLocaleString()],["✦ Shiny",coins.filter(c=>c.shiny).length]].map(([k,v])=>(
-          <div key={k} className="px-2 py-2.5 text-center" style={card}>
-            <div className="font-extrabold text-[20px] -tracking-[0.5px] tabular-nums leading-none" style={{ ...FR, color:t.text }}>{v}</div>
-            <div className="text-[9px] mt-1" style={microLabel}>{k}</div>
-          </div>
-        ))}
-      </div>
-
-      {!editingProfile?(
-        <>
-          <div className="flex justify-between items-start px-1 mb-3.5">
-            <div className="min-w-0 flex-1">
-              <div className="font-extrabold text-[22px] -tracking-[0.5px]" style={{ ...FR, color:t.text }}>{username}</div>
-              <div className="text-[18px] tracking-[3px] mt-0.5" style={{ ...VT, color:t.muted }}>{rune(username.toUpperCase().replace(/[^A-Z]/g,""))}</div>
-              <div className="text-[13px] mt-2 leading-[1.55] max-w-[340px]" style={{ ...mu, color:t.textDim }}>{bio}</div>
+      {open && (
+        <CoinModal coin={g.coins.find(c => c.id === open.coin.id) || open.coin} onClose={() => setOpen(null)} onToggleLock={g.toggleLock}
+                   pinned onTogglePin={() => { g.clearPinSlot(open.slot); setOpen(null); }}/>
+      )}
+      {slot != null && (
+        <div className="veil appear" style={{ zIndex: 430 }} onClick={() => setSlot(null)}>
+          <div className="panel panel-hi sheet rise" role="dialog" aria-modal="true" aria-label="Choose a coin for the cabinet" style={{ padding: 12 }} onClick={e => e.stopPropagation()}>
+            <h2 className="t-title" style={{ margin: "0 0 12px" }}>CHOOSE A COIN</h2>
+            <div className="grid-coins" style={{ maxHeight: 360, overflowY: "auto", padding: 2 }}>
+              {g.coins.map(c => <CoinTile key={c.id} coin={c} pinned={g.pinnedIds?.includes(c.id)} onClick={() => { g.pinToSlot(slot, c.id); setSlot(null); feel("tap"); }}/>)}
             </div>
-            <button
-              onClick={()=>setEditingProfile(true)}
-              className="px-3.5 py-2 rounded-[9px] cursor-pointer text-[11px] font-bold whitespace-nowrap flex-shrink-0 uppercase tracking-[1.5px] ml-2"
-              style={{ ...F, border:`1px solid ${t.border}`, background:t.surfaceHi, color:t.textDim }}>
-              Edit
-            </button>
-          </div>
-          <div className="px-1 mb-[18px]">
-            <div className="mb-2" style={microLabel}>Equipped Title</div>
-            <div className="flex gap-1.5 flex-wrap">
-              {unlockedTitles(level).map(title=>{
-                const sel=selectedTitle===title;
-                return (
-                  <button
-                    key={title}
-                    onClick={()=>setSelectedTitle(title)}
-                    className="px-[13px] py-1.5 rounded-full text-xs font-semibold cursor-pointer transition-all duration-150 tracking-[0.5px]"
-                    style={{ ...F, border:`1px solid ${sel?t.accent:t.border}`, background:sel?`${t.accent}18`:t.surface, color:sel?t.accent:t.textDim }}>
-                    {title}
-                  </button>
-                );
-              })}
-              {/* Premium owned titles render with their animated effect even in selection chips */}
-              {ownedTitles.map(id=>{
-                const ti=PREMIUM_TITLE_BY_ID[id];
-                if(!ti)return null;
-                const sel=selectedTitle===ti.label;
-                return (
-                  <button
-                    key={id}
-                    onClick={()=>setSelectedTitle(ti.label)}
-                    className="px-[13px] py-1.5 rounded-full text-xs font-bold cursor-pointer transition-all duration-150 tracking-[0.5px]"
-                    style={{ ...F, border:`1px solid ${sel?t.accent:t.border}`, background:sel?`${t.accent}18`:t.surface }}>
-                    <span className={`title-${ti.effect}`}>{ti.label}</span>
-                  </button>
-                );
-              })}
-              {level<TITLE_LEVELS[unlockedTitles(level).length]&&(
-                <span className="text-[11px] self-center italic" style={mu}>Lv.{TITLE_LEVELS[unlockedTitles(level).length]} unlocks next</span>
-              )}
-            </div>
-          </div>
-        </>
-      ):(
-        <div className="p-[18px] mb-4" style={card}>
-          <div className="font-bold text-[16px] mb-3.5 -tracking-[0.3px]" style={FR}>Edit Profile</div>
-          <div className="mb-3">
-            <div className="mb-1.5" style={microLabel}>Username</div>
-            <div
-              className="w-full px-[13px] py-2.5 rounded-[9px] text-sm tracking-[0.3px] flex justify-between items-center"
-              style={{ ...F, border:`1px solid ${t.border}`, background:t.surface2, color:t.textDim }}>
-              <span>{username}</span>
-              <span className="text-[9px] font-bold uppercase tracking-[1.5px]" style={{ ...F, color:t.muted }}>🔒 Locked</span>
-            </div>
-          </div>
-          <div className="mb-3.5">
-            <div className="mb-1.5" style={microLabel}>Bio</div>
-            <textarea
-              value={bio}
-              onChange={e=>setBio(e.target.value.slice(0,120))}
-              rows={2}
-              className="w-full px-[13px] py-2.5 rounded-[9px] text-[13px] resize-none outline-none leading-[1.55] transition-[border-color] duration-150"
-              style={{ ...F, border:`1px solid ${t.inputBorder}`, background:t.input, color:t.text }}
-              onFocus={e=>e.target.style.borderColor=t.inputFocus}
-              onBlur={e=>e.target.style.borderColor=t.inputBorder}/>
-            <div className="text-[10px] text-right mt-[3px] tracking-[0.5px]" style={mu}>{bio.length} / 120</div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={()=>setEditingProfile(false)}
-              className="flex-1 py-[11px] rounded-[10px] cursor-pointer font-bold text-[13px] uppercase tracking-[1.5px]"
-              style={{ ...F, border:`1px solid ${t.border}`, background:t.surfaceHi, color:t.muted }}>
-              Cancel
-            </button>
-            <button
-              onClick={()=>setEditingProfile(false)}
-              className="flex-[2] py-[11px] rounded-[10px] border-none cursor-pointer font-extrabold text-[13px] uppercase tracking-[2px]"
-              style={{ ...F, background:`linear-gradient(135deg,${t.accentHi},${t.accent})`, color:t.accentInk, boxShadow:`0 4px 12px ${t.accent}33` }}>
-              Save
-            </button>
+            <button className="btn btn-ghost btn-block" style={{ marginTop: 12 }} onClick={() => setSlot(null)}>CANCEL</button>
           </div>
         </div>
       )}
+    </section>
+  );
+}
 
-      {coins.length>0&&(
-        <div className="px-1 mb-[18px]">
-          <div className="mb-1.5" style={microLabel}>Vault Composition</div>
-          <div
-            className="flex h-1.5 rounded-[3px] overflow-hidden gap-[1.5px] p-px"
-            style={{ background:t.faint, border:`1px solid ${t.border}` }}>
-            {METALS.map((mt,i)=>{
-              const cnt=coins.filter(c=>c.metalIdx===i).length;
-              const p=(cnt/Math.max(1,coins.length))*100;
-              return p>0&&<div key={i} className="rounded-[1.5px]" style={{ width:`${p}%`, background:`linear-gradient(to bottom,${mt.hl},${mt.base})` }}/>;
-            })}
+function You({ g }) {
+  const ui = useUi();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(g.bio);
+  const [muted, setMute] = useState(isMuted());
+  const titles = unlockedTitles(g.level);
+  const nextTitle = TITLE_LEVELS[titles.length];
+  const frames = Object.entries(FRAMES).filter(([id, f]) => !f.premium || g.ownedFrames.includes(id));
+  const nextFrame = Object.values(FRAMES).filter(f => !f.premium && f.minLvl > g.level).sort((a, b) => a.minLvl - b.minLvl)[0];
+  const lead = g.showcase.find(Boolean);
+
+  const signOut = async () => {
+    if (await ui.confirm({ title: "SIGN OUT?", body: "YOUR VAULT STAYS ON THE SERVER. YOU WILL NEED YOUR PIN TO RETURN.", yes: "SIGN OUT" })) g.signOut();
+  };
+
+  return (
+    <>
+      <section className="panel" style={{ overflow: "hidden" }} aria-label="You">
+        <PixelBanner frame={g.frame}>
+          <div className="t-label" style={{ position: "absolute", left: 12, bottom: 8, color: g.fr.accent }}>{g.fr.lbl}</div>
+        </PixelBanner>
+        <div style={{ padding: 12, display: "flex", gap: 12, alignItems: "center" }}>
+          <div style={{ flexShrink: 0, padding: 4, background: "var(--stone-0)", boxShadow: `0 0 0 2px #000, 0 0 0 4px ${g.fr.accent}` }}>
+            {lead ? <CoinCanvas coin={lead} size={64}/> : <div style={{ width: 64, height: 64, display: "grid", placeItems: "center", color: "var(--mute)" }}><PixelIcon name="face" size={33}/></div>}
           </div>
-          <div className="flex gap-[11px] mt-[9px] flex-wrap">
-            {METALS.map((mt,i)=>{
-              const cnt=coins.filter(c=>c.metalIdx===i).length;
-              return cnt>0&&(
-                <div key={i} className="flex items-center gap-[5px]">
-                  <div className="w-[7px] h-[7px] rounded-sm" style={{ background:mt.hl, boxShadow:`0 0 6px ${mt.hl}55` }}/>
-                  <span className="text-[11px] font-semibold" style={{ ...mu, color:t.textDim }}>
-                    {cnt}<span className="font-medium" style={{ color:t.muted }}> {mt.name}</span>
-                  </span>
-                </div>
-              );
-            })}
+          <div style={{ minWidth: 0 }}>
+            <div className="t-title t-plain" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{g.username}</div>
+            <div className="t-rune t-dim">{rune(g.username.toUpperCase().replace(/[^A-Z]/g, ""))}</div>
+            <div><TitleText label={g.selectedTitle}/></div>
           </div>
         </div>
-      )}
-
-      {/* Display Cabinet header */}
-      <div className="flex items-baseline justify-between mb-3 px-1">
-        <div className="text-[18px]" style={sectionTitle}>Display Cabinet</div>
-        <div className="flex items-center gap-2">
-          {pinnedIds!=null&&(
-            <button
-              onClick={()=>{ if(confirm("Reset to auto-pinned (top 6 by rarity)?"))setPinnedIds(null); }}
-              className="text-[9px] font-bold uppercase tracking-[1.5px] px-2 py-[3px] rounded-[5px] cursor-pointer"
-              style={{ ...F, color:t.muted, border:`1px solid ${t.border}`, background:"transparent" }}>
-              Reset
-            </button>
+        <dl style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, margin: 0, padding: "0 12px 12px" }}>
+          {[["COINS", g.coins.length], ["SCORE", rarityScore(g.coins).toLocaleString()], ["SHINY", g.coins.filter(c => c.shiny).length]].map(([k, v]) => (
+            <div key={k} className="panel" style={{ padding: 8, textAlign: "center" }}>
+              <dd className="t-title" style={{ margin: 0 }}>{v}</dd><dt className="t-label">{k}</dt>
+            </div>
+          ))}
+        </dl>
+        <div style={{ padding: "0 12px 12px" }}>
+          {editing ? (
+            <>
+              <label className="t-label" htmlFor="bio">BIO</label>
+              <textarea id="bio" className="field t-plain" rows={3} maxLength={120} value={draft} style={{ resize: "none", marginTop: 4 }}
+                        onChange={e => setDraft(e.target.value.slice(0, 120))}/>
+              <div className="between" style={{ marginTop: 8 }}>
+                <span className="t-label">{draft.length} / 120</span>
+                <span className="row">
+                  <button className="btn btn-ghost" onClick={() => { setDraft(g.bio); setEditing(false); }}>CANCEL</button>
+                  <button className="btn btn-gold" onClick={() => { g.setBio(draft); setEditing(false); }}>SAVE</button>
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="between" style={{ alignItems: "flex-start" }}>
+              <p className="t-dim t-plain" style={{ margin: 0, minWidth: 0, overflowWrap: "anywhere" }}>{g.bio || "NO BIO YET."}</p>
+              <button className="btn" onClick={() => { setDraft(g.bio); setEditing(true); }}>EDIT</button>
+            </div>
           )}
-          <div style={microLabel}>{pinnedIds?"Manual":"Auto"}{maxPins>6&&` · ${maxPins} slots`}</div>
         </div>
-      </div>
-      {/* Cabinet grid */}
-      <div className="grid grid-cols-3 gap-[9px]">
-        {Array.from({length:maxPins}).map((_,i)=>{
-          const coin=showcaseCoins[i];
-          if(!coin)return (
-            <button
-              key={i}
-              onClick={()=>setPickerSlot(i)}
-              className="min-h-[144px] rounded-[13px] flex flex-col items-center justify-center gap-[5px] cursor-pointer transition-all duration-150"
-              style={{
-                fontFamily:"Outfit,sans-serif",
-                border:`1px dashed ${t.border}`,
-                background:`${t.surface}66`,
-                color:t.muted,
-              }}
-              onMouseEnter={e=>{ e.currentTarget.style.borderColor=t.borderHi; e.currentTarget.style.background=t.surfaceHi; }}
-              onMouseLeave={e=>{ e.currentTarget.style.borderColor=t.border; e.currentTarget.style.background=`${t.surface}66`; }}>
-              <span className="text-[22px] opacity-40">+</span>
-              <span className="text-[9px] font-bold uppercase tracking-[1.5px] opacity-55" style={F}>Pick coin</span>
-            </button>
-          );
-          const m=METALS[coin.metalIdx];
-          return (
-            <div
-              key={coin.id}
-              className={`text-center relative cursor-pointer transition-transform duration-200 overflow-visible${coin.shiny?" shiny-card":""}`}
-              style={{
-                background:isDark?`linear-gradient(160deg,${m.dark}40,${t.surface})`:t.surface,
-                border:`1px solid ${m.eng}30`,
-                borderTop:`2px solid ${fr.accent}`,
-                borderRadius:13,
-                padding:"13px 8px 10px",
-              }}
-              onClick={()=>setSelectedCoin(coin)}
-              onMouseEnter={e=>{ e.currentTarget.style.transform="translateY(-3px)"; }}
-              onMouseLeave={e=>{ e.currentTarget.style.transform=""; }}>
-              {coin.shiny&&<div className="shiny-aura"/>}
-              {coin.metalIdx>=7&&<div className={`ambient-particles ${coin.metalIdx===8?"astral":"eldritch"}`}><span/><span/><span/></div>}
-              <button
-                onClick={(e)=>{ e.stopPropagation(); togglePin(coin.id); }}
-                title="Unpin from display"
-                className="absolute top-[5px] right-[5px] w-5 h-5 rounded-full cursor-pointer text-[11px] p-0 leading-none flex items-center justify-center z-[3]"
-                style={{ fontFamily:"Outfit,sans-serif", border:`1px solid ${t.border}`, background:`${t.surface}cc`, color:t.muted }}>
-                ×
-              </button>
-              {coin.shiny&&<div className="absolute top-1.5 left-[7px] text-[11px]" style={{ color:"#ffe060", textShadow:"0 0 6px #ffe06088" }}>✦</div>}
-              <div className="flex justify-center mb-[7px]"><CoinCanvas coin={coin} size={64}/></div>
-              <div className="text-[15px] tracking-[3px] leading-none" style={{ ...VT, color:m.hl }}>{coin.runes}</div>
-              <div className="text-[8px] mt-[3px] opacity-60" style={{ ...microLabel, color:m.hl }}>{m.name}{coin.shiny?" ✦":""}</div>
-            </div>
-          );
-        })}
-      </div>
+      </section>
 
-      {/* The tarot spread lived here. Dropped with the rest of that system. */}
+      <section className="panel" style={{ padding: 12 }} aria-label="Title">
+        <h2 className="t-title" style={{ margin: "0 0 12px" }}>TITLE</h2>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {titles.map(t => <button key={t} className="chip" aria-pressed={g.selectedTitle === t} onClick={() => g.setSelectedTitle(t)}>{t}</button>)}
+          {g.ownedTitles.map(id => PREMIUM_TITLE_BY_ID[id] && (
+            <button key={id} className="chip" aria-pressed={g.selectedTitle === PREMIUM_TITLE_BY_ID[id].label} onClick={() => g.setSelectedTitle(PREMIUM_TITLE_BY_ID[id].label)}>
+              <TitleText label={PREMIUM_TITLE_BY_ID[id].label}/>
+            </button>
+          ))}
+        </div>
+        {nextTitle && <p className="t-label" style={{ margin: "12px 0 0" }}>{TITLES[titles.length]} AT LEVEL {nextTitle}</p>}
+      </section>
+
+      <section className="panel" style={{ padding: 12 }} aria-label="Banner">
+        <h2 className="t-title" style={{ margin: "0 0 12px" }}>BANNER</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+          {frames.map(([id, f]) => {
+            const locked = g.level < f.minLvl;
+            return (
+              <button key={id} className="tile" style={{ padding: 0, borderTopColor: f.accent, overflow: "hidden" }} aria-pressed={g.frame === id}
+                      disabled={locked} onClick={() => g.setFrame(id)} aria-label={locked ? `${f.lbl}, unlocks at level ${f.minLvl}` : f.lbl}>
+                <div style={{ width: "100%" }}><PixelBanner frame={id} height={44} dim={locked}/></div>
+                <span aria-hidden style={{ padding: "4px 0 8px" }}>{locked ? `LV ${f.minLvl}` : f.lbl}</span>
+              </button>
+            );
+          })}
+        </div>
+        {nextFrame && <p className="t-label" style={{ margin: "12px 0 0" }}>{nextFrame.lbl} AT LEVEL {nextFrame.minLvl}</p>}
+      </section>
+
+      <Cabinet g={g}/>
+
+      {g.coins.length > 0 && (
+        <section className="panel" style={{ padding: 12 }} aria-label="What the vault is made of">
+          <h2 className="t-title" style={{ margin: "0 0 12px" }}>VAULT, BY METAL</h2>
+          <div style={{ display: "flex", height: 12, border: "2px solid #000" }} aria-hidden>
+            {METALS.map((m, i) => { const n = g.coins.filter(c => c.metalIdx === i).length; return n > 0 && <div key={i} style={{ flex: n, background: m.base }}/>; })}
+          </div>
+          <ul style={{ listStyle: "none", margin: "12px 0 0", padding: 0, display: "flex", flexWrap: "wrap", gap: "4px 16px" }}>
+            {METALS.map((m, i) => { const n = g.coins.filter(c => c.metalIdx === i).length; return n > 0 && <li key={i} style={{ color: m.hl }}>{n} {m.name}</li>; })}
+          </ul>
+        </section>
+      )}
+
+      <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }} aria-label="Settings">
+        <h2 className="t-title" style={{ margin: 0 }}>SETTINGS</h2>
+        <div className="between"><span className="t-dim">BRUSH</span><span>{(BRUSH_UPS[g.brushLevel] || BRUSH_UPS[0]).label}</span></div>
+        <button className="btn btn-block" aria-pressed={!muted} onClick={() => { const m = !muted; setMuted(m); setMute(m); if (!m) feel("tap"); }}>
+          <PixelIcon name={muted ? "mute" : "sound"} size={11}/>SOUND AND HAPTICS: {muted ? "OFF" : "ON"}
+        </button>
+        <button className="btn btn-ghost btn-block" onClick={signOut}>SIGN OUT</button>
+      </section>
+    </>
+  );
+}
+
+export default function Profile() {
+  const g = useGame();
+  const [view, setView] = useState("you");
+  return (
+    <div className="page">
+      <div className="page-in">
+        <div className="seg" role="tablist" aria-label="Profile">
+          <button role="tab" aria-selected={view === "you"} onClick={() => setView("you")}><PixelIcon name="face" size={11}/>YOU</button>
+          <button role="tab" aria-selected={view === "friends"} onClick={() => setView("friends")}><PixelIcon name="friends" size={11}/>FRIENDS</button>
+        </div>
+        {view === "you" ? <You g={g}/> : <Friends/>}
+      </div>
     </div>
   );
 }
