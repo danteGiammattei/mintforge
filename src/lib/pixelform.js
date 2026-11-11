@@ -26,6 +26,9 @@
 
 export const capsule = (x1, y1, x2, y2, r1, r2 = r1) => ({ x1, y1, x2, y2, r1, r2 });
 export const joint   = (x, y, r) => ({ x, y, r });
+/* A rounded slab, for the few things that are made rather than grown:
+ * a chest, a lid. x,y is the top-left corner; r rounds the corners. */
+export const box     = (x, y, w, h, r = 1) => ({ x, y, w, h, r });
 
 /* A jointed digit: n segments, each angled a little further than the
  * last, tapering as it goes, with a proud knuckle at every bend.
@@ -33,8 +36,10 @@ export const joint   = (x, y, r) => ({ x, y, r });
  *   angle  radians    0 is +x, negative is up
  *   lens   [..]       segment lengths, base to tip
  *   r      number     radius at the base
- *   bend   radians    extra rotation per segment (curl)          */
-export function digit({ base, angle, lens, r, bend = 0.1, taper = 0.42 }) {
+ *   bend   radians    extra rotation per segment (curl)
+ *   minR   number     floor for the radius as it tapers
+ *   tipR   number     radius of the fingertip (defaults to the taper) */
+export function digit({ base, angle, lens, r, bend = 0.1, taper = 0.42, minR = 1.5, tipR = null }) {
   const C = [], J = [];
   let x = base.x, y = base.y;
   for (let i = 0; i < lens.length; i++) {
@@ -42,18 +47,18 @@ export function digit({ base, angle, lens, r, bend = 0.1, taper = 0.42 }) {
     const nx = x + Math.cos(a) * lens[i];
     const ny = y + Math.sin(a) * lens[i];
     const r1 = r - taper * i;
-    C.push(capsule(x, y, nx, ny, r1, Math.max(1.5, r - taper * (i + 1))));
+    C.push(capsule(x, y, nx, ny, r1, Math.max(minR, r - taper * (i + 1))));
     J.push(joint(x, y, r1 + 0.5));
     x = nx; y = ny;
   }
-  J.push(joint(x, y, Math.max(1.4, r - taper * lens.length)));
+  J.push(joint(x, y, tipR ?? Math.max(1.4, r - taper * lens.length)));
   return { C, J };
 }
 
 export function merge(...forms) {
-  const C = [], J = [];
-  for (const f of forms) { C.push(...(f.C || [])); J.push(...(f.J || [])); }
-  return { C, J };
+  const C = [], J = [], B = [];
+  for (const f of forms) { C.push(...(f.C || [])); J.push(...(f.J || [])); B.push(...(f.B || [])); }
+  return { C, J, B };
 }
 
 /* ─── placing a form ──────────────────────────────────────────────────
@@ -70,12 +75,17 @@ export function place(form, { mirror = null, angle = 0, pivot = { x: 0, y: 0 }, 
     let dx = px - pivot.x, dy = y - pivot.y;
     return { x: (dx * c - dy * s + at.x) * scale, y: (dx * s + dy * c + at.y) * scale };
   };
+  if (form.B?.length && angle) throw new Error("pixelform: slabs cannot be rotated — build the form at its final angle");
   return {
-    C: form.C.map(o => {
+    C: (form.C || []).map(o => {
       const a = pt(o.x1, o.y1), b = pt(o.x2, o.y2);
       return { x1: a.x, y1: a.y, x2: b.x, y2: b.y, r1: o.r1 * scale, r2: o.r2 * scale };
     }),
-    J: form.J.map(o => { const a = pt(o.x, o.y); return { x: a.x, y: a.y, r: o.r * scale }; }),
+    J: (form.J || []).map(o => { const a = pt(o.x, o.y); return { x: a.x, y: a.y, r: o.r * scale }; }),
+    B: (form.B || []).map(o => {
+      const a = pt(o.x, o.y), b = pt(o.x + o.w, o.y + o.h);
+      return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y), r: o.r * scale };
+    }),
     // where an authored point ended up — for anchoring things in the world
     locate: (x, y) => { const a = pt(x, y); return { x: a.x * 1, y: a.y * 1 }; },
   };
@@ -97,17 +107,27 @@ export function fieldAt(form, x, y) {
     const v = Math.hypot(x - j.x, y - j.y) - j.r;
     if (v < d) d = v;
   }
+  if (form.B) for (const b of form.B) {
+    const qx = Math.abs(x - (b.x + b.w / 2)) - (b.w / 2 - b.r);
+    const qy = Math.abs(y - (b.y + b.h / 2)) - (b.h / 2 - b.r);
+    const v = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - b.r;
+    if (v < d) d = v;
+  }
   return d;
 }
 
 /* ─── light rigs ──────────────────────────────────────────────────────
  * [ lx, ly, lz, ambient, fill, rim, rimPower ]
  *
- * The scene has exactly two sources: the slot of light behind the door,
- * and the goblin's magic when he pulls. Both sit up and to the left, and
- * both are BEHIND what they light — so the rig is mostly rim. A form lit
+ * The door has exactly two sources: the slot of light behind it, and the
+ * goblin's magic when he pulls. Both sit up and to the left, and both
+ * are BEHIND what they light — so those rigs are mostly rim. A form lit
  * this way is dark through its body with a bright grazing edge, which is
  * how you actually see anything in an unlit room.
+ *
+ * The player's own side — the desk and the satchel — has one source too:
+ * a candle off the left edge, in FRONT of what it lights. That rig is
+ * mostly fill, with a short warm ramp, and is the only one that is.
  *
  * Raise `fill` to make something read more plainly; raise `rim` and drop
  * `ambient` to push it further into silhouette.                        */
@@ -120,6 +140,10 @@ export const LIGHT = {
   magic:   [-0.70, -0.60, 0.40, 0.16, 0.30, 0.95, 1.4],
   // an object held out in the slot's edge light
   carried: [-0.62, -0.66, 0.44, 0.15, 0.20, 0.86, 1.5],
+  // the same object in flight toward his palm: lit from where it is going
+  pulled:  [-0.62, -0.66, 0.44, 0.30, 0.40, 0.95, 1.2],
+  // the desk and the satchel: one candle, low and to the left, in front
+  candle:  [-0.70, -0.34, 0.63, 0.24, 0.66, 0.26, 1.6],
 };
 
 /* ─── tone ramps ──────────────────────────────────────────────────────
@@ -135,6 +159,13 @@ export const RAMP = {
   parchmentLit:["#131a15", "#223029", "#38493d", "#547053", "#7ea877", "#bbe8b6"],
   wood:        ["#140f08", "#2a1f10", "#42301a", "#5c452a", "#7a5f3c", "#9b7f55"],
   stone:       ["#0b0d10", "#15181d", "#20242b", "#2d333c", "#414a56", "#5d6878"],
+  // warm-side materials, for things seen by the candle
+  iron:        ["#0e0f10", "#1b1d1f", "#2b2e31", "#3f4347", "#5b6166", "#858c90"],
+  gold:        ["#1c1404", "#3a2a08", "#5e440e", "#8a661a", "#bb9030", "#e6c463"],
+  obsidian:    ["#0a0612", "#150c26", "#22143c", "#352058", "#573890", "#8f6ad0"],
+  voidstone:   ["#04050f", "#090c20", "#101636", "#1a2452", "#2e3f86", "#6f86d6"],
+  dirt:        ["#120c06", "#1e1208", "#2e1c0c", "#3a2410", "#4a3018", "#6a4220"],
+  bristle:     ["#1a1408", "#3a2c12", "#5c4820", "#86692e", "#b08d44", "#d6b56a"],
 };
 
 /* ─── rasterise ───────────────────────────────────────────────────────

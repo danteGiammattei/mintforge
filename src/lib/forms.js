@@ -24,7 +24,7 @@
  *  └──────────────────────────────────────────────────────────────────┘
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { capsule, joint, digit, merge, place, raster, sprite, quantise, LIGHT, RAMP } from "./pixelform.js";
+import { capsule, joint, box, digit, merge, place, raster, sprite, quantise, LIGHT, RAMP } from "./pixelform.js";
 
 /* ─── the goblin's hand ───────────────────────────────────────────────
  * Authored from a photograph: a forearm running in from the left and
@@ -35,7 +35,7 @@ import { capsule, joint, digit, merge, place, raster, sprite, quantise, LIGHT, R
  * Then mirrored and swung down, so it reaches out of the doorway and
  * across into the light rather than off to the side. */
 export const GOBLIN_HAND = {
-  art:   { w: 92, h: 52, wrist: { x: 2, y: 26 }, shoulder: { x: -8, y: 27 }, palm: { x: 38, y: 26 } },
+  art:   { w: 92, h: 52, wrist: { x: 0, y: 26 }, shoulder: { x: -8, y: 27 }, palm: { x: 38, y: 26 } },
   frame: { w: 106, h: 70, pivot: { x: 66, y: 24 }, angle: -0.20 },
   scale: 0.304,
 };
@@ -70,23 +70,34 @@ function goblinHandForm(curl) {
       angle: open + (shut - open) * curl,
       lens: d.lens, r: d.r,
       bend: 0.13 + curl * -0.75,
-      taper: 0.44,
+      taper: 0.44, minR: 1.6, tipR: 1.8,
     }));
   }
   return merge(...f);
+}
+
+const goblinPlacement = () => {
+  const G = GOBLIN_HAND;
+  return {
+    mirror: G.art.w - G.frame.pivot.x,   // flip so it reaches left
+    angle:  G.frame.angle,               // and hangs slightly down
+    pivot:  G.art.wrist,
+    at:     G.frame.pivot,
+    scale:  G.scale,
+  };
+};
+/* Where an authored point of the hand lands inside its sprite — the
+ * scene uses this to hang the sleeve on the shoulder and to aim the
+ * scroll at the palm. */
+export function goblinHandPoint(p) {
+  return place({ C: [], J: [] }, goblinPlacement()).locate(p.x, p.y);
 }
 
 export function goblinHand(curl) {
   const step = quantise(curl, 8);
   return sprite(`goblin-hand:${step}`, () => {
     const G = GOBLIN_HAND;
-    const form = place(goblinHandForm(0.06 + (step / 8) * 0.94), {
-      mirror: G.art.w - G.frame.pivot.x,   // flip so it reaches left
-      angle:  G.frame.angle,               // and hangs slightly down
-      pivot:  G.art.wrist,
-      at:     G.frame.pivot,
-      scale:  G.scale,
-    });
+    const form = place(goblinHandForm(0.06 + (step / 8) * 0.94), goblinPlacement());
     const cv = raster(form, {
       w: Math.round(G.frame.w * G.scale),
       h: Math.round(G.frame.h * G.scale),
@@ -97,7 +108,7 @@ export function goblinHand(curl) {
     const cr = form.locate(31, 30);
     c.globalAlpha = 0.45; c.fillStyle = RAMP.goblin[1];
     c.fillRect(Math.round(cr.x - 5 * G.scale), Math.round(cr.y), Math.round(11 * G.scale), 1);
-    c.fillRect(Math.round(cr.x - 4 * G.scale), Math.round(cr.y + 1), Math.round(10 * G.scale), 1);
+    c.fillRect(Math.round(cr.x - 4 * G.scale), Math.round(cr.y + G.scale), Math.round(10 * G.scale), 1);
     c.globalAlpha = 1;
     return cv;
   });
@@ -131,7 +142,7 @@ function playerHandForms() {
     { base: { x: 36.5, y: 37 }, a: -1.39, lens: [16, 11.0, 7.0], r: 3.3 },
   ];
   const fingers = merge(...F.map(d =>
-    digit({ base: d.base, angle: d.a, lens: d.lens, r: d.r, bend: 0.09, taper: 0.42 })));
+    digit({ base: d.base, angle: d.a, lens: d.lens, r: d.r, bend: 0.09, taper: 0.42, minR: 1.6, tipR: 1.8 })));
 
   return { base, fingers };
 }
@@ -148,12 +159,14 @@ export function playerHand(lit = false) {
       light: lit ? LIGHT.magic : LIGHT.unlit,
     };
     const whole = raster(place(merge(base, fingers), opts), common);
-    const c = whole.getContext("2d");
-    c.globalAlpha = 0.45; c.fillStyle = common.ramp[1];
-    c.fillRect(24 * P.scale, 48 * P.scale, 13 * P.scale, 1);
-    c.fillRect(25 * P.scale, 49 * P.scale, 12 * P.scale, 1);
-    c.fillRect(27 * P.scale, 55 * P.scale, 10 * P.scale, 1);
-    c.globalAlpha = 1;
+    if (!lit) {                          // palm creases; his light washes them out
+      const c = whole.getContext("2d");
+      c.globalAlpha = 0.45; c.fillStyle = common.ramp[1];
+      c.fillRect(24 * P.scale, 48 * P.scale, 13 * P.scale, 1);
+      c.fillRect(25 * P.scale, 49 * P.scale, 12 * P.scale, 1);
+      c.fillRect(27 * P.scale, 55 * P.scale, 10 * P.scale, 1);
+      c.globalAlpha = 1;
+    }
     return whole;
   });
 }
@@ -191,7 +204,7 @@ export function rolledScroll(rarityColour, charged = false) {
     const cv = raster(form, {
       w: size, h: size, depth: 4.4 * px,
       ramp:  charged ? RAMP.parchmentLit : RAMP.parchment,
-      light: charged ? LIGHT.magic : LIGHT.carried,
+      light: charged ? LIGHT.pulled : LIGHT.carried,
     });
     const c = cv.getContext("2d");
 
@@ -212,6 +225,7 @@ export function rolledScroll(rarityColour, charged = false) {
     for (let i = 0; i < 7; i++) {   // two tails falling from the knot
       c.fillStyle = i > 4 ? dark : rarityColour;
       c.fillRect(Math.round((15.4 + i * 0.55) * px), Math.round((15.2 + i * 0.95) * px), Math.max(1, Math.round((1.6 - i * 0.1) * px)), Math.max(1, Math.round(1.3 * px)));
+      c.fillStyle = i > 3 ? dark : rarityColour;
       c.fillRect(Math.round((17.2 + i * 0.75) * px), Math.round((14.4 + i * 0.72) * px), Math.max(1, Math.round((1.5 - i * 0.1) * px)), Math.max(1, Math.round(1.2 * px)));
     }
     return cv;
@@ -223,6 +237,8 @@ export function rolledScroll(rarityColour, charged = false) {
  * the sigil somewhere to live. Each scroll grows its own mark from its
  * seed — the hook for showing what the player actually drew. */
 export const INV_SCROLL = { w: 22, h: 28 };
+const OPEN_PARCH = ["#1d1810", "#6f6246", "#90835d", "#b0a378"];
+const OPEN_ROD   = ["#1d1810", "#3c2b18", "#5e4526", "#7f6138"];
 
 export function openScroll(rarityColour, seed, smokes = false) {
   return sprite(`inv:${rarityColour}:${seed}:${smokes}`, () => {
@@ -231,11 +247,11 @@ export function openScroll(rarityColour, seed, smokes = false) {
     const c = cv.getContext("2d");
     const F = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
 
-    F(3, 7, 16, 14, RAMP.parchment[0]);              // the sheet
-    F(4, 8, 14, 12, RAMP.parchment[3]);
-    F(4, 8, 14, 1, RAMP.parchment[4]);
-    F(4, 19, 14, 1, RAMP.parchment[2]);
-    F(17, 8, 1, 12, RAMP.parchment[2]);
+    F(3, 7, 16, 14, OPEN_PARCH[0]);                  // the sheet
+    F(4, 8, 14, 12, OPEN_PARCH[2]);
+    F(4, 8, 14, 1, OPEN_PARCH[3]);
+    F(4, 19, 14, 1, OPEN_PARCH[1]);
+    F(17, 8, 1, 12, OPEN_PARCH[1]);
 
     const rng = rnd(seed ^ 0x51617);                 // the sigil, mirrored
     for (let y = 0; y < 7; y++) for (let x = 0; x < 3; x++) {
@@ -244,11 +260,11 @@ export function openScroll(rarityColour, seed, smokes = false) {
     F(11, 11, 1, 7, rarityColour);
 
     for (const ry of [3, 20]) {                      // rods, with knobbed ends
-      F(1, ry, 20, 4, RAMP.wood[0]);
-      F(2, ry + 1, 18, 2, RAMP.wood[3]);
-      F(2, ry + 1, 18, 1, RAMP.wood[4]);
-      F(0, ry, 2, 4, RAMP.wood[1]); F(20, ry, 2, 4, RAMP.wood[1]);
-      F(0, ry + 1, 1, 2, RAMP.wood[3]); F(21, ry + 1, 1, 2, RAMP.wood[3]);
+      F(1, ry, 20, 4, OPEN_ROD[0]);
+      F(2, ry + 1, 18, 2, OPEN_ROD[2]);
+      F(2, ry + 1, 18, 1, OPEN_ROD[3]);
+      F(0, ry, 2, 4, OPEN_ROD[1]); F(20, ry, 2, 4, OPEN_ROD[1]);
+      F(0, ry + 1, 1, 2, OPEN_ROD[2]); F(21, ry + 1, 1, 2, OPEN_ROD[2]);
     }
     if (smokes) {                                    // the good ones smoke
       c.globalAlpha = 0.75;
@@ -256,6 +272,126 @@ export function openScroll(rarityColour, seed, smokes = false) {
       F(13, 1, 1, 2, rarityColour); F(12, 0, 1, 1, rarityColour);
       c.globalAlpha = 1;
     }
+    return cv;
+  });
+}
+
+/* ─── the chest ───────────────────────────────────────────────────────
+ * A slab body under a domed lid, bound with two straps and a lock. It is
+ * two sprites so the lid can lift. The tier picks the materials; the
+ * light picks how they are seen — warm and plain by the candle in the
+ * satchel, a cold near-silhouette in the doorway. Same skeleton both
+ * times, which is the point of building it this way. */
+export const CHEST = { w: 40, h: 34, lidH: 17 };
+const CHEST_TIERS = [
+  { body: "wood",      strap: "iron"      },   // wooden
+  { body: "wood",      strap: "stone"     },   // iron
+  { body: "wood",      strap: "gold"      },   // gilded
+  { body: "obsidian",  strap: "gold"      },   // obsidian
+  { body: "voidstone", strap: "parchmentLit" },// void
+];
+const toneIndex = (ramp) => {
+  const key = ramp.map(h => parseInt(h.slice(1), 16));
+  return (r, g, b) => key.indexOf((r << 16) | (g << 8) | b);
+};
+/* Repaint a region in another material, keeping each pixel's tone — so
+ * a strap is lit exactly as the wood under it was. */
+function reskin(cv, from, to, test) {
+  const c = cv.getContext("2d"), img = c.getImageData(0, 0, cv.width, cv.height), d = img.data, idx = toneIndex(from);
+  const rgb = to.map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+  for (let y = 0; y < cv.height; y++) for (let x = 0; x < cv.width; x++) {
+    const i = (y * cv.width + x) * 4;
+    if (!d[i + 3] || !test(x, y)) continue;
+    const t = idx(d[i], d[i + 1], d[i + 2]);
+    if (t < 0) continue;
+    d[i] = rgb[t][0]; d[i + 1] = rgb[t][1]; d[i + 2] = rgb[t][2];
+  }
+  c.putImageData(img, 0, 0);
+}
+const strapAt = x => (x >= 8 && x <= 10) || (x >= 29 && x <= 31);
+
+export function chestParts(tier = 0, light = "candle") {
+  const t = CHEST_TIERS[Math.max(0, Math.min(CHEST_TIERS.length - 1, tier))];
+  return sprite(`chest:${tier}:${light}`, () => {
+    const cold = light === "slot";
+    const bodyRamp = cold ? RAMP.stone : RAMP[t.body];
+    const strapRamp = cold ? RAMP.goblin : RAMP[t.strap];
+    const rig = cold ? LIGHT.slot : LIGHT.candle;
+    const opts = { w: CHEST.w, h: CHEST.h, ramp: bodyRamp, light: rig, depth: 3.2 };
+
+    const body = raster({ C: [], J: [], B: [box(3, 15, 34, 18, 2)] }, opts);
+    reskin(body, bodyRamp, strapRamp, (x) => strapAt(x));
+    const bc = body.getContext("2d");
+    bc.fillStyle = bodyRamp[0]; bc.fillRect(4, 15, 32, 1);            // the dark where the lid sits
+    bc.fillStyle = bodyRamp[1]; bc.fillRect(5, 22, 30, 1); bc.fillRect(5, 28, 30, 1);   // plank lines
+    reskin(body, bodyRamp, strapRamp, (x, y) => strapAt(x) && (y === 22 || y === 28));
+
+    const lid = raster({ C: [], J: [], B: [box(2, 3, 36, 14, 6)] }, { ...opts, h: CHEST.lidH });
+    reskin(lid, bodyRamp, strapRamp, (x) => strapAt(x));
+    const lc = lid.getContext("2d");
+    lc.fillStyle = bodyRamp[1]; lc.fillRect(6, 10, 28, 1);
+    reskin(lid, bodyRamp, strapRamp, (x, y) => strapAt(x) && y === 10);
+    // the lock plate hangs from the lid over the seam
+    const lock = cold ? RAMP.goblin : RAMP[t.strap];
+    lc.fillStyle = lock[2]; lc.fillRect(17, 12, 6, 5);
+    lc.fillStyle = lock[4]; lc.fillRect(17, 12, 6, 1); lc.fillRect(17, 12, 1, 5);
+    lc.fillStyle = lock[0]; lc.fillRect(19, 14, 2, 2);
+    return { body, lid };
+  });
+}
+/* The chest shut, as one sprite. */
+export function chest(tier = 0, light = "candle") {
+  return sprite(`chest-shut:${tier}:${light}`, () => {
+    const { body, lid } = chestParts(tier, light);
+    const cv = document.createElement("canvas"); cv.width = CHEST.w; cv.height = CHEST.h;
+    const c = cv.getContext("2d");
+    c.drawImage(body, 0, 0); c.drawImage(lid, 0, 0);
+    return cv;
+  });
+}
+
+/* ─── a coin nobody has seen yet ──────────────────────────────────────
+ * Deliberately NOT a coin: a clod of dirt the size of one. What is under
+ * it is drawn by lib/coin.js when it is brushed, and by nothing else. */
+export function dirtClod(seed = 1) {
+  return sprite(`clod:${seed & 7}`, () => {
+    const cv = raster({ C: [], J: [joint(12, 12, 10.5)] }, { w: 24, h: 24, ramp: RAMP.dirt, light: LIGHT.candle, depth: 6 });
+    const c = cv.getContext("2d"), rng = rnd((seed & 7) + 0x99), idx = toneIndex(RAMP.dirt);
+    const img = c.getImageData(0, 0, 24, 24), d = img.data;
+    for (let n = 0; n < 46; n++) {                   // grit: nudge a pixel one tone
+      const x = (rng() * 24) | 0, y = (rng() * 24) | 0, i = (y * 24 + x) * 4;
+      if (!d[i + 3]) continue;
+      const t = Math.max(0, Math.min(5, idx(d[i], d[i + 1], d[i + 2]) + (rng() < 0.5 ? -1 : 1)));
+      const h = RAMP.dirt[t];
+      d[i] = parseInt(h.slice(1, 3), 16); d[i + 1] = parseInt(h.slice(3, 5), 16); d[i + 2] = parseInt(h.slice(5, 7), 16);
+    }
+    c.putImageData(img, 0, 0);
+    return cv;
+  });
+}
+
+/* ─── the brush ───────────────────────────────────────────────────── */
+export function brush() {
+  return sprite("brush", () => {
+    const handle = raster({ C: [capsule(21, 4, 11, 14, 2.2, 2.6)], J: [] }, { w: 26, h: 26, ramp: RAMP.wood, light: LIGHT.candle, depth: 2 });
+    const head = raster({ C: [capsule(10, 15, 5, 20, 3.4, 4.2)], J: [] }, { w: 26, h: 26, ramp: RAMP.bristle, light: LIGHT.candle, depth: 3 });
+    const c = handle.getContext("2d");
+    c.drawImage(head, 0, 0);
+    c.fillStyle = RAMP.iron[3]; c.fillRect(10, 13, 3, 1); c.fillRect(9, 14, 3, 1);   // the ferrule
+    c.fillStyle = RAMP.bristle[1];
+    for (const [x, y] of [[4, 19], [6, 21], [3, 22], [7, 18]]) c.fillRect(x, y, 1, 2);
+    return handle;
+  });
+}
+
+/* ─── something small, wrapped, pushed through the gap ────────────── */
+export function pouch(light = "slot") {
+  return sprite(`pouch:${light}`, () => {
+    const cold = light === "slot";
+    const cv = raster({ C: [capsule(8, 5, 8, 7, 2.2, 2.6)], J: [joint(8, 11, 5.2)] },
+      { w: 16, h: 18, ramp: cold ? RAMP.stone : RAMP.wood, light: cold ? LIGHT.slot : LIGHT.candle, depth: 3 });
+    const c = cv.getContext("2d");
+    c.fillStyle = (cold ? RAMP.goblin : RAMP.gold)[4]; c.fillRect(6, 7, 5, 1);     // the drawstring
     return cv;
   });
 }
