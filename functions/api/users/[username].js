@@ -1,8 +1,10 @@
 import { json, bad, getAuth } from "../_utils.js";
 
 /* GET /api/users/:username
-   Returns the public profile of a player — bio, title, level, frame,
-   pinned showcase coins (or top-by-rarity if no pins), and equipped tarots. */
+   The public profile of a player — bio, title, level, frame and the
+   cabinet (pinned coins in their order, or the best few if none are
+   pinned). Dusty coins are not public: nobody has seen them yet,
+   including their owner. */
 export async function onRequestGet({ request, env, params }) {
   const auth = await getAuth(request, env);
   if (!auth) return bad("Unauthorized", 401);
@@ -10,7 +12,6 @@ export async function onRequestGet({ request, env, params }) {
   const username = String(params.username || "").trim();
   if (!username) return bad("Username required");
 
-  // Base columns — always present
   const player = await env.DB.prepare(
     `SELECT players.id, players.username, players.created_at,
             COALESCE(player_state.xp, 0) AS xp,
@@ -22,34 +23,14 @@ export async function onRequestGet({ request, env, params }) {
        LEFT JOIN player_state ON player_state.player_id = players.id
       WHERE players.username = ?1 COLLATE NOCASE`
   ).bind(username).first();
-
   if (!player) return bad("Player not found", 404);
 
-  // v2+ extras (equipped tarots) — wrapped in try so missing migration doesn't 500
-  let equippedTarots = [];
-  try {
-    const ext = await env.DB.prepare(
-      `SELECT equipped_tarots FROM player_state WHERE player_id = ?1`
-    ).bind(player.id).first();
-    if (ext?.equipped_tarots) equippedTarots = JSON.parse(ext.equipped_tarots);
-  } catch {}
+  const r = await env.DB.prepare(
+    `SELECT id, seed, metal_idx, shiny, rarity FROM coins WHERE player_id = ?1 AND dusty = 0`
+  ).bind(player.id).all();
+  const allCoins = r.results || [];
 
-  // Coin list — try with rarity column, fall back without if migration missing
-  let allCoins = [];
-  try {
-    const r = await env.DB.prepare(
-      `SELECT id, seed, metal_idx, shiny, rarity_idx FROM coins WHERE player_id = ?1`
-    ).bind(player.id).all();
-    allCoins = r.results || [];
-  } catch {
-    const r = await env.DB.prepare(
-      `SELECT id, seed, metal_idx, shiny FROM coins WHERE player_id = ?1`
-    ).bind(player.id).all();
-    allCoins = r.results || [];
-  }
-
-  // Showcase: pinned_ids preserves order, otherwise top by metal then shiny
-  let showcase;
+  let showcase = [];
   if (player.pinned_ids) {
     try {
       const ids = JSON.parse(player.pinned_ids);
@@ -57,19 +38,16 @@ export async function onRequestGet({ request, env, params }) {
       showcase = ids.map(id => byId.get(id)).filter(Boolean).slice(0, 8);
     } catch { showcase = []; }
   }
-  if (!showcase || !showcase.length) {
+  if (!showcase.length) {
     showcase = [...allCoins]
-      .sort((a, b) => b.metal_idx - a.metal_idx || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0))
+      .sort((a, b) => (b.rarity ?? 0) - (a.rarity ?? 0) || b.metal_idx - a.metal_idx || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0))
       .slice(0, 6);
   }
 
-  // Tier weights extended for 9 metals (Eldritch, Astral added)
   const tierWeights = [1, 3, 8, 20, 45, 120, 300, 800, 2000];
   const rarityScore = allCoins.reduce(
-    (s, c) => s + (tierWeights[c.metal_idx] || 1) * (c.shiny ? 3 : 1), 0
-  );
+    (s, c) => s + (tierWeights[c.metal_idx] || 1) * ((c.rarity ?? 0) + 1) * (c.shiny ? 3 : 1), 0);
 
-  // Friendship status
   const friendRow = await env.DB.prepare(
     `SELECT 1 FROM friends WHERE player_id = ?1 AND friend_id = ?2`
   ).bind(auth.player.id, player.id).first();
@@ -87,13 +65,9 @@ export async function onRequestGet({ request, env, params }) {
     coinCount: allCoins.length,
     shinyCount: allCoins.filter(c => c.shiny).length,
     rarityScore,
-    equippedTarots,
     showcase: showcase.map(c => ({
-      id: c.id,
-      seed: c.seed >>> 0,
-      metalIdx: c.metal_idx,
-      shiny: !!c.shiny,
-      rarityIdx: c.rarity_idx ?? null,
+      id: c.id, seed: c.seed >>> 0, metalIdx: c.metal_idx, shiny: !!c.shiny,
+      ...(c.rarity != null ? { rarity: c.rarity } : {}),
     })),
   });
 }

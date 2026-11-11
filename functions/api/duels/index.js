@@ -49,7 +49,7 @@ async function areFriends(env, aId, bId) {
 async function fetchOwnedCoin(env, playerId, coinId) {
   const c = await env.DB.prepare(
     `SELECT id, seed, metal_idx, shiny, locked, rarity
-       FROM coins WHERE player_id = ?1 AND id = ?2`
+       FROM coins WHERE player_id = ?1 AND id = ?2 AND dusty = 0`
   ).bind(playerId, coinId).first();
   if (!c) return null;
   if (c.locked) return null;
@@ -316,7 +316,6 @@ async function actionFlip(env, pid, body) {
   const seedHex = await sha256Hex(seedInput);
 
   const { flips, winnerId } = runFlips(seedHex, duel.challenger_id, duel.challenged_id);
-  const loserId = winnerId === duel.challenger_id ? duel.challenged_id : duel.challenger_id;
   const winnerCoinId = winnerId === duel.challenger_id ? duel.challenger_coin : duel.challenged_coin;
   const loserCoinId = winnerId === duel.challenger_id ? duel.challenged_coin : duel.challenger_coin;
 
