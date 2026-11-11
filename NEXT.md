@@ -1,34 +1,36 @@
-# Where the grassroots branch is up to
+# What is open
 
-## Done
+The rebuild is complete on `grassroots`: the loop runs end to end, the server
+is the authority, and the branch builds, lints and passes its tests. These are
+the things that are decisions rather than work, or that need real players.
 
-- **Deleted**: the side-scroller hunt and its sprite system, tarot (cards,
-  pairs, buffs, shop, spreads), the pickaxe/shovel upgrade tree and its
-  durability + repair loop, artefacts and the Shrine, the old radar/dig
-  Hunt screen, and the 176 hand-drawn coin PNGs.
-- **Coins untouched.** `lib/coin.js` keeps its 13×13 generator exactly as
-  it was. See the warning block at the top of `lib/forms.js`.
-- **Two bugs fixed.** `coinValue` read `?.multiplier`, which does not exist
-  on RARITIES, so rarity contributed nothing to a coin's value — now reads
-  `?.valueMul`. And `BrushReveal`/`CoinModal` loaded coin PNGs while the
-  vault drew procedurally, so the coin you brushed was not the coin you
-  kept; both now use the one painter.
-- **Added**: `lib/pixelform.js` (the shared renderer), `lib/forms.js` (the
-  sprites), `lib/sigil.js` (scroll judging), `scenes/door.js`,
-  `scenes/scribe.js`, and the `Door`/`Scribe` screen wrappers.
+## Decisions waiting on you
 
-## Not done — and why
+- **Marks have nothing to spend them on.** Selling coins pays marks, and the
+  shop that took marks is gone — the goblin gives away what it used to sell.
+  Until there is a sink, marks are a score. The option closest to the design:
+  let marks be offered at the door alongside scrolls, at a poor rate.
+- **Duels** are kept and still hidden (`FEATURES.duels` in `shared/tuning.js`),
+  as they were before the rebuild. The server endpoint is unchanged; the client
+  UI is ported and lives under Profile → Friends. Flip the flag to try them.
+- **The Tavern is simulated gambling.** It is coins-only and says so, but if
+  this is ever distributed in Australia that is the feature that sets its
+  classification.
+- **Titles still say "Digger".** `Novice Digger` is the starting title and
+  there is no digging any more. Renaming titles was left to you.
 
-`MintForge.jsx` still imports and uses the removed systems in roughly 200
-places, so **the build does not pass yet.** Most of that is the phase
-machine (`hunt → dig → brush`), the ore economy and the shovel gating,
-which the new loop replaces outright. Stripping it is not a separate job
-from wiring scribe → goblin → chest → brush — it is the same job, and
-doing it as deletion first would mean writing the state twice.
+## Needs real players
 
-## Open question before that starts
+- **Sigil thresholds.** They are tuned against generated drawings
+  (`npm run sim`), not people. The first real stroke logs should replace the
+  generators in `tools/simulate.mjs`. `deliberate` (drawing pace) is the trait
+  most likely to be wrong.
+- **Chest pacing** past the first hour, and whether eight steps of posture are
+  enough of a signal on the longest waits.
 
-What is the Tavern for now? Its tarot shop and repair tab are gone, and
-the goblin hands out banners and titles for free, which was the other half
-of its shop. That leaves gambling. Keep it, fold the gambling into the
-goblin, or drop it?
+## Not built
+
+- Real sound. The hooks and placeholder tones are in `src/lib/feel.js`.
+- Offline sealing. A scroll cannot be judged without the server; if the
+  request fails the drawing stays on the sheet to try again.
+- Seal-farming protection beyond a 2.5s cooldown and the eight-scroll satchel.

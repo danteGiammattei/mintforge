@@ -1,157 +1,131 @@
 # MintForge
 
-Hunt, forge, and gamble ancient coins from lost civilisations.
-Runs on Cloudflare Pages + D1.
+A mobile-first pixel-art collecting game. You are a scribe. You draw sigils,
+pay them to something behind a door, and brush the dust off whatever it gives
+back.
 
-## Architecture
+## The loop
 
-- **Frontend** — Vite + React, built into `dist/`
-- **API** — Cloudflare Pages Functions (`functions/api/...`)
-- **Storage** — D1 (SQLite), bound as `DB`
-- **Auth** — username + 4-6 digit PIN, PBKDF2-hashed, session tokens in `localStorage`
+1. **Scribe** — free-draw a sigil on parchment with a limited well of ink and
+   seal it into a scroll. The scroll gets a rarity. To the player this is meant
+   to feel random; the rules are never shown.
+2. **Door** — a goblin waits half-hidden in the gap. Swipe up, pick a scroll,
+   offer it; he pulls it out of your hand. There is no menu, no price and no
+   tooltip. His posture is the only meter: he leans further out as the pot
+   fills. When he has been paid enough, a chest comes through.
+3. **Satchel** — hold to break the chest's seal. It cannot fail. Inside is a
+   coin, thick with dust.
+4. **Brush** — clean it. Then it is yours, in the **Vault**.
 
-All API routes are same-origin; no separate Worker.
+The goblin also gives things away unprompted when you visit: the first chest,
+better brushes, titles, banners. When a scroll was lifted by something about
+the way it was drawn, he sometimes says so, obliquely. He never comments on a
+poor scroll and never states a rule.
 
-## Local dev
+Around the loop: the **Tavern** (three coin wagers), and **Profile** (banner,
+title, a cabinet of six coins, friends).
 
-```bash
+## Three rules of the codebase
+
+**The coin generator is frozen.** `genFace` in `src/lib/coin.js` is a 13×13
+cellular automaton and stays that way. Its coarseness is the point — players
+see rabbits and faces in the blobs, and a nearly blank face is prized.
+`tests/coin.golden.test.js` pins its output against the generator on `main`.
+Coins are never drawn through `pixelform`.
+
+**The server decides everything of value.** The client sends which of the
+player's own things to act on (and, for sealing, the strokes). It never sends
+a coin, a rarity, a balance or a roll. See `server/game.js`.
+
+**Nothing on the door screen explains itself.** No prices, no progress bar, no
+tooltips. `shared/tuning.js` and the server keep the pot hidden; the client is
+told his posture in eight coarse steps and nothing finer.
+
+## Layout
+
+```
+shared/        rules both sides run
+  tuning.js      every balance number, in one file
+  economy.js     the pot, chests, coin rolls, gifts, wagers — pure functions
+  sigil.js       how a drawing is judged
+server/        the authority (runs in Pages Functions; plain modules, so tests run them in Node)
+  game.js        seal · offer · visit · open · brush · sell · gamble
+  state.js       the snapshot the client may see; cosmetic choices
+  auth.js        PIN hashing, login throttle, session expiry
+functions/api/ thin HTTP wrappers over server/
+src/
+  scenes/        canvas scenes: door, scribe, chest (+ kit.js: scaling, 60Hz loop, reduced motion)
+  lib/           pixelform (renderer), forms (sprites), coin (frozen), feel (sound/haptics), outbox
+  state/         useGameState — the one place game state changes
+  screens/       Scribe, Door, Satchel, Vault, Tavern, Profile (+ Friends)
+  ui/            dialogs, toasts, aria-live, pixel icons
+tests/         node --test: coin golden, sigil traits, server actions, contrast
+tools/simulate.mjs   plays the loop thousands of times and prints what it pays
+migrations/    D1 migrations 001–009 · schema.sql is all of them applied
+```
+
+## Running it
+
+```sh
 npm install
-npm run dev           # Vite only — API returns 404 locally
+npm run db:local     # create a local D1 from schema.sql (once; delete .wrangler/state to reset)
+npm run build
+npm run serve        # http://localhost:8788 — the built app + the API + the local D1
 ```
 
-For full-stack local after D1 is set up:
-```bash
-npx wrangler pages dev -- npm run dev
+`npm run dev` serves the client alone with hot reload, but there is no API
+behind it; use `npm run serve` (rebuild after changes) to play.
+
+```sh
+npm run check        # lint + tests + build
+npm test             # 46 tests, no network, no browser
+npm run sim          # the balance report (npm run sim -- --quick while iterating)
 ```
 
-## Deploy walkthrough
+## Deploying
 
-### 1. Create the D1 database
+The project is Cloudflare Pages + D1 (`wrangler.toml`).
 
-```bash
-npx wrangler d1 create mintforge
+An existing database needs migration 009 before this branch is deployed:
+
+```sh
+npx wrangler d1 execute mintforge --remote --file=migrations/009_grassroots.sql
 ```
 
-Copy the printed `database_id` into `wrangler.toml` under `[[d1_databases]]`.
+It only adds things. Old columns and tables from removed systems (shovel,
+tarot, ore, artefacts) are left in place and no longer read. A fresh database
+takes `schema.sql` instead.
 
-### 2. Apply the schema
+## Art
 
-```bash
-npx wrangler d1 execute mintforge --file=./schema.sql --remote
-```
+Everything except coins is built in `src/lib/pixelform.js`: a sprite is a
+skeleton of capsules, joints and slabs, turned into a distance field, lit by
+one named rig and quantised to a six-tone ramp. No outlines. To move, mirror
+or resize a sprite, transform its skeleton and rasterise again — never rotate
+or scale a finished sprite by a fraction.
 
-Verify:
-```bash
-npx wrangler d1 execute mintforge --command="SELECT name FROM sqlite_master WHERE type='table'" --remote
-```
-Expect: `players`, `player_state`, `coins`, `sessions`.
+Each scene names its light at the top of its file and shades to it:
 
-### 3. Push to GitHub
+| Scene | Light |
+| --- | --- |
+| Door | A cold slot of light **behind** the door, up and left. Rim only. His magic is the second source. |
+| Scribe, Satchel, chest | One candle, low and left, **in front**. Warm, falls off hard. |
 
-```bash
-git init
-git add .
-git commit -m "Initial MintForge deploy"
-git remote add origin <your-repo-url>
-git push -u origin main
-```
+HTML screens follow the scenes: one dark palette, Silkscreen for every word,
+hard square edges, pixel icons (`src/ui/icons.js`), no emoji.
 
-### 4. Connect to Cloudflare Pages
+## Accessibility
 
-Dashboard → Workers & Pages → Create → Pages → Connect to Git → pick repo.
+Pinch-zoom is on. Touch targets are at least 44px. Text clears 4.5:1
+(`tests/contrast.test.js`). `prefers-reduced-motion` stops flicker, grain,
+sway and shake in the scenes and animation elsewhere. Results that are only
+drawn on a canvas — a scroll's rarity, the goblin's hints — are also sent to
+an `aria-live` region, and every canvas control has an off-canvas button.
+Render loops stop while the tab is hidden.
 
-Build settings:
-- Framework preset: **Vite**
-- Build command: `npm run build`
-- Build output directory: `dist`
-- Env var: `NODE_VERSION` = `20`
+## Sound
 
-### 5. Bind D1 to the Pages project
-
-After first deploy: Pages project → **Settings** → **Functions** → **D1 database bindings** → Add:
-- Variable name: `DB`
-- D1 database: `mintforge`
-
-Then **Retry deployment**. API endpoints only work after binding is attached.
-
-### 6. Smoke test
-
-```bash
-curl -X POST https://<your-pages-url>/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"test","pin":"1234"}'
-```
-
-Expect: `{ "token": "...", "player": { ... } }`.
-
-### 7. Custom domain (optional)
-
-Pages project → Custom domains → `mintforge.projectthoth.com` (auto-DNS if zone is already on your CF account).
-
-## Schema reference
-
-See `schema.sql`. Four tables:
-- **players** — account credentials (PBKDF2 + salt, 10k iterations)
-- **player_state** — xp, shovel_level, brush_level, frame, bio, selected_title, pinned_ids (JSON)
-- **coins** — id, seed, metal_idx, shiny, acquired_at (rest derives from seed via `mkCoin(seed)`)
-- **sessions** — token → player_id
-
-## API surface
-
-| Method | Path                 | Auth | Purpose                                  |
-|--------|----------------------|------|------------------------------------------|
-| POST   | `/api/auth/register` | —    | Create account + session                 |
-| POST   | `/api/auth/login`    | —    | Authenticate + session                   |
-| POST   | `/api/auth/logout`   | ✓    | Revoke session                           |
-| GET    | `/api/vault`         | ✓    | Full player state + coin list            |
-| POST   | `/api/vault`         | ✓    | Transactional `{remove?, add?, state?}`  |
-
-All coin mutations flow through the single transactional endpoint — forges and gambles stay atomic.
-
-## Migrations (existing deployments)
-
-Run these in order. Each is idempotent — `CREATE TABLE IF NOT EXISTS` skips if applied; `ALTER TABLE ADD COLUMN` errors with "duplicate column name" if already applied (safe to ignore).
-
-```bash
-# v1 -> v2: Locked coins + friends
-npx wrangler d1 execute mintforge --file=./migrations/001_locked_friends.sql --remote
-
-# v2 -> v3: Marks currency, pickaxe durability, tarot cards
-npx wrangler d1 execute mintforge --file=./migrations/002_marks_durability_tarot.sql --remote
-
-# v3 -> v4: Premium frame + title ownership
-npx wrangler d1 execute mintforge --file=./migrations/003_owned_cosmetics.sql --remote
-
-# v4 -> v5: Coin rarity column
-npx wrangler d1 execute mintforge --file=./migrations/004_coin_rarity.sql --remote
-
-# v5 -> v6: Artefacts table (Shrine system)
-npx wrangler d1 execute mintforge --file=./migrations/005_artefacts.sql --remote
-```
-
-If you can't run wrangler (e.g. on mobile), the equivalent SQL to paste into the Cloudflare D1 web console is in each migration file.
-
-## API surface (current)
-
-| Method | Path                       | Auth | Purpose                                         |
-|--------|----------------------------|------|-------------------------------------------------|
-| POST   | `/api/auth/register`       | —    | Create account + session                        |
-| POST   | `/api/auth/login`          | —    | Authenticate + session                          |
-| POST   | `/api/auth/logout`         | ✓    | Revoke session                                  |
-| GET    | `/api/vault`               | ✓    | Full player state + coins + tarots + artefacts  |
-| POST   | `/api/vault`               | ✓    | Transactional `{remove?, add?, lock?, tarotBuy?, tarotSell?, artefactAdd?, state?}` |
-| GET    | `/api/users/search?q=`     | ✓    | Username prefix search (max 10)                 |
-| GET    | `/api/users/:username`     | ✓    | Public profile + showcase coins                 |
-| GET    | `/api/friends`             | ✓    | List your friends                               |
-| POST   | `/api/friends`             | ✓    | `{username}` — add friend                       |
-| DELETE | `/api/friends`             | ✓    | `{username}` — remove friend                    |
-
-## Game systems
-
-- **Coins** — the collectables. Found via Hunt, identity derived from a 32-bit seed (so DB rows stay tiny — `{id, seed, metalIdx, shiny, locked}`). All visual properties are reconstructed client-side via `mkCoin(seed)`.
-- **Marks (◈)** — the spendable currency. Earned at ~30% of a coin's value on discovery, or by selling coins from the inspect modal. Spent on tarot cards and pickaxe repairs.
-- **Pickaxe durability** — each dig costs 1 durability (Hierophant tarot halves it). Broken pickaxes refuse to dig until repaired in the Tavern. Repair cost scales with shovel level.
-- **Tarot cards** — purchased once each from the Tavern shop, equip up to 5 simultaneously for stacking buffs (shiny chance, XP multiplier, marks multiplier, tier-up rolls, durability reduction, pin slots, lucky-dig chance, forge refund).
-- **Brush** — capped at 15% shiny chance at max level (was 35%) to leave room for tarot stacking. Tarot bonuses apply on top of the brush rate.
-
-
+`src/lib/feel.js` has a named cue for every moment worth feeling (`seal`,
+`pull`, `break`, `reveal`, …) with a haptic pattern and a placeholder tone.
+To use a real sound, drop a file in `public/sfx/` and add its name to
+`SAMPLES` at the top of that file.
