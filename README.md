@@ -22,8 +22,10 @@ better brushes, titles, banners. When a scroll was lifted by something about
 the way it was drawn, he sometimes says so, obliquely. He never comments on a
 poor scroll and never states a rule.
 
-Around the loop: the **Tavern** (three coin wagers), and **Profile** (banner,
-title, a cabinet of six coins, friends).
+Around the loop: the **Forge** (reached from any coin in the vault — spend
+marks on a strike that may leave the coin shiny, and never harms it), the
+**Tavern** (three coin wagers), and **Profile** (banner, title, a cabinet of
+six coins, friends).
 
 ## Three rules of the codebase
 
@@ -49,19 +51,19 @@ shared/        rules both sides run
   economy.js     the pot, chests, coin rolls, gifts, wagers — pure functions
   sigil.js       how a drawing is judged
 server/        the authority (runs in Pages Functions; plain modules, so tests run them in Node)
-  game.js        seal · offer · visit · open · brush · sell · gamble
+  game.js        seal · offer · visit · open · brush · sell · forge · gamble
   state.js       the snapshot the client may see; cosmetic choices
   auth.js        PIN hashing, login throttle, session expiry
 functions/api/ thin HTTP wrappers over server/
 src/
-  scenes/        canvas scenes: door, scribe, chest (+ kit.js: scaling, 60Hz loop, reduced motion)
+  scenes/        canvas scenes: door, scribe, chest, forge (+ kit.js: scaling, 60Hz loop, reduced motion)
   lib/           pixelform (renderer), forms (sprites), coin (frozen), feel (sound/haptics), outbox
   state/         useGameState — the one place game state changes
   screens/       Scribe, Door, Satchel, Vault, Tavern, Profile (+ Friends)
   ui/            dialogs, toasts, aria-live, pixel icons
 tests/         node --test: coin golden, sigil traits, server actions, contrast
 tools/simulate.mjs   plays the loop thousands of times and prints what it pays
-migrations/    D1 migrations 001–009 · schema.sql is all of them applied
+migrations/    D1 migrations 001–010 · schema.sql is all of them applied
 ```
 
 ## Running it
@@ -78,7 +80,7 @@ behind it; use `npm run serve` (rebuild after changes) to play.
 
 ```sh
 npm run check        # lint + tests + build
-npm test             # 46 tests, no network, no browser
+npm test             # 50 tests, no network, no browser
 npm run sim          # the balance report (npm run sim -- --quick while iterating)
 ```
 
@@ -86,13 +88,16 @@ npm run sim          # the balance report (npm run sim -- --quick while iteratin
 
 The project is Cloudflare Pages + D1 (`wrangler.toml`).
 
-An existing database needs migration 009 before this branch is deployed:
+An existing database needs migration 009 before this branch is deployed, and
+010 at any point after:
 
 ```sh
 npx wrangler d1 execute mintforge --remote --file=migrations/009_grassroots.sql
+npx wrangler d1 execute mintforge --remote --file=migrations/010_retheme_titles.sql
 ```
 
-It only adds things. Old columns and tables from removed systems (shovel,
+009 only adds things. 010 rewrites stored titles from the old digging game to
+their new names; the app already shows the new names without it. Old columns and tables from removed systems (shovel,
 tarot, ore, artefacts) are left in place and no longer read. A fresh database
 takes `schema.sql` instead.
 
@@ -110,6 +115,7 @@ Each scene names its light at the top of its file and shades to it:
 | --- | --- |
 | Door | A cold slot of light **behind** the door, up and left. Rim only. His magic is the second source. |
 | Scribe, Satchel, chest | One candle, low and left, **in front**. Warm, falls off hard. |
+| Forge | A bed of coals, low and right, **in front**. Orange, and the only light. |
 
 HTML screens follow the scenes: one dark palette, Silkscreen for every word,
 hard square edges, pixel icons (`src/ui/icons.js`), no emoji.

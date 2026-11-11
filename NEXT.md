@@ -6,18 +6,14 @@ the things that are decisions rather than work, or that need real players.
 
 ## Decisions waiting on you
 
-- **Marks have nothing to spend them on.** Selling coins pays marks, and the
-  shop that took marks is gone — the goblin gives away what it used to sell.
-  Until there is a sink, marks are a score. The option closest to the design:
-  let marks be offered at the door alongside scrolls, at a poor rate.
 - **Duels** are kept and still hidden (`FEATURES.duels` in `shared/tuning.js`),
   as they were before the rebuild. The server endpoint is unchanged; the client
   UI is ported and lives under Profile → Friends. Flip the flag to try them.
 - **The Tavern is simulated gambling.** It is coins-only and says so, but if
   this is ever distributed in Australia that is the feature that sets its
   classification.
-- **Titles still say "Digger".** `Novice Digger` is the starting title and
-  there is no digging any more. Renaming titles was left to you.
+- **The new title names** are a first pass (`TITLES` and `TITLE_RENAMES` in
+  `src/lib/data.js`). Changing one is a one-line edit plus a row in the map.
 
 ## Needs real players
 
@@ -25,6 +21,9 @@ the things that are decisions rather than work, or that need real players.
   (`npm run sim`), not people. The first real stroke logs should replace the
   generators in `tools/simulate.mjs`. `deliberate` (drawing pace) is the trait
   most likely to be wrong.
+- **Forge prices.** A shine costs about 1,000 marks on an ordinary coin —
+  roughly twenty minutes of selling — and five times a coin's worth above
+  that. Whether that makes shinies too common is a question for real play.
 - **Chest pacing** past the first hour, and whether eight steps of posture are
   enough of a signal on the longest waits.
 

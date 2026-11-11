@@ -21,11 +21,11 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { analyse, rollScroll, TRAITS } from "../shared/sigil.js";
-import { SCRIBE, CHESTS, XP } from "../shared/tuning.js";
+import { SCRIBE, CHESTS, XP, FORGE } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
-  resolveToss, resolveCrucible, resolveRoulette,
+  resolveToss, resolveCrucible, resolveRoulette, forgeCost,
 } from "../shared/economy.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
@@ -255,6 +255,39 @@ async function sell(db, pid, body) {
   return { sold: rows.map(r => r.id), marks };
 }
 
+/* ─── the forge ───────────────────────────────────────────────────────
+ * Marks for a chance at a shine. The marks leave first, and only if the
+ * balance covers them; the coin is never at risk. */
+async function forge(db, pid, body, { rand }) {
+  if (!idOk(body.coinId)) throw new Refusal("Which coin?");
+  const c = await db.prepare(
+    `SELECT id, seed, metal_idx, shiny, rarity FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
+  ).bind(body.coinId, pid).first();
+  if (!c) throw new Refusal("That coin is gone", 404);
+  if (c.shiny) throw new Refusal("It already shines", 409);
+
+  const cost = forgeCost(coinValue(hydrate({ ...c, shiny: 0 })));
+  const paid = await db.prepare(
+    `UPDATE player_state SET marks = marks - ?2 WHERE player_id = ?1 AND marks >= ?2`).bind(pid, cost).run();
+  if (!paid.meta.changes) throw new Refusal("Not enough marks", 402);
+
+  const shiny = rand() < FORGE.shinyChance;
+  if (shiny) {
+    const set = await db.prepare(
+      `UPDATE coins SET shiny = 1 WHERE id = ?1 AND player_id = ?2 AND shiny = 0 AND dusty = 0`).bind(c.id, pid).run();
+    if (!set.meta.changes) {
+      // the coin was sold, staked or shined from under us: give the marks back
+      await db.prepare(`UPDATE player_state SET marks = marks + ?2 WHERE player_id = ?1`).bind(pid, cost).run();
+      throw new Refusal("That coin is gone", 409);
+    }
+  }
+  const xp = XP.forge.strike + (shiny ? XP.forge.shine : 0);
+  const struck = bump("struck");
+  const stats = shiny ? `json_set(${struck}, '$.shined', COALESCE(json_extract(stats, '$.shined'), 0) + 1)` : struck;
+  await db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${stats} WHERE player_id = ?1`).bind(pid, xp).run();
+  return { shiny, cost, xp };
+}
+
 /* ─── the tavern ──────────────────────────────────────────────────── */
 
 const GAMES = {
@@ -304,7 +337,7 @@ async function gamble(db, pid, body, { now, rand }) {
 
 /* ─── dispatch ────────────────────────────────────────────────────── */
 
-const ACTIONS = { seal, offer, visit, open, brush, sell, gamble };
+const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge };
 
 export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;

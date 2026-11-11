@@ -105,15 +105,28 @@ export const SHINY_VALUE_MUL  = 4;
 export const CONDITION_STEP   = 0.05;   // each grade below Pristine; Pristine is +15%
 
 /* ─── experience ──────────────────────────────────────────────────────
- * Sealing, offering and brushing replace digging as the sources. */
+ * Sealing, offering and brushing are the sources. */
 export const XP = {
   seal:   { base: 6,  perRarity: 4 },
   offer:  { base: 8,  perRarity: 6 },
   open:   10,
   brush:  { base: 30, perRarity: 15, perMetal: 10, shiny: 60 },
+  forge:  { strike: 5, shine: 60 },
   gambleWin: 120, gambleLoss: 20,
   rouletteWin: 140, rouletteLoss: 20,
   perLevel: 220,                       // level = floor(sqrt(xp / perLevel)) + 1
+};
+
+/* ─── the forge ───────────────────────────────────────────────────────
+ * Where marks go. A strike costs marks and may put a shine on a coin; it
+ * never harms the coin. The price follows what the coin is worth, so the
+ * expected gain from a strike (chance × the three extra multiples a
+ * shiny coin sells for) must stay BELOW the price or the forge turns
+ * into a way to print marks: shinyChance × (SHINY_VALUE_MUL − 1) < costMul. */
+export const FORGE = {
+  shinyChance: 0.12,
+  costMul: 0.6,          // × the coin's unshined sale value, per strike
+  minCost: 120,          // so a copper is not shined for pocket change
 };
 
 /* ─── the tavern ──────────────────────────────────────────────────── */

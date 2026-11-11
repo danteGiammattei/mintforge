@@ -6,6 +6,8 @@ import { coinRarity, coinValue } from "../lib/coin.js";
 import { METALS, RARITIES } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
 import CoinModal from "../components/CoinModal.jsx";
+import Forge from "../components/Forge.jsx";
+import { FORGE } from "../../shared/tuning.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
 
 /* ─── VAULT ───────────────────────────────────────────────────────────────
@@ -43,6 +45,7 @@ export default function Vault() {
   const [picked, setPicked] = useState(() => new Set());
   const [openId, setOpenId] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [forging, setForging] = useState(null);
 
   const pinnedSet = useMemo(() => new Set(g.showcase.filter(Boolean).map(c => c.id)), [g.showcase]);
   const counts = useMemo(() => METALS.map((_, i) => g.coins.filter(c => c.metalIdx === i).length), [g.coins]);
@@ -105,6 +108,11 @@ export default function Vault() {
           </div>
         ) : (
           <>
+            {g.marks >= FORGE.minCost && !(g.stats.struck > 0) && (
+              <p className="panel t-gold" style={{ margin: 0, padding: 12 }}>
+                YOU HAVE MARKS TO SPEND. OPEN A COIN AND TAKE IT TO THE FORGE.
+              </p>
+            )}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="group" aria-label="Filter by metal">
               <button className="chip" aria-pressed={filter === -1} onClick={() => setFilter(-1)}>ALL {g.coins.length}</button>
               {METALS.map((m, i) => counts[i] > 0 && (
@@ -139,8 +147,10 @@ export default function Vault() {
 
       {open && (
         <CoinModal coin={open} busy={busy} onClose={() => setOpenId(null)} onToggleLock={g.toggleLock} onSell={c => sell([c])}
-                   pinned={pinnedSet.has(open.id)} onTogglePin={id => { g.togglePin(id); feel("tap"); }}/>
+                   pinned={pinnedSet.has(open.id)} onTogglePin={id => { g.togglePin(id); feel("tap"); }}
+                   onForge={c => { setOpenId(null); setForging(c.id); }}/>
       )}
+      {forging && <Forge coinId={forging} onClose={() => setForging(null)}/>}
     </div>
   );
 }

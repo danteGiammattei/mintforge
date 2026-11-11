@@ -5,7 +5,10 @@ import { world, driver, circle, line, scribble } from "./helpers.js";
 import { login, register, getAuth, hashPin } from "../server/auth.js";
 import { act } from "../server/game.js";
 import { loadState, patchCosmetics } from "../server/state.js";
-import { AUTH, SCRIBE, CHESTS, FAVOUR_PER_RARITY, GIFTS } from "../shared/tuning.js";
+import { readFileSync } from "node:fs";
+import { AUTH, SCRIBE, CHESTS, FAVOUR_PER_RARITY, GIFTS, FORGE, SHINY_VALUE_MUL } from "../shared/tuning.js";
+import { forgeCost } from "../shared/economy.js";
+import { TITLES, TITLE_RENAMES, PREMIUM_TITLES } from "../src/lib/data.js";
 import { TRAITS } from "../shared/sigil.js";
 import { coinValue, mkCoin } from "../src/lib/coin.js";
 import { onRequestPost as vaultPost } from "../functions/api/vault/index.js";
@@ -374,8 +377,66 @@ test("cosmetics: only what you have earned can be worn", async () => {
   await refuses(patchCosmetics(db, pid, { state: { frame: "void" } }), 403);        // level 50
   await refuses(patchCosmetics(db, pid, { state: { selectedTitle: "Eternal Forge" } }), 403);
   await refuses(patchCosmetics(db, pid, { state: { selectedTitle: "Goldspun" } }), 403);
-  await patchCosmetics(db, pid, { state: { frame: "stone", selectedTitle: "Novice Digger", bio: "x".repeat(500), pinnedIds: ["a", null, 7] } });
+  await patchCosmetics(db, pid, { state: { frame: "stone", selectedTitle: "Novice Scribe", bio: "x".repeat(500), pinnedIds: ["a", null, 7] } });
   const s = await loadState(db, pid);
   assert.equal(s.bio.length, 120);
   assert.deepEqual(s.pinnedIds, ["a", null, null]);
+});
+
+/* ─── the forge ───────────────────────────────────────────────────── */
+
+test("a strike costs marks, may shine the coin, and never harms it", async () => {
+  const { db, pid } = await world();
+  coin(db, pid, "a", 3);                                           // gold, common
+  const plain = coinValue(Object.assign(mkCoin(5, 1, 3), { rarity: 0 }));
+  const cost = forgeCost(plain);
+  await refuses(driver(db, pid, seeded(1))("forge", { coinId: "a" }), 402);       // no marks yet
+  db.raw.prepare(`UPDATE player_state SET marks = ? WHERE player_id = ?`).run(cost * 2 + 7, pid);
+
+  const miss = await driver(db, pid, scripted(0.99))("forge", { coinId: "a" });
+  assert.deepEqual([miss.result.shiny, miss.result.cost], [false, cost]);
+  assert.equal(miss.state.marks, cost + 7);
+  assert.equal(miss.state.coins[0].shiny, false);
+
+  const hit = await driver(db, pid, scripted(0.01))("forge", { coinId: "a" });
+  assert.equal(hit.result.shiny, true);
+  assert.equal(hit.state.marks, 7);
+  assert.equal(hit.state.coins[0].shiny, true);
+  assert.deepEqual([hit.state.stats.struck, hit.state.stats.shined], [2, 1]);
+
+  await refuses(driver(db, pid, seeded(1))("forge", { coinId: "a" }), 409);       // already shines
+  assert.equal((await loadState(db, pid)).marks, 7, "a refused strike costs nothing");
+  await refuses(driver(db, pid, seeded(1))("forge", { coinId: "nope" }), 404);
+});
+
+test("the forge cannot be run at a profit", () => {
+  // expected gain from a strike on a coin worth V is chance × (shiny multiple − 1) × V
+  assert.ok(FORGE.shinyChance * (SHINY_VALUE_MUL - 1) < FORGE.costMul);
+  for (const v of [1, 50, 199, 200, 5000, 90000]) {
+    assert.ok(forgeCost(v) >= FORGE.minCost);
+    assert.ok(forgeCost(v) > FORGE.shinyChance * (SHINY_VALUE_MUL - 1) * v, `value ${v}`);
+  }
+});
+
+/* ─── titles ──────────────────────────────────────────────────────── */
+
+test("old titles read as their new names, everywhere a title is read", async () => {
+  const { db, pid } = await world("oldhand");
+  assert.equal((await loadState(db, pid)).selectedTitle, "Novice Scribe");
+  for (const [old, now] of Object.entries(TITLE_RENAMES)) {
+    db.raw.prepare(`UPDATE player_state SET selected_title = ? WHERE player_id = ?`).run(old, pid);
+    assert.equal((await loadState(db, pid)).selectedTitle, now);
+    assert.ok(!TITLES.includes(old), `${old} is retired`);
+  }
+  // no title, old or new, still speaks of the game that was removed
+  const all = [...TITLES, ...PREMIUM_TITLES.map(t => t.label)].join(" ");
+  assert.ok(!/dig|hunt|reaper|tarot|shovel|pick|ore\b|smith|seeker/i.test(all), all);
+});
+
+test("migration 010 rewrites stored titles and can be run twice", async () => {
+  const { db, pid } = await world("mig");
+  db.raw.prepare(`UPDATE player_state SET selected_title = 'Bronzesmith' WHERE player_id = ?`).run(pid);
+  const sql = readFileSync(new URL("../migrations/010_retheme_titles.sql", import.meta.url), "utf8");
+  db.raw.exec(sql); db.raw.exec(sql);
+  assert.equal(db.raw.prepare(`SELECT selected_title t FROM player_state WHERE player_id = ?`).get(pid).t, "Sigil-Wright");
 });

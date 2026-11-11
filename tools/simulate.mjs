@@ -26,8 +26,8 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { analyse, traitsOf, rollScroll, RARITY, TRAITS } from "../shared/sigil.js";
-import { SCRIBE, FAVOUR_PER_RARITY, CHESTS, XP, GAMBLE } from "../shared/tuning.js";
-import { offerScroll, rollCoin, levelOf, xpForSeal, xpForOffer, xpForBrush, nextGift } from "../shared/economy.js";
+import { SCRIBE, FAVOUR_PER_RARITY, CHESTS, XP, GAMBLE, FORGE, SHINY_VALUE_MUL } from "../shared/tuning.js";
+import { offerScroll, rollCoin, levelOf, xpForSeal, xpForOffer, xpForBrush, nextGift, forgeCost } from "../shared/economy.js";
 import { mkCoin, coinValue } from "../src/lib/coin.js";
 import { METALS } from "../src/lib/data.js";
 
@@ -318,5 +318,16 @@ head("6. The tavern, per coin staked (expected coins back, and expected tiers ga
   console.log(`toss      coins ×${GAMBLE.toss.win.toFixed(2)}   tiers +${GAMBLE.toss.win.toFixed(2)}`);
   console.log(`crucible  coins ×${(GAMBLE.crucible.win + (1 - GAMBLE.crucible.win) / 3).toFixed(2)}   tiers +${GAMBLE.crucible.win.toFixed(2)}`);
   console.log(`roulette  coins ×${GAMBLE.roulette.reduce((s, v) => s + v.weight * back[v.outcome], 0) / tot}   tiers +${(GAMBLE.roulette.reduce((s, v) => s + v.weight * tiers[v.outcome], 0) / tot).toFixed(2)} (jackpot counted as +4)`);
+}
+head("7. The forge: what a shine costs, and how long that takes to earn");
+{
+  const perHour = mean(agg.marks) / HOURS, tries = 1 / FORGE.shinyChance;
+  console.log(`a strike is ${Math.round(FORGE.shinyChance * 100)}% to shine, so ${tries.toFixed(1)} strikes on average; income is ${perHour.toFixed(0)} marks an hour`);
+  for (const [label, v] of [["a median coin", quant(agg.value, 0.5)], ["a 90th-percentile coin", quant(agg.value, 0.9)], ["a 99th-percentile coin", quant(agg.value, 0.99)]]) {
+    const c = forgeCost(v), total = c * tries;
+    console.log(`${pad(label, 24)} worth ${String(v).padStart(6)}   strike ${String(c).padStart(6)}   a shine ≈ ${total.toFixed(0).padStart(7)} marks ≈ ${(total / perHour).toFixed(1)}h of play   (it then sells for ${v * SHINY_VALUE_MUL})`);
+  }
+  const edge = FORGE.costMul - FORGE.shinyChance * (SHINY_VALUE_MUL - 1);
+  console.log(`marks destroyed per strike, net of the shine's resale: ${(edge * 100).toFixed(0)}% of the coin's value (must stay above 0)`);
 }
 console.log("");

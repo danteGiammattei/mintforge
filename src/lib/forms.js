@@ -384,6 +384,28 @@ export function brush() {
   });
 }
 
+/* ─── the forge ───────────────────────────────────────────────────────
+ * An anvil and a hammer, lit from the coal bed low on the right. */
+export const ANVIL = { w: 52, h: 34, face: { x: 31, y: 4 } };      // face: where a coin rests
+export function anvil() {
+  return sprite("anvil", () => raster({
+    C: [capsule(16, 9, 3, 8, 4.2, 1.4)],                            // the horn
+    J: [],
+    B: [box(14, 4, 34, 9, 2), box(23, 12, 16, 10, 2), box(14, 21, 34, 11, 2)],   // face, waist, foot
+  }, { w: ANVIL.w, h: ANVIL.h, ramp: RAMP.ironHot, light: LIGHT.ember, depth: 3 }));
+}
+export const HAMMER = { w: 44, h: 26, strike: { x: 8, y: 24 } };    // strike: the middle of the head's underside
+export function hammer() {
+  return sprite("hammer", () => {
+    // the head stands upright with the handle running off to the right,
+    // so a blow is a straight drop and nothing has to turn
+    const cv = raster({ C: [capsule(14, 12, 41, 12, 2, 2.4)], J: [] }, { w: HAMMER.w, h: HAMMER.h, ramp: RAMP.woodHot, light: LIGHT.ember, depth: 2 });
+    const head = raster({ C: [], J: [], B: [box(2, 2, 13, 22, 2)] }, { w: HAMMER.w, h: HAMMER.h, ramp: RAMP.ironHot, light: LIGHT.ember, depth: 3 });
+    cv.getContext("2d").drawImage(head, 0, 0);
+    return cv;
+  });
+}
+
 /* ─── something small, wrapped, pushed through the gap ────────────── */
 export function pouch(light = "slot") {
   return sprite(`pouch:${light}`, () => {

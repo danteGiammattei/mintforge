@@ -11,7 +11,7 @@
 
 import {
   FAVOUR_PER_RARITY, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
-  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS,
+  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE,
 } from "./tuning.js";
 
 export const MAX_METAL = 8;
@@ -86,6 +86,11 @@ export const xpForSeal  = rarity => XP.seal.base + XP.seal.perRarity * rarity;
 export const xpForOffer = rarity => XP.offer.base + XP.offer.perRarity * rarity;
 export const xpForBrush = coin =>
   XP.brush.base + XP.brush.perRarity * (coin.rarity || 0) + XP.brush.perMetal * coin.metalIdx + (coin.shiny ? XP.brush.shiny : 0);
+
+/* ─── the forge ───────────────────────────────────────────────────── */
+
+/* What one strike costs, from the coin's sale value before any shine. */
+export const forgeCost = plainValue => Math.max(FORGE.minCost, Math.round(plainValue * FORGE.costMul));
 
 /* ─── the tavern ──────────────────────────────────────────────────────
  * Each returns what happens to the stake in terms the server can apply:

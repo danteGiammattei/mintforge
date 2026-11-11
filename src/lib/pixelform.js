@@ -144,6 +144,8 @@ export const LIGHT = {
   pulled:  [-0.62, -0.66, 0.44, 0.30, 0.40, 0.95, 1.2],
   // the desk and the satchel: one candle, low and to the left, in front
   candle:  [-0.70, -0.34, 0.63, 0.24, 0.66, 0.26, 1.6],
+  // the forge: a bed of coals, low and to the right, in front
+  ember:   [0.62, 0.46, 0.63, 0.20, 0.64, 0.34, 1.5],
 };
 
 /* ─── tone ramps ──────────────────────────────────────────────────────
@@ -166,6 +168,9 @@ export const RAMP = {
   voidstone:   ["#04050f", "#090c20", "#101636", "#1a2452", "#2e3f86", "#6f86d6"],
   dirt:        ["#120c06", "#1e1208", "#2e1c0c", "#3a2410", "#4a3018", "#6a4220"],
   bristle:     ["#1a1408", "#3a2c12", "#5c4820", "#86692e", "#b08d44", "#d6b56a"],
+  // iron and wood as the coals show them
+  ironHot:     ["#0e0a09", "#1e1512", "#33231a", "#523524", "#7e4f2e", "#c47a3a"],
+  woodHot:     ["#150c06", "#2c180b", "#472611", "#663819", "#8c5124", "#b87434"],
 };
 
 /* ─── rasterise ───────────────────────────────────────────────────────

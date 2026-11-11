@@ -36,6 +36,8 @@ const CUES = {
   win:     [[20, 40, 40],   [[523, 0.08, "square", 0.04], [659, 0.08, "square", 0.04], [784, 0.20, "square", 0.04]]],
   lose:    [[50],           [[196, 0.16, "sawtooth", 0.05], [147, 0.28, "sawtooth", 0.05]]],
   gift:    [[16, 50, 16],   [[440, 0.10, "sine", 0.05], [660, 0.22, "sine", 0.05]]],
+  strike:  [[35],           [[1250, 0.05, "square", 0.05], [620, 0.16, "triangle", 0.06]]],
+  dull:    [[12],           [[150, 0.14, "sine", 0.05]]],
   error:   [[30, 40, 30],   [[120, 0.18, "square", 0.04]]],
   // a sealed scroll speaks its tier: higher, longer, brighter
   rarity0: [[10],               [[330, 0.10, "sine", 0.04]]],

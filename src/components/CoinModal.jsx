@@ -7,11 +7,11 @@ import PixelIcon from "../ui/PixelIcon.jsx";
  * The coin inspector. Drag to turn the coin over in the light; the canvas
  * itself is the flat painted coin from lib/coin.js at 3× (192px).
  *
- * Esc closes. Background click closes. `onSell`, `onToggleLock` and
- * `onTogglePin` are optional — a coin in someone else's cabinet has none. */
+ * Esc closes. Background click closes. `onSell`, `onToggleLock`,
+ * `onTogglePin` and `onForge` are optional — a coin in someone else's cabinet has none. */
 const SIZE = 192;
 
-export default function CoinModal({ coin, onClose, onToggleLock, onSell, onTogglePin, pinned, busy }) {
+export default function CoinModal({ coin, onClose, onToggleLock, onSell, onTogglePin, onForge, pinned, busy }) {
   const cvRef    = useRef();
   const rotRef   = useRef({ x: 12, y: 0 });
   const velRef   = useRef({ x: 0,  y: 0 });
@@ -108,6 +108,11 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
           {onTogglePin && (
             <button className={`btn ${pinned ? "btn-gold" : ""}`} style={{ flex: "1 1 120px" }} aria-pressed={!!pinned} onClick={() => onTogglePin(coin.id)}>
               <PixelIcon name="pin" size={11}/>{pinned ? "PINNED" : "PIN"}
+            </button>
+          )}
+          {onForge && !coin.shiny && (
+            <button className="btn btn-gold" style={{ flex: "1 1 120px" }} onClick={() => onForge(coin)}>
+              <PixelIcon name="spark" size={11}/>FORGE
             </button>
           )}
           {onSell && !coin.locked && (
