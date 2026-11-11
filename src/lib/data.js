@@ -34,16 +34,31 @@ export const HOUSES = ["the Ashen Crown","the Collapsing Sun","the Iron Serpent"
 export const CONDS  = ["Pristine","Mint","Fine","Good","Fair","Worn","Corroded"];
 
 /* ─── PROGRESSION ─────────────────────────────────────────────────────── */
-// XP-gated titles. The TITLE_LEVELS array MUST stay the same length as
-// TITLES — entries pair by index. selectTitle UI fades anything you haven't
-// yet hit the level for.
-export const TITLES       = ["Novice Digger","Copper Hand","Bronzesmith","Silver Seeker","Coin Warden","Vault Keeper","Master Minter","Grand Archivist","Mythic Collector","Void Walker","Starbinder","Coin Sage","Eternal Forge"];
+// XP-gated titles: a scribe's climb. TITLE_LEVELS MUST stay the same length
+// as TITLES — entries pair by index.
+//
+// A player's chosen title is stored by its label, so a label can never
+// simply be edited: add the old → new pair to TITLE_RENAMES (and to a
+// migration, see 010) and every place a title is read goes through
+// currentTitle(). The first five entries below are the titles of the old
+// digging game, rethemed.
+export const TITLES       = ["Novice Scribe","Copper Hand","Sigil-Wright","Wax-Sealer","Coin Warden","Vault Keeper","Master of Seals","Grand Archivist","Mythic Collector","Void Walker","Starbinder","Coin Sage","Eternal Quill"];
+export const TITLE_RENAMES = {
+  "Novice Digger": "Novice Scribe",
+  "Bronzesmith":   "Sigil-Wright",
+  "Silver Seeker": "Wax-Sealer",
+  "Master Minter": "Master of Seals",
+  "Eternal Forge": "Eternal Quill",
+  "Bone Reaper":   "Bone Quill",
+};
+export const DEFAULT_TITLE = TITLES[0];
+export const currentTitle = label => TITLE_RENAMES[label] || label || DEFAULT_TITLE;
 export const TITLE_LEVELS = [1, 5, 10, 15, 22, 30, 40, 52, 65, 80, 95, 110, 130];
 
 /* ─── RARITY (independent of metal) ──────────────────────────────────────
    Six tiers. A coin's rarity is independent of its metal — a Common Bronze
-   and a Legendary Bronze are both possible. Rarity is rolled at find time
-   based on dig quality, shiny status, and player level. */
+   and a Legendary Bronze are both possible. The server rolls it when the
+   chest opens; better chests lean it upward. */
 export const RARITIES = [
   { id:0, name:"Common",    color:"#9a8868", glow:"rgba(154,136,104,.35)", weight:55,   valueMul:0 },
   { id:1, name:"Uncommon",  color:"#7ad888", glow:"rgba(122,216,136,.40)", weight:28,   valueMul:0 },
@@ -104,7 +119,7 @@ export const PREMIUM_TITLES = [
   { id:"goldspun",     label:"Goldspun",            minLvl:10, effect:"shimmer" },
   { id:"voidtouched",  label:"Void-Touched",        minLvl:20, effect:"void" },
   { id:"astral",       label:"Of the Astral Hour",  minLvl:35, effect:"astral" },
-  { id:"bone_reaper",  label:"Bone Reaper",         minLvl:18, effect:"shimmer" },
+  { id:"bone_reaper",  label:"Bone Quill",          minLvl:18, effect:"shimmer" },   // id kept: it is what players own
   { id:"fortunes_hand",label:"Fortune's Hand",      minLvl:25, effect:"shimmer" },
 ];
 export const PREMIUM_TITLE_BY_ID  = Object.fromEntries(PREMIUM_TITLES.map(t => [t.id, t]));

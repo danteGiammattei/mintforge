@@ -1,4 +1,5 @@
 import { json, bad, getAuth } from "../_utils.js";
+import { currentTitle } from "../../../src/lib/data.js";
 
 /* GET /api/friends
    Returns:
@@ -12,7 +13,7 @@ export async function onRequestGet({ request, env }) {
   const friendsQuery = env.DB.prepare(
     `SELECT players.id, players.username,
             COALESCE(player_state.xp, 0) AS xp,
-            COALESCE(player_state.selected_title, 'Novice Digger') AS title,
+            player_state.selected_title AS title,
             COALESCE(player_state.frame, 'stone') AS frame,
             friends.created_at
        FROM friends
@@ -27,7 +28,7 @@ export async function onRequestGet({ request, env }) {
   const followersQuery = env.DB.prepare(
     `SELECT players.id, players.username,
             COALESCE(player_state.xp, 0) AS xp,
-            COALESCE(player_state.selected_title, 'Novice Digger') AS title,
+            player_state.selected_title AS title,
             COALESCE(player_state.frame, 'stone') AS frame,
             friends.created_at
        FROM friends
@@ -45,10 +46,10 @@ export async function onRequestGet({ request, env }) {
 
   return json({
     friends: (friendsRes.results || []).map(r => ({
-      id: r.id, username: r.username, xp: r.xp, title: r.title, frame: r.frame, addedAt: r.created_at,
+      id: r.id, username: r.username, xp: r.xp, title: currentTitle(r.title), frame: r.frame, addedAt: r.created_at,
     })),
     followers: (followersRes.results || []).map(r => ({
-      id: r.id, username: r.username, xp: r.xp, title: r.title, frame: r.frame, addedAt: r.created_at,
+      id: r.id, username: r.username, xp: r.xp, title: currentTitle(r.title), frame: r.frame, addedAt: r.created_at,
     })),
   });
 }

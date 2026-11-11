@@ -1,4 +1,5 @@
 import { json, bad, getAuth } from "../_utils.js";
+import { currentTitle } from "../../../src/lib/data.js";
 
 /* GET /api/users/search?q=xxx
    Returns up to 10 matching users (case-insensitive prefix). Auth required. */
@@ -15,7 +16,7 @@ export async function onRequestGet({ request, env }) {
 
   const rows = await env.DB.prepare(
     `SELECT players.id, players.username, COALESCE(player_state.xp, 0) AS xp,
-            COALESCE(player_state.selected_title, 'Novice Digger') AS title
+            player_state.selected_title AS title
        FROM players
        LEFT JOIN player_state ON player_state.player_id = players.id
       WHERE players.username LIKE ?1 COLLATE NOCASE
@@ -29,7 +30,7 @@ export async function onRequestGet({ request, env }) {
       id: r.id,
       username: r.username,
       xp: r.xp,
-      title: r.title,
+      title: currentTitle(r.title),
     })),
   });
 }

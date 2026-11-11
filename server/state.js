@@ -12,7 +12,7 @@
 
 import { levelOf, leanOf } from "../shared/economy.js";
 import { SCRIBE } from "../shared/tuning.js";
-import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES } from "../src/lib/data.js";
+import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
 
 export const parseList = (txt) => { try { const v = JSON.parse(txt || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
@@ -45,7 +45,7 @@ export async function loadState(db, pid, now = Date.now()) {
     username: ps.username,
     xp: ps.xp, level: levelOf(ps.xp), marks: ps.marks || 0,
     brushLevel: ps.brush_level || 0,
-    frame: ps.frame, bio: ps.bio || "", selectedTitle: ps.selected_title,
+    frame: ps.frame, bio: ps.bio || "", selectedTitle: currentTitle(ps.selected_title),
     pinnedIds: ps.pinned_ids ? JSON.parse(ps.pinned_ids) : null,
     ownedFrames: parseList(ps.owned_frames), ownedTitles: parseList(ps.owned_titles),
     coins: all.filter(r => !r.dusty).map(coinOut),

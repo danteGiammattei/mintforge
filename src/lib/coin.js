@@ -33,8 +33,7 @@ export function rune(s) {
 
 /* ─── PRNG ────────────────────────────────────────────────────────────────
  * xorshift32 — fast, deterministic, seed-stable. Used for everything that
- * needs reproducibility from a coin seed (face generation, dig depths,
- * artefact rarity, etc.). */
+ * needs reproducibility from a coin seed (the face, the name, the lore). */
 export class RNG {
   constructor(seed) { this.s = (seed ^ 0xdeadbeef) >>> 0 || 1; }
   next()           { this.s ^= this.s << 13; this.s ^= this.s >>> 17; this.s ^= this.s << 5; return (this.s >>> 0) / 4294967296; }
@@ -125,7 +124,7 @@ export function genFace(seed) {
 export function mkCoin(seed, pLvl = 1, tier = null, tierCap = MAX_TIER, rarityOverride = null) {
   const rng = new RNG(seed);
   const raw = (rng.pick(CONS) + rng.pick(VOWS) + rng.pick(CONS) + rng.pick(VOWS)).slice(0, 9);
-  // Rarity: explicit override (used at dig time so dig quality matters),
+  // Rarity: explicit override (the server's roll, stored with the coin),
   // otherwise derived from seed so stored coins persist their rarity stably.
   const rarity = rarityOverride != null ? rarityOverride : deriveRarity(seed);
   return {

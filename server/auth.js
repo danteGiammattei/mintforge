@@ -10,6 +10,7 @@
 
 import { AUTH } from "../shared/tuning.js";
 import { randomHex } from "./http.js";
+import { DEFAULT_TITLE } from "../src/lib/data.js";
 
 const LEGACY_ITERATIONS = 10000;
 
@@ -161,8 +162,8 @@ export async function register(db, { username: rawName, pin, ip, now = Date.now(
   await db.batch([
     db.prepare(
       `INSERT INTO player_state (player_id, xp, brush_level, frame, bio, selected_title, seal_nonce)
-       VALUES (?1, 0, 0, 'stone', '', 'Novice Digger', ?2)`
-    ).bind(playerId, nonce),
+       VALUES (?1, 0, 0, 'stone', '', ?3, ?2)`
+    ).bind(playerId, nonce, DEFAULT_TITLE),
     db.prepare(`INSERT INTO sessions (token, player_id, created_at, last_used_at) VALUES (?1, ?2, ?3, ?3)`).bind(token, playerId, now),
   ]);
   await recordFail(db, regKey, "reg", now);

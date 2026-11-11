@@ -1,4 +1,5 @@
 import { json, bad, getAuth } from "../_utils.js";
+import { currentTitle } from "../../../src/lib/data.js";
 
 /* GET /api/users/:username
    The public profile of a player — bio, title, level, frame and the
@@ -17,7 +18,7 @@ export async function onRequestGet({ request, env, params }) {
             COALESCE(player_state.xp, 0) AS xp,
             COALESCE(player_state.frame, 'stone') AS frame,
             COALESCE(player_state.bio, '') AS bio,
-            COALESCE(player_state.selected_title, 'Novice Digger') AS title,
+            player_state.selected_title AS title,
             player_state.pinned_ids
        FROM players
        LEFT JOIN player_state ON player_state.player_id = players.id
@@ -55,7 +56,7 @@ export async function onRequestGet({ request, env, params }) {
   return json({
     id: player.id,
     username: player.username,
-    title: player.title,
+    title: currentTitle(player.title),
     bio: player.bio,
     xp: player.xp,
     frame: player.frame,

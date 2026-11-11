@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS player_state (
   brush_level     INTEGER NOT NULL DEFAULT 0,
   frame           TEXT    NOT NULL DEFAULT 'stone',
   bio             TEXT    NOT NULL DEFAULT '',
-  selected_title  TEXT    NOT NULL DEFAULT 'Novice Digger',
+  selected_title  TEXT    NOT NULL DEFAULT 'Novice Scribe',
   pinned_ids      TEXT,
   marks           INTEGER NOT NULL DEFAULT 0,
   shovel_dur      INTEGER NOT NULL DEFAULT 40,
