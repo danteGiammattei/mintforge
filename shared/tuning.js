@@ -28,18 +28,23 @@ export const SCRIBE = {
  * the chance a present trait lifts the scroll one tier. Tuned against
  * `npm run sim` so no single archetype of drawing wins on average. */
 export const SIGIL = {
-  baseline: [55, 28, 11, 4.5, 1.3, 0.2],
-  bump: 0.42,
+  baseline: [62, 25, 9, 3.1, 0.8, 0.1],
+  bump: 0.22,            // chance a present trait lifts the scroll one tier
+  maxBumps: 2,           // however many traits a drawing has
   thresholds: {
-    symmetric: 0.62,     // mirrored overlap, left against right
-    closed: 2,           // enclosed grid cells, more than
-    woven: 4,            // self-crossings, at least
-    sparse: 0.17,        // filled fraction of the grid, less than
-    deliberate: 0.58,    // speed variation, less than
-    vast: 0.46,          // share of the sheet covered, more than
+    symmetric: 0.66,         // mirrored overlap, left against right, more than
+    symmetricMinCells: 28,   //   …of a shape with at least this many grid cells inked
+    closed: 0.22,            // share of the drawing's own box that is enclosed, more than
+    continuousInk: 300,      // one stroke, at least this long
+    woven: 6,                // self-crossings, at least
+    sparse: 0.10,            // inked share of the drawing's own box, less than
+    sparseSpan: 0.07,        //   …while that box covers this much of the sheet
+    deliberate: 0.085,       // pace in px/ms with the pen down, slower than
+    deliberateInk: 80,       //   …over at least this much ink
+    vast: 0.42,              // share of the sheet the drawing's box covers, more than
   },
-  effortInk: 420,        // ink at which effort counts in full
-  effortBump: 0.28,      // chance full effort lifts a tier
+  effortInk: 150,        // ink at which a drawing counts as a real attempt
+  faintChance: 0.7,      // with no ink at all, how often the roll comes to nothing
   familiar: 0.86,        // signature similarity that counts as a repeat
   familiarPenalty: 2,    // tiers lost for a repeat
 };
@@ -63,15 +68,15 @@ export const FAVOUR_PER_RARITY = [1, 2, 4, 9, 20, 50];
  * player more chests. It is the long game. */
 export const CHESTS = {
   names: ["WOODEN", "IRON", "GILDED", "OBSIDIAN", "VOID"],
-  cost:  [8, 22, 60, 150, 400],
+  cost:  [8, 20, 45, 90, 180],
   early: [70, 22, 6, 1.7, 0.3],
-  late:  [38, 32, 18, 9, 3],
+  late:  [42, 31, 16, 8, 3],
   trustChests: 60,                    // chests received at which `late` applies in full
+  alwaysWooden: 3,                    // a new player's first few are quick, whatever the odds say
   impressFrom: 3,                     // best-in-pot rarity that can trade a chest up
   impressChance: [0, 0, 0, 0.2, 0.4, 0.75],
-  leanSteps: 4,                       // how coarsely his posture shows the pot
+  leanSteps: 8,                       // how coarsely his posture shows the pot
   hintChance: 0.7,                    // when a trait lifted a scroll, how often he says so
-  heldCap: 24,                        // chests the satchel will take
 };
 
 /* ─── what a chest holds ──────────────────────────────────────────── */

@@ -57,18 +57,18 @@ export function analyse(strokes, sheet) {
   const pts = strokes.flat();
   if (pts.length < 4) return null;
 
-  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, ink = 0;
-  const speeds = [];
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, ink = 0, penDown = 0;
   for (const s of strokes) {
     for (let i = 0; i < s.length; i++) {
       const p = s[i];
-      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
       if (i) {
-        const d = Math.hypot(p.x - s[i - 1].x, p.y - s[i - 1].y);
-        const dt = Math.max(8, p.t - s[i - 1].t);
-        ink += d;
-        if (d > 0.4) speeds.push(d / dt);
+        ink += Math.hypot(p.x - s[i - 1].x, p.y - s[i - 1].y);
+        // a pause mid-stroke is thinking, not drawing: count at most a beat of it
+        penDown += Math.min(250, Math.max(4, p.t - s[i - 1].t));
       }
     }
   }
@@ -94,32 +94,40 @@ export function analyse(strokes, sheet) {
     strokes, ink, grid,
     bbox: { x: minX, y: minY, w: bw, h: bh },
     sheetFrac: (bw * bh) / (sheet.w * sheet.h),
-    speedCV: cv(speeds),
+    pace: penDown > 0 ? ink / penDown : 0,          // scene pixels per millisecond, pen down
     seed: hashStrokes(strokes),
     signature: signature(grid),
   };
 }
 
-/* ─── which traits a drawing has ──────────────────────────────────── */
+/* ─── which traits a drawing has ──────────────────────────────────────
+ * Each is something a person can stumble into and half-notice, and most
+ * pull against another: a line that never lifts is rarely symmetric, a
+ * page-filling sprawl is never sparse, patience costs time. Thresholds
+ * are tuned (npm run sim) so each fires on a minority of drawings. */
 export function traitsOf(a) {
   if (!a) return [];
-  const out = [];
-  const filled = a.grid.reduce((s, v) => s + v, 0);
+  const out = [], cells = GRID * GRID;
+  const filled = a.grid.reduce((s, v) => s + v, 0) / cells;
 
-  // mirrored overlap, left against right
+  // mirrored overlap, left against right — of a shape, not of a single line
   let both = 0, either = 0;
   for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
     const p = a.grid[y * GRID + x], q = a.grid[y * GRID + (GRID - 1 - x)];
     if (p || q) either++;
     if (p && q) both++;
   }
-  if (either && both / either > TH.symmetric) out.push("symmetric");
+  if (either >= TH.symmetricMinCells && both / either > TH.symmetric) out.push("symmetric");
 
-  if (enclosedCells(a.grid) > TH.closed) out.push("closed");
-  if (a.strokes.length === 1) out.push("continuous");
+  // a real enclosure, not a pocket left by a scribble
+  if (enclosedCells(a.grid) / cells > TH.closed) out.push("closed");
+  // one unbroken stroke, and a long one
+  if (a.strokes.length === 1 && a.ink >= TH.continuousInk) out.push("continuous");
   if (crossings(a.strokes) >= TH.woven) out.push("woven");
-  if (filled / (GRID * GRID) < TH.sparse) out.push("sparse");
-  if (a.speedCV > 0 && a.speedCV < TH.deliberate) out.push("deliberate");
+  // a mark or two across a wide stretch of page, and nothing else
+  if (a.sheetFrac > TH.sparseSpan && filled < TH.sparse) out.push("sparse");
+  // drawn slowly: enough ink to judge, and a patient hand
+  if (a.ink >= TH.deliberateInk && a.pace > 0 && a.pace < TH.deliberate) out.push("deliberate");
   if (a.sheetFrac > TH.vast) out.push("vast");
 
   return out;
@@ -141,15 +149,20 @@ export function rollScroll(a, recent = [], salt = 0) {
   let roll = rng() * tot, rarity = 0;
   for (let i = 0; i < RARITY.length; i++) { roll -= RARITY[i].w; if (roll <= 0) { rarity = i; break; } }
 
-  // traits bump, sometimes. the ones that land are the ones he can mention
+  // a two-second dot should not pay like a sigil: too little ink and the
+  // roll often comes to nothing, whatever it would have been
+  const effort = Math.min(1, a.ink / SIGIL.effortInk);
+  const faint = rng() < (1 - effort) * SIGIL.faintChance;
+  if (faint) rarity = 0;
+
+  // traits bump, sometimes — at most a couple, in an order that changes
+  // from scroll to scroll. The ones that land are the ones he can mention.
   const traits = traitsOf(a), bumped = [];
-  for (const t of traits) {
+  const order = traits.map(t => [rng(), t]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
+  for (const t of order) {
+    if (bumped.length >= SIGIL.maxBumps || faint) break;
     if (rng() < SIGIL.bump && rarity < RARITY.length - 1) { rarity++; bumped.push(t); }
   }
-
-  // effort nudges quietly: a two-second dot should not pay like a sigil
-  const effort = Math.min(1, a.ink / SIGIL.effortInk);
-  if (rng() < effort * SIGIL.effortBump && rarity < RARITY.length - 1) rarity++;
 
   // a near-copy of something recent is worth much less
   const familiar = recent.some(sig => similarity(sig, a.signature) > SIGIL.familiar);
@@ -195,14 +208,6 @@ function segCross(p, p2, q, q2) {
   const d1 = d(p, p2, q), d2 = d(p, p2, q2), d3 = d(q, q2, p), d4 = d(q, q2, p2);
   return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
 }
-function cv(xs) {
-  if (xs.length < 4) return 0;
-  const m = xs.reduce((a, b) => a + b, 0) / xs.length;
-  if (!m) return 0;
-  const v = xs.reduce((a, b) => a + (b - m) * (b - m), 0) / xs.length;
-  return Math.sqrt(v) / m;
-}
-
 /* a short fingerprint of the drawn shape, for spotting repeats */
 function signature(grid) {
   let s = "";

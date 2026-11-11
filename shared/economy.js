@@ -31,6 +31,7 @@ export function weighted(weights, roll) {
 /* ─── the door ────────────────────────────────────────────────────── */
 
 export function chestTierWeights(chestsGiven) {
+  if (chestsGiven < CHESTS.alwaysWooden) return [1, 0, 0, 0, 0];
   const k = Math.min(1, Math.max(0, chestsGiven / CHESTS.trustChests));
   return CHESTS.early.map((w, i) => w + (CHESTS.late[i] - w) * k);
 }
