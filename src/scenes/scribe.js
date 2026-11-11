@@ -25,7 +25,7 @@ function fit(){
   cv.style.width = W * s + "px"; cv.style.height = H * s + "px";
 }
 addEventListener("resize", fit);
-if (window.ResizeObserver) new ResizeObserver(fit).observe(document.getElementById("stage"));
+const ro = window.ResizeObserver ? new ResizeObserver(fit) : null; if (ro && cv.parentElement) ro.observe(cv.parentElement);
 
 /* the sheet: where ink may land */
 const SHEET = { x: 20, y: 84, w: 155, h: 212 };
@@ -211,7 +211,6 @@ cv.addEventListener("pointermove", e => {
   S.cur.push({ x:p.x, y:p.y, t:performance.now() });
 });
 cv.addEventListener("pointerup", () => { S.cur = null; });
-document.getElementById("reset").addEventListener("click", () => { reset(); });
 
 function recount(){
   S.ink = 0;
@@ -244,5 +243,5 @@ function rnd(seed){ let s=seed>>>0||1; return ()=>{s^=s<<13;s^=s>>>17;s^=s<<5;re
 
 fit();
 if (running) requestAnimationFrame(frame);
-  return () => { running = false; };
+  return () => { running = false; removeEventListener("resize", fit); if (ro) ro.disconnect(); };
 }

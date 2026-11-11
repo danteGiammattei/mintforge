@@ -25,7 +25,7 @@ function fit(){
   cv.style.width=(W*s)+"px";cv.style.height=(H*s)+"px";
 }
 window.addEventListener("resize",fit);
-if(window.ResizeObserver)new ResizeObserver(fit).observe(document.getElementById("stage"));
+const ro=window.ResizeObserver?new ResizeObserver(fit):null; if(ro&&cv.parentElement)ro.observe(cv.parentElement);
 
 const P={
   wall:"#050609", jamb:"#0d0f15", cloak:"#040507", cloakEdge:"#0b0e15",
@@ -817,5 +817,5 @@ cv.addEventListener("pointerup",e=>{
 fit();
 if(running) requestAnimationFrame(frame);
 
-  return () => { running = false; };
+  return () => { running = false; removeEventListener("resize", fit); if (ro) ro.disconnect(); };
 }
