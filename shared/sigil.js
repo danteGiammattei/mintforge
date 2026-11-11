@@ -18,18 +18,23 @@
  *  examples with no negatives produce superstition rather than a rule,
  *  which is the texture we want.
  *
- *  Thresholds below are first guesses and want tuning against real
- *  drawings, not reasoning.
+ *  This file is pure: no DOM, no clock, no Math.random. The server runs
+ *  it to judge a scroll; the client only ever sees the verdict. Every
+ *  threshold lives in tuning.js and is tuned with `npm run sim`.
  * ══════════════════════════════════════════════════════════════════════ */
 
+import { SIGIL } from "./tuning.js";
+
+const TH = SIGIL.thresholds;
+
 export const RARITY = [
-  { n: "COMMON",    c: "#8a8372", w: 55   },
-  { n: "UNCOMMON",  c: "#7ad888", w: 28   },
-  { n: "RARE",      c: "#80c0ff", w: 11   },
-  { n: "EPIC",      c: "#c080ff", w: 4.5  },
-  { n: "LEGENDARY", c: "#f0c850", w: 1.3  },
-  { n: "MYTHIC",    c: "#ff7060", w: 0.2  },
-];
+  { n: "COMMON",    c: "#8a8372" },
+  { n: "UNCOMMON",  c: "#7ad888" },
+  { n: "RARE",      c: "#80c0ff" },
+  { n: "EPIC",      c: "#c080ff" },
+  { n: "LEGENDARY", c: "#f0c850" },
+  { n: "MYTHIC",    c: "#ff7060" },
+].map((r, i) => ({ ...r, w: SIGIL.baseline[i] }));
 
 /* Each trait carries the line the goblin uses for it. The hint lives
  * with the rule so the two can never drift apart. */
@@ -108,24 +113,28 @@ export function traitsOf(a) {
     if (p || q) either++;
     if (p && q) both++;
   }
-  if (either && both / either > 0.62) out.push("symmetric");
+  if (either && both / either > TH.symmetric) out.push("symmetric");
 
-  if (enclosedCells(a.grid) > 2) out.push("closed");
+  if (enclosedCells(a.grid) > TH.closed) out.push("closed");
   if (a.strokes.length === 1) out.push("continuous");
-  if (crossings(a.strokes) >= 4) out.push("woven");
-  if (filled / (GRID * GRID) < 0.17) out.push("sparse");
-  if (a.speedCV > 0 && a.speedCV < 0.58) out.push("deliberate");
-  if (a.sheetFrac > 0.46) out.push("vast");
+  if (crossings(a.strokes) >= TH.woven) out.push("woven");
+  if (filled / (GRID * GRID) < TH.sparse) out.push("sparse");
+  if (a.speedCV > 0 && a.speedCV < TH.deliberate) out.push("deliberate");
+  if (a.sheetFrac > TH.vast) out.push("vast");
 
   return out;
 }
 
 /* ─── the roll ────────────────────────────────────────────────────────
  * recent: signatures of the player's last few scrolls, so the same
- * sigil drawn over and over stops paying. The goblin has seen it. */
-export function rollScroll(a, recent = []) {
+ * sigil drawn over and over stops paying. The goblin has seen it.
+ * salt:   mixed into the drawing's seed. The server passes a secret
+ * per-player value that moves with every seal, so the roll cannot be
+ * searched for offline and a winning drawing cannot be replayed. */
+export function rollScroll(a, recent = [], salt = 0) {
   if (!a) return null;
-  const rng = rnd(a.seed);
+  const seed = (a.seed ^ (salt >>> 0)) >>> 0;
+  const rng = rnd(seed);
 
   // baseline: weighted, from the drawing's own seed
   const tot = RARITY.reduce((s, r) => s + r.w, 0);
@@ -135,18 +144,18 @@ export function rollScroll(a, recent = []) {
   // traits bump, sometimes. the ones that land are the ones he can mention
   const traits = traitsOf(a), bumped = [];
   for (const t of traits) {
-    if (rng() < 0.42 && rarity < RARITY.length - 1) { rarity++; bumped.push(t); }
+    if (rng() < SIGIL.bump && rarity < RARITY.length - 1) { rarity++; bumped.push(t); }
   }
 
   // effort nudges quietly: a two-second dot should not pay like a sigil
-  const effort = Math.min(1, a.ink / 420);
-  if (rng() < effort * 0.28 && rarity < RARITY.length - 1) rarity++;
+  const effort = Math.min(1, a.ink / SIGIL.effortInk);
+  if (rng() < effort * SIGIL.effortBump && rarity < RARITY.length - 1) rarity++;
 
   // a near-copy of something recent is worth much less
-  const familiar = recent.some(sig => similarity(sig, a.signature) > 0.86);
-  if (familiar) { rarity = Math.max(0, rarity - 2); bumped.length = 0; }
+  const familiar = recent.some(sig => similarity(sig, a.signature) > SIGIL.familiar);
+  if (familiar) { rarity = Math.max(0, rarity - SIGIL.familiarPenalty); bumped.length = 0; }
 
-  return { rarity, traits, bumped, familiar, ink: a.ink, seed: a.seed, signature: a.signature };
+  return { rarity, traits, bumped, familiar, ink: a.ink, seed, signature: a.signature };
 }
 
 /* ─── measurements ────────────────────────────────────────────────── */

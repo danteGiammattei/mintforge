@@ -5,15 +5,18 @@
  *  the RNG, rune translator, face generator, drawCoin canvas painter, and
  *  the coinValue / rarity calculations.
  *
- *  Why GAMBLES is here: it references mkCoin/newSeed and putting it in
- *  data.js would create a circular import.
+ *  Pure apart from drawCoin, which needs a canvas and is only ever called
+ *  in the browser — so the server imports this file for coinValue too.
+ *
+ *  THE GENERATOR (genFace, mkCoin, drawCoin) IS FROZEN. tests/coin.golden
+ *  pins its output; if that test fails, the change is wrong, not the test.
  * ════════════════════════════════════════════════════════════════════════ */
 
 import {
   METALS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
-  RARITIES, MAX_RARITY,
-  TITLES, TITLE_LEVELS,
+  RARITIES,   TITLES, TITLE_LEVELS,
 } from "./data.js";
+import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP } from "../../shared/tuning.js";
 
 /* ─── RUNE TRANSLATOR ─────────────────────────────────────────────────── */
 const RL = { A:"ᚨ",B:"ᛒ",C:"ᚲ",D:"ᛞ",E:"ᛖ",F:"ᚠ",G:"ᚷ",H:"ᚺ",I:"ᛁ",J:"ᛃ",K:"ᚲ",L:"ᛚ",M:"ᛗ",N:"ᚾ",O:"ᛟ",P:"ᛈ",R:"ᚱ",S:"ᛊ",T:"ᛏ",U:"ᚢ",V:"ᚡ",W:"ᚹ",X:"ᛪ",Y:"ᚤ",Z:"ᛉ" };
@@ -235,9 +238,9 @@ export function drawCoin(canvas, coin, px) {
 }
 
 /* ─── XP / LEVEL CURVE ────────────────────────────────────────────────── */
-export function lvl(xp)         { return Math.floor(Math.sqrt(xp / 220)) + 1; }
-export function lvlMin(l)       { return (l - 1) ** 2 * 220; }
-export function lvlMax(l)       { return l ** 2 * 220; }
+export function lvl(xp)         { return Math.floor(Math.sqrt(xp / XP.perLevel)) + 1; }
+export function lvlMin(l)       { return (l - 1) ** 2 * XP.perLevel; }
+export function lvlMax(l)       { return l ** 2 * XP.perLevel; }
 
 /* ─── RARITY ──────────────────────────────────────────────────────────── */
 
@@ -249,29 +252,6 @@ export function deriveRarity(seed) {
   let roll  = r.next() * tot;
   for (let i = 0; i < RARITIES.length; i++) { roll -= RARITIES[i].weight; if (roll <= 0) return i; }
   return 0;
-}
-
-// Pick a rarity at coin-find time, weighted by player level + dig conditions.
-//   digBonus: "first" (+2 tiers), "lucky" (+1), "damaged" (-1), null (none)
-//   shiny:    +1 rarity tier on top
-export function rollRarity(rng, playerLevel, digBonus, shiny) {
-  const lvFactor = Math.min(1, playerLevel / 50);
-  const w = RARITIES.map((r, i) => {
-    if (i === 0) return r.weight * (1 - lvFactor * 0.85);   // Common: fades with level
-    if (i === 1) return r.weight * (1 - lvFactor * 0.4);    // Uncommon: also fades a bit
-    if (i === 2) return r.weight * (1 + lvFactor * 0.3);    // Rare: rises slightly
-    if (i === 3) return r.weight * (1 + lvFactor * 0.6);    // Epic: rises with level
-    if (i === 4) return r.weight * (1 + lvFactor * 1.0);    // Legendary: doubles by Lv50
-    return            r.weight * (1 + lvFactor * 1.4);      // Mythic: triples by Lv50
-  });
-  const tot = w.reduce((s, x) => s + x, 0);
-  let roll = rng.next() * tot, r = 0;
-  for (let i = 0; i < w.length; i++) { roll -= w[i]; if (roll <= 0) { r = i; break; } }
-  if      (digBonus === "first")   r = Math.min(MAX_RARITY, r + 2);
-  else if (digBonus === "lucky")   r = Math.min(MAX_RARITY, r + 1);
-  else if (digBonus === "damaged") r = Math.max(0, r - 1);
-  if (shiny) r = Math.min(MAX_RARITY, r + 1);
-  return r;
 }
 
 // Read a coin's rarity — uses stored value if present, derives from seed otherwise.
@@ -292,18 +272,13 @@ export function rarityScore(coins) {
   );
 }
 
-// Single coin → marks. Rarity is the dominant axis; metal sets a floor;
-// condition adjusts ±15%; shiny ×4.
-//
-// Fixed: this read `?.multiplier`, which does not exist on RARITIES, so
-// rarity contributed nothing to a coin's value — a Mythic and a Common
-// paid identically. The field is `valueMul`. Rarity now matters, which
-// means the metal base curve below wants a balance pass.
+// Single coin → marks: metal base × rarity × condition × shiny. Every
+// factor is in shared/tuning.js. The server sells with this same function.
 export function coinValue(c) {
-  const base    = [3, 8, 20, 55, 140, 360, 900, 2400, 6000][c.metalIdx] || 3;
-  const condIdx = Math.max(0, CONDS.indexOf(c.cond));
-  const condMul = 1 + (0.15 - condIdx * 0.05);
-  const shinyMul = c.shiny ? 4 : 1;
+  const base     = METAL_BASE_VALUE[c.metalIdx] || METAL_BASE_VALUE[0];
+  const condIdx  = Math.max(0, CONDS.indexOf(c.cond));
+  const condMul  = 1 + (3 - condIdx) * CONDITION_STEP;
+  const shinyMul = c.shiny ? SHINY_VALUE_MUL : 1;
   const rarMul   = RARITIES[coinRarity(c)]?.valueMul || 1;
   return Math.max(1, Math.round(base * condMul * shinyMul * rarMul));
 }
@@ -316,56 +291,3 @@ export function vaultMarks(coins) {
 export function unlockedTitles(level) {
   return TITLES.filter((_, i) => level >= TITLE_LEVELS[i]);
 }
-
-/* ─── SENSE LEVEL ─────────────────────────────────────────────────────── */
-export function senseLevel(signal) {
-  if (signal >= 0.92) return "locked";
-  if (signal >= 0.6)  return "close";
-  if (signal >= 0.3)  return "rising";
-  if (signal >= 0.08) return "faint";
-  return null;
-}
-
-/* ─── GAMBLES ─────────────────────────────────────────────────────────────
- * Lives here (instead of data.js) because resolve callbacks reference mkCoin. */
-export const GAMBLES = [
-  { id:"toss", label:"Coin Toss", icon:"🪙", desc:"1 coin · 50/50: tier up or lost", odds:"50/50", count:1, same:false,
-    resolve: (bet) => {
-      const c = bet[0];
-      if (Math.random() < .5) {
-        return { won:true,  remove:[c.id], add:[mkCoin(newSeed(), 1, Math.min(MAX_TIER, c.metalIdx + 1))], msg:"LUCKY FLIP" };
-      }
-      return   { won:false, remove:[c.id], add:[],                                                         msg:"TAILS — COIN LOST" };
-    },
-  },
-  // Triple Stack: stake 3 coins of the SAME metal. Win → all 3 become coins
-  // of the NEXT metal tier (capped at Astral). Lose → keep 1 random coin,
-  // the other 2 are lost. ~38% win rate — more frequent than toss-up but
-  // requires you to collect 3 same-metal coins to play.
-  { id:"triple", label:"Triple Stack", icon:"🃏", desc:"3 same-metal coins · win → all tier up · lose → keep 1", odds:"~38%", count:3, same:true,
-    resolve: (bet) => {
-      const meta = bet[0].metalIdx;
-      if (Math.random() < .38) {
-        return {
-          won:true,
-          remove: bet.map(c => c.id),
-          add: bet.map(() => mkCoin(newSeed(), 1, Math.min(MAX_TIER, meta + 1))),
-          msg: "TRIPLE STACK!",
-        };
-      }
-      // Lose: keep one random coin from the stake
-      const keptIdx = Math.floor(Math.random() * bet.length);
-      const kept = bet[keptIdx];
-      return {
-        won: false,
-        remove: bet.filter((_, i) => i !== keptIdx).map(c => c.id),
-        add: [],
-        msg: `LOST — KEPT ${kept.metalIdx >= 0 ? "ONE" : ""}`,
-      };
-    },
-  },
-];
-
-/* Alias for new CoinCanvas defensive-fallback path. Same function, clearer
- * name in the call site. */
-export const drawCoinFallback = drawCoin;
