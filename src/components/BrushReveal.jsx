@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { drawCoin, RNG } from "../lib/coin.js";
-import { METALS, BA, coinImagePath } from "../lib/data.js";
+import { METALS, BA } from "../lib/data.js";
 
 /* Local rendering constants — only used inside BrushReveal so they live here.
  *   RS = render size of the coin/dirt canvas (180px square)
@@ -41,20 +41,10 @@ export default function BrushReveal({ coin, brushAlpha = BA, shinyChance = .01, 
     if (!cv) return;
     cv.width = RS; cv.height = RS;
     const ctx = cv.getContext("2d");
-    const img = new Image();
-    img.onload = () => {
-      ctx.clearRect(0, 0, RS, RS);
-      // Clip to the circular coin area so the image is masked the same
-      // way as the brush mechanic (which samples a circle).
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(RS/2, RS/2, RS/2 - 1, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(img, 0, 0, RS, RS);
-      ctx.restore();
-    };
-    img.onerror = () => drawCoin(cv, coin, RS); // procedural fallback
-    img.src = coinImagePath(coin);
+    // The coin is painted by the procedural generator, the same one the
+    // vault and the profile use. There is no image variant any more —
+    // one renderer, so the coin you brush is the coin you keep.
+    drawCoin(cv, coin, RS);
   }, [coin.seed, coin.metalIdx]);
 
   // Paint the dirt overlay — pseudo-random rocks, particles, scratches

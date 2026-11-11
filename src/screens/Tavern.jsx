@@ -1,39 +1,33 @@
 import { useGame } from "../lib/GameContext.js";
-import { repairCost } from "../lib/coin.js";
 import { bannerStyle } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
-import TarotCard from "../components/TarotCard.jsx";
-import ShovelIcon from "../components/ShovelIcon.jsx";
 import RouletteWheel from "../components/RouletteWheel.jsx";
 
 /* ─── TAVERN ──────────────────────────────────────────────────────────────
  * Three sub-tabs:
- *   shop   → Tarot / Banners / Titles purchase grids
+ *   shop   → Banners / Titles purchase grids
  *   duels  → Active duels list + create/accept/decline/flip
- *   repair → Pickaxe durability fix or buy-new-pickaxe fallback
  *
- * Shop tab is the cosmetic + tarot store. Locked items show level/cost gates.
+ * Shop tab is the cosmetic store. Locked items show level/cost gates.
  * Duels show pending invitations (incoming need stake, outgoing are pending),
  * active duels (both staked, ready to flip), and resolved ones (with result).
- * Repair tab gates on marks; if you can't afford, offers a Lv1 reset option.
  *
  * BUG FIX during migration: NEW_PICKAXE_COST was used but not destructured.
  * Now properly added to GameContext exposure and destructured here. */
 export default function Tavern() {
   const {
     coins, marks, tab, tavernView, shopTab,
-    frame, level, shovelLevel, shovelDur, maxDur,
-    selectedTitle, ownedFrames, ownedTitles, ownedTarots, equippedTarots,
+    frame, level,
+    selectedTitle, ownedFrames, ownedTitles,
     duelsList,
     setTavernView, setShopTab, setFrame, setSelectedTitle, setTab,
-    buyFrame, buyTitle, buyTarot, buyNewPickaxe, repairPickaxe, NEW_PICKAXE_COST,
-    toggleTarot, promptAcceptDuel, declineDuel, flipDuel,
+    buyFrame, buyTitle, promptAcceptDuel, declineDuel, flipDuel,
     // Gambling — wired in MintForge, presented in the Gamble sub-view
     gambMode, setGambMode, betIds, betCoins, toggleBet,
     gambPhase, gambResult, gamble, doGamble, gambOk, resetGamble,
     roulBetId, setRoulBetId, roulBetCoin, roulResult, roulDone,
     onRoulResult, resetRoulette,
-    METALS, FRAMES, BANNERS, TAROT_CARDS, TITLES, PREMIUM_TITLES, SHOVEL_UPS, MAX_EQUIPPED_TAROTS,
+    METALS, FRAMES, BANNERS, TITLES, PREMIUM_TITLES,
     t, isDark, F, FR, mu, microLabel, sectionTitle, card,
   } = useGame();
   return (
@@ -72,7 +66,7 @@ export default function Tavern() {
         {/* Duels hidden until friend-vs-friend coin battles are reworked.
             Duel state, API, accept/decline/flip handlers, list — all preserved
             in MintForge.jsx + functions/api/duels/. Just not navigable. */}
-        {[["shop","◈","Shop"],["gamble","🎲","Gamble"],["repair","⚒","Repair"]].map(([id,ic,lbl])=>{
+        {[["shop","◈","Shop"],["gamble","🎲","Gamble"]].map(([id,ic,lbl])=>{
           const active=tavernView===id;
           return (
             <button
@@ -97,7 +91,7 @@ export default function Tavern() {
           <div
             className="flex gap-[5px] mb-3 p-[3px] rounded-[9px]"
             style={{ background:t.surfaceHi, border:`1px solid ${t.border}` }}>
-            {[["tarot","🃏","Tarot"],["banners","🖼","Banners"],["titles","✦","Titles"]].map(([id,ic,lbl])=>{
+            {[["banners","🖼","Banners"],["titles","✦","Titles"]].map(([id,ic,lbl])=>{
               const active=shopTab===id;
               return (
                 <button
@@ -112,74 +106,7 @@ export default function Tavern() {
           </div>
 
           {/* ── TAROT SUB-TAB ── */}
-          {shopTab==="tarot"&&(
-            <>
-              <div className="text-xs mb-3 italic px-0.5" style={mu}>Tarot cards grant a single, build-defining effect while equipped. Maximum 2 active at a time — choose carefully. One copy each.</div>
-              {/* Tarot grid — explicit 3 columns so the 12 cards lay out
-                  cleanly as 4 rows × 3 columns on mobile (rather than the
-                  old auto-fill which could give 2 or 5 columns depending
-                  on viewport width). Drops the gap slightly and shrinks
-                  card text on small screens. */}
-              <div className="grid grid-cols-3 gap-2">
-                {TAROT_CARDS.map(tc=>{
-                  const owned=ownedTarots.includes(tc.id);
-                  const equipped=equippedTarots.includes(tc.id);
-                  const lvlMet=!tc.minLvl||level>=tc.minLvl;
-                  const canBuy=!owned&&lvlMet&&marks>=tc.price;
-                  return (
-                    <div key={tc.id} className="flex flex-col gap-[7px]">
-                      <TarotCard
-                        card={tc}
-                        owned={owned}
-                        equipped={equipped}
-                        t={t}
-                        onClick={owned?()=>toggleTarot(tc.id):canBuy?()=>{ if(confirm(`Purchase ${tc.title} for ◈${tc.price}?`))buyTarot(tc.id); }:undefined}/>
-                      <div className="text-[10px] leading-[1.4] italic text-center min-h-[28px]" style={{ ...F, color:t.textDim }}>{tc.desc}</div>
-                      {!owned?(
-                        !lvlMet?(
-                          <div
-                            className="py-[7px] rounded-lg text-[10px] font-bold uppercase tracking-[1px] text-center"
-                            style={{ ...F, border:`1px solid ${t.border}`, background:t.surfaceHi, color:t.muted }}>
-                            Lv {tc.minLvl} required
-                          </div>
-                        ):(
-                          <button
-                            onClick={()=>{ if(canBuy&&confirm(`Purchase ${tc.title} for ◈${tc.price}?`))buyTarot(tc.id); }}
-                            disabled={!canBuy}
-                            className="py-[7px] rounded-lg text-[11px] font-extrabold uppercase tracking-[1px] tabular-nums"
-                            style={{
-                              ...F,
-                              border:`1px solid ${canBuy?t.accent:t.border}`,
-                              background:canBuy?`linear-gradient(135deg,${t.accentHi},${t.accent})`:t.surfaceHi,
-                              cursor:canBuy?"pointer":"not-allowed",
-                              color:canBuy?t.accentInk:t.muted,
-                            }}>
-                            ◈ {tc.price.toLocaleString()}
-                          </button>
-                        )
-                      ):(
-                        <button
-                          onClick={()=>toggleTarot(tc.id)}
-                          disabled={!equipped&&equippedTarots.length>=MAX_EQUIPPED_TAROTS}
-                          className="py-[7px] rounded-lg text-[11px] font-extrabold uppercase tracking-[1px]"
-                          style={{
-                            ...F,
-                            border:`1px solid ${equipped?t.success:(equippedTarots.length>=MAX_EQUIPPED_TAROTS?t.border:t.borderHi)}`,
-                            background:equipped?(isDark?"#0e2810":"#e8f8ee"):t.surfaceHi,
-                            cursor:(!equipped&&equippedTarots.length>=MAX_EQUIPPED_TAROTS)?"not-allowed":"pointer",
-                            color:equipped?t.success:(equippedTarots.length>=MAX_EQUIPPED_TAROTS?t.muted:t.textDim),
-                          }}>
-                          {equipped?"✓ Equipped":(equippedTarots.length>=MAX_EQUIPPED_TAROTS?"Slots Full":"Equip")}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {/* ── BANNERS SUB-TAB ── */}
+          {/* The tarot shop went with the tarot system. */}
           {shopTab==="banners"&&(
             <>
               <div className="text-xs mb-3 italic px-0.5" style={mu}>Premium banners — once owned, equip them in your Profile. Standard frames are XP-unlocked separately.</div>
@@ -593,82 +520,7 @@ export default function Tavern() {
       })()}
 
       {/* ── REPAIR VIEW ── */}
-      {tavernView==="repair"&&(()=>{
-        const missing=maxDur-shovelDur;
-        const cost=repairCost(missing,shovelLevel);
-        const canRepair=missing>0&&marks>=cost;
-        const durPct=Math.round((shovelDur/maxDur)*100);
-        return (
-          <div className="animate-fadein flex flex-col gap-3.5">
-            <div className="p-[18px]" style={card}>
-              <div className="flex items-center gap-3.5 mb-3.5">
-                <div
-                  className="w-[54px] h-[54px] rounded-[11px] flex items-center justify-center"
-                  style={{ background:`linear-gradient(135deg,${t.surfaceHi},${t.surface})`, border:`1px solid ${t.borderHi}` }}>
-                  <ShovelIcon level={shovelLevel} size={40}/>
-                </div>
-                <div className="flex-1">
-                  <div className="font-bold text-base -tracking-[0.2px]" style={{ ...FR, color:t.text }}>{SHOVEL_UPS[shovelLevel]?.label||`Shovel Lv.${shovelLevel}`}</div>
-                  <div className="text-[11px] mt-0.5" style={mu}>Durability {shovelDur} / {maxDur}</div>
-                </div>
-                <div className="font-extrabold text-2xl -tracking-[1px] tabular-nums" style={{ ...FR, color:durPct>50?t.success:durPct>20?t.accent:t.danger }}>{durPct}%</div>
-              </div>
-              <div
-                className="h-[9px] rounded-[4px] overflow-hidden mb-3.5"
-                style={{ background:t.faint, border:`1px solid ${t.border}` }}>
-                <div
-                  className="h-full transition-[width] duration-[400ms]"
-                  style={{
-                    width:`${durPct}%`,
-                    background:durPct>50?`linear-gradient(to right,${t.success},#a0e0a0)`:durPct>20?`linear-gradient(to right,${t.accentDim},${t.accent})`:`linear-gradient(to right,#8a2010,${t.danger})`,
-                    boxShadow:`0 0 8px ${durPct>50?t.success:durPct>20?t.accent:t.danger}55`,
-                  }}/>
-              </div>
-              {missing===0?(
-                <div className="text-[13px] font-bold text-center py-2.5 uppercase tracking-[1.5px]" style={{ ...F, color:t.success }}>✦ Pickaxe Pristine</div>
-              ):(
-                <button
-                  onClick={()=>{ if(canRepair)repairPickaxe(); }}
-                  disabled={!canRepair}
-                  className="w-full py-3 rounded-[10px] text-[13px] font-extrabold uppercase tracking-[2px]"
-                  style={{
-                    ...F,
-                    border:`1px solid ${canRepair?t.accent:t.border}`,
-                    cursor:canRepair?"pointer":"not-allowed",
-                    background:canRepair?`linear-gradient(135deg,${t.accentHi},${t.accent})`:t.surfaceHi,
-                    color:canRepair?t.accentInk:t.muted,
-                  }}>
-                  {canRepair?`⚒ Repair · ◈ ${cost.toLocaleString()}`:marks<cost?`Need ◈ ${cost.toLocaleString()}`:`Repair · ◈ ${cost.toLocaleString()}`}
-                </button>
-              )}
-              <div className="text-[11px] mt-2.5 italic text-center" style={mu}>Each dig consumes 1 durability. The Hierophant tarot halves it.</div>
-            </div>
-
-            {/* Broken-pickaxe last-resort replacement */}
-            {shovelDur<=0&&(
-              <div
-                className="px-4 py-3.5"
-                style={{ ...card, border:`1px dashed ${t.danger}66`, background:isDark?"#1a0606":"#fff0ec" }}>
-                <div className="font-bold text-[14px] mb-1.5 -tracking-[0.2px]" style={{ ...FR, color:t.danger }}>Pickaxe Broken</div>
-                <div className="text-xs italic leading-[1.5] mb-2.5" style={mu}>Stuck without enough marks to repair? Buy a fresh Lv1 pickaxe — resets your shovel level and refills durability.</div>
-                <button
-                  onClick={()=>{ if(marks>=NEW_PICKAXE_COST&&confirm(`Buy a fresh Lv1 pickaxe for ◈${NEW_PICKAXE_COST}? Your shovel level will reset to 1.`))buyNewPickaxe(); }}
-                  disabled={marks<NEW_PICKAXE_COST}
-                  className="w-full py-2.5 rounded-[9px] text-xs font-extrabold uppercase tracking-[2px]"
-                  style={{
-                    ...F,
-                    border:`1px solid ${marks>=NEW_PICKAXE_COST?t.danger:t.border}`,
-                    cursor:marks>=NEW_PICKAXE_COST?"pointer":"not-allowed",
-                    background:marks>=NEW_PICKAXE_COST?(isDark?"linear-gradient(135deg,#3a1010,#5a1818)":"linear-gradient(135deg,#fbe8e8,#f0c4c4)"):t.surfaceHi,
-                    color:marks>=NEW_PICKAXE_COST?(isDark?"#ffb0a0":t.danger):t.muted,
-                  }}>
-                  ⛏ Buy New Pickaxe · ◈ {NEW_PICKAXE_COST}
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })()}
+      {/* The repair tab went with the pickaxe durability system. */}
 
       {/* ── DUELS VIEW ── friend coin battles */}
       {tavernView==="duels"&&(

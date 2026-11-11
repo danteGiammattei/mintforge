@@ -1,13 +1,12 @@
 import { useGame } from "../lib/GameContext.js";
 import { coinRarity, rune, lvl, mkCoin } from "../lib/coin.js";
-import { bannerStyle, activeTarotPair } from "../lib/data.js";
+import { bannerStyle } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
-import TarotCard from "../components/TarotCard.jsx";
 
 /* ─── SOCIAL ──────────────────────────────────────────────────────────────
  * Friends + profile viewer + user search. The header shows your friends
  * count. Tap a friend to view their profile inline (banner, level, bio,
- * pinned coins, equipped tarots). Buttons to challenge a duel or remove.
+ * pinned coins). Buttons to challenge a duel or remove.
  *
  * Search auto-debounces in the parent component (see useDebouncedEffect on
  * searchQ). Adding a found user takes them to the friends list and clears
@@ -19,8 +18,8 @@ export default function Social() {
     setSearchQ, setProfileData, setProfileErr, setViewingProfile,
     setTab, setTavernView,
     handleAddFriend, handleRemoveFriend, promptCreateDuel,
-    METALS, RARITIES, FRAMES, TAROT_BY_ID, MAX_EQUIPPED_TAROTS,
-    bio, frame, equippedTarots, xp,
+    METALS, RARITIES, FRAMES,
+    bio, frame, xp,
     t, isDark, F, VT, FR, mu, microLabel, sectionTitle, card,
   } = useGame();
   return (
@@ -278,37 +277,6 @@ export default function Social() {
                         );
                       })}
                     </div>
-                  </div>
-                )}
-                {/* Equipped tarots — visible on friends' profiles too */}
-                {Array.isArray(pd.equippedTarots)&&pd.equippedTarots.length>0&&(
-                  <div className="px-0.5 mt-[18px]">
-                    <div className="mb-[9px]" style={microLabel}>Tarot Spread · {pd.equippedTarots.length}/{MAX_EQUIPPED_TAROTS}</div>
-                    <div className="flex gap-2 overflow-x-auto pb-1.5 px-0.5 justify-center">
-                      {pd.equippedTarots.map(cid=>{
-                        const tCard=TAROT_BY_ID[cid];
-                        if(!tCard)return null;
-                        return <div key={cid} className="flex-shrink-0"><TarotCard card={tCard} owned equipped size="sm" t={t}/></div>;
-                      })}
-                    </div>
-                    {/* Pair badge — shows when the other player has a
-                        synergy pair active. Lets you scout opponents'
-                        builds before duelling. */}
-                    {(() => {
-                      const pair = activeTarotPair(pd.equippedTarots);
-                      if (!pair) return null;
-                      return (
-                        <div className="px-3 py-2 mt-2 rounded-md text-center"
-                          style={{
-                            background:"linear-gradient(135deg, rgba(122,76,255,.22), rgba(0,229,255,.18))",
-                            border:"1px solid rgba(0,229,255,.5)",
-                            boxShadow:"0 0 12px rgba(122,76,255,.35)",
-                          }}>
-                          <div className="text-[9px] font-bold uppercase tracking-[2px]" style={{ ...F, color:"#00e5ff" }}>Pair Active</div>
-                          <div className="text-[13px] font-extrabold mt-0.5" style={{ ...F, color:"#e8e0ff" }}>{pair.label}</div>
-                        </div>
-                      );
-                    })()}
                   </div>
                 )}
               </>

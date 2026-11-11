@@ -12,8 +12,6 @@
 import {
   METALS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
   RARITIES, MAX_RARITY,
-  ARTEFACT_GRADES, SHOVEL_MAX_DUR, TAROT_BY_ID,
-  activeTarotPair,
   TITLES, TITLE_LEVELS,
 } from "./data.js";
 
@@ -45,7 +43,7 @@ export class RNG {
 /* ─── METAL PICKING ───────────────────────────────────────────────────────
  * Weighted by player level: at Lv1 it's mostly Copper/Bronze, by Lv50 the
  * top tiers (Eldritch, Astral) become reachable. tierCap clamps to whatever
- * the player's shovel can mine (see SHOVEL_TIER_CAP in data.js). */
+ * the player's tools allow. */
 export function pickMetal(rng, pLvl = 1, tierCap = MAX_TIER) {
   const b = Math.min(pLvl - 1, 50);
   const w = [
@@ -297,98 +295,21 @@ export function rarityScore(coins) {
 // Single coin → marks. Rarity is the dominant axis; metal sets a floor;
 // condition adjusts ±15%; shiny ×4.
 //
-// NOTE: currently reads `?.multiplier` which doesn't exist on RARITIES.
-// This is a known bug — the field is `valueMul`. Fixing it changes the
-// economy (rarity finally affects value), so it's left as-is here for
-// faithful 1:1 extraction. A separate balance pass should change the read
-// to `?.valueMul` and rebalance the metal base curve accordingly.
+// Fixed: this read `?.multiplier`, which does not exist on RARITIES, so
+// rarity contributed nothing to a coin's value — a Mythic and a Common
+// paid identically. The field is `valueMul`. Rarity now matters, which
+// means the metal base curve below wants a balance pass.
 export function coinValue(c) {
   const base    = [3, 8, 20, 55, 140, 360, 900, 2400, 6000][c.metalIdx] || 3;
   const condIdx = Math.max(0, CONDS.indexOf(c.cond));
   const condMul = 1 + (0.15 - condIdx * 0.05);
   const shinyMul = c.shiny ? 4 : 1;
-  const rarMul   = RARITIES[coinRarity(c)]?.multiplier || 1;
+  const rarMul   = RARITIES[coinRarity(c)]?.valueMul || 1;
   return Math.max(1, Math.round(base * condMul * shinyMul * rarMul));
 }
 
 export function vaultMarks(coins) {
   return coins.reduce((s, c) => s + coinValue(c), 0);
-}
-
-/* ─── ARTEFACT GRADE HELPER ─────────────────────────────────────────────
- * Pure helper — no React. Lives here next to coinRarity since artefacts are
- * scored from input coin rarities. */
-export function gradeForRaritySum(avgRarity) {
-  let g = 0;
-  for (let i = 0; i < ARTEFACT_GRADES.length; i++) {
-    if (avgRarity >= ARTEFACT_GRADES[i].threshold) g = i;
-  }
-  return g;
-}
-
-/* ─── REPAIR COST ─────────────────────────────────────────────────────── */
-export function shovelMaxDur(lv) {
-  return SHOVEL_MAX_DUR[Math.min(lv, SHOVEL_MAX_DUR.length - 1)] || 40;
-}
-// Flatter curve so repairs feel routine, not punishing.
-export function repairCost(missing, shovelLevel) {
-  return Math.max(1, Math.round(missing * (3 + shovelLevel * 1.3)));
-}
-
-/* ─── TAROT BUFFS ─────────────────────────────────────────────────────────
- * Aggregate the active buffs from a list of equipped tarot card ids. */
-export function tarotBuffs(equippedIds) {
-  const buff = {
-    xpMul:0, durPenalty:0, pinSlots:0, marksMul:0,
-    revealRarity:false, allowSkip:false, rerollRarity:0,
-    guaranteedEvery:0, guaranteedFloor:0,
-    firstStrikeBonus:0, rarityFloor:0,
-    forgeDiscount:0,
-    shinyBonus:0,
-    // Legacy fields — neutral defaults so older code that reads them doesn't break
-    tierUp:0, durMul:1, digSpeed:0, artefactRate:0, forgeRefund:0, rerollDig:0,
-  };
-  for (const id of equippedIds || []) {
-    const c = TAROT_BY_ID[id]; if (!c) continue;
-    if (c.xpMul)            buff.xpMul        += c.xpMul;
-    if (c.durPenalty)       buff.durPenalty   += c.durPenalty;
-    if (c.pinSlots)         buff.pinSlots     += c.pinSlots;
-    if (c.marksMul)         buff.marksMul     += c.marksMul;
-    if (c.revealRarity)     buff.revealRarity = true;
-    if (c.allowSkip)        buff.allowSkip    = true;
-    if (c.rerollRarity)     buff.rerollRarity += c.rerollRarity;
-    if (c.guaranteedEvery && !buff.guaranteedEvery) buff.guaranteedEvery = c.guaranteedEvery; // first wins
-    if (c.guaranteedFloor)  buff.guaranteedFloor = Math.max(buff.guaranteedFloor, c.guaranteedFloor);
-    if (c.firstStrikeBonus) buff.firstStrikeBonus += c.firstStrikeBonus;
-    if (c.rarityFloor)      buff.rarityFloor = Math.max(buff.rarityFloor, c.rarityFloor);
-    if (c.forgeDiscount)    buff.forgeDiscount += c.forgeDiscount;
-    if (c.shinyBonus)       buff.shinyBonus   += c.shinyBonus;
-  }
-
-  // ── PAIR BONUS ──────────────────────────────────────────────────────
-  // Equipping both cards in a TAROT_PAIRS entry layers a bonus on top of
-  // the per-card effects. Same field names — so a "pair adds +0.15 xpMul"
-  // simply sums with the cards' base xpMul values.
-  // Only one pair can be active at a time (you only have 2 slots).
-  const pair = activeTarotPair(equippedIds);
-  if (pair) {
-    if (pair.xpMul)        buff.xpMul        += pair.xpMul;
-    if (pair.marksMul)     buff.marksMul     += pair.marksMul;
-    if (pair.pinSlots)     buff.pinSlots     += pair.pinSlots;
-    if (pair.shinyBonus)   buff.shinyBonus   += pair.shinyBonus;
-    if (pair.rerollRarity) buff.rerollRarity += pair.rerollRarity;
-    if (pair.rarityFloor)  buff.rarityFloor  = Math.max(buff.rarityFloor, pair.rarityFloor);
-    // For guaranteedEvery, the pair value REPLACES the individual cards'
-    // value if it's lower (more frequent guarantees), since the buff
-    // reducer keeps the FIRST non-zero guaranteedEvery from the cards.
-    if (pair.guaranteedEvery && (!buff.guaranteedEvery || pair.guaranteedEvery < buff.guaranteedEvery)) {
-      buff.guaranteedEvery = pair.guaranteedEvery;
-    }
-    if (pair.guaranteedFloor) buff.guaranteedFloor = Math.max(buff.guaranteedFloor, pair.guaranteedFloor);
-    // Expose the active pair so UI can show a badge ("Path of Transcendence active")
-    buff.activePair = pair;
-  }
-  return buff;
 }
 
 /* ─── UNLOCKED TITLES ─────────────────────────────────────────────────── */

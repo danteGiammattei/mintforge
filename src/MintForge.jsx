@@ -47,12 +47,11 @@ import { GameContext } from "./lib/GameContext.js";
 
 // Screens
 import Vault from "./screens/Vault.jsx";
-import Forge from "./screens/Forge.jsx";
-import Shrine from "./screens/Shrine.jsx";
+import Door from "./screens/Door.jsx";
+import Scribe from "./screens/Scribe.jsx";
 // Old Hunt screen (sweep + signal + 4×4 dig grid) replaced by HuntSideScroller.
 // The old file remains in git history and src/screens/Hunt.jsx for now;
 // remove it once the new flow is proven in production.
-import Hunt from "./screens/HuntSideScroller.jsx";
 import Profile from "./screens/Profile.jsx";
 import Social from "./screens/Social.jsx";
 import Tavern from "./screens/Tavern.jsx";
@@ -62,13 +61,9 @@ import CoinCanvas    from "./components/CoinCanvas.jsx";
 import Particles     from "./components/Particles.jsx";
 import LuckyFanfare  from "./components/LuckyFanfare.jsx";
 import BrushReveal   from "./components/BrushReveal.jsx";
-import DigPit        from "./components/DigPit.jsx";
 import RouletteWheel from "./components/RouletteWheel.jsx";
 import RevealBanner  from "./components/RevealBanner.jsx";
 import CoinModal     from "./components/CoinModal.jsx";
-import ShovelIcon    from "./components/ShovelIcon.jsx";
-import PickaxeIcon   from "./components/PickaxeIcon.jsx";
-import TarotCard     from "./components/TarotCard.jsx";
 import BottomNav     from "./components/BottomNav.jsx";
 import MarksCounter  from "./components/MarksCounter.jsx";
 import AuthScreen    from "./components/AuthScreen.jsx";
@@ -97,7 +92,7 @@ export default function MintForge(){
 
   const [coins,setCoins]=useState([]);
   const [xp,setXP]=useState(0);
-  const [tab,setTab]=useState("hunt");
+  const [tab,setTab]=useState("door");
 
   // Redirect away from hidden tabs. Shrine is hidden from nav until the
   // altar mechanic + artefact rework lands — but state may persist from
@@ -175,7 +170,7 @@ export default function MintForge(){
   const [tavernView,setTavernView]=useState("shop"); // shop · repair (duels hidden for now)
   // Same guard as the tab redirect — keeps hidden sub-views unreachable.
   useEffect(()=>{ if(tavernView==="duels")setTavernView("shop"); },[tavernView]);
-  const [shopTab,setShopTab]=useState("tarot");      // tarot · banners · titles
+  const [shopTab,setShopTab]=useState("banners");   // banners · titles
   const [betIds,setBetIds]=useState([]);
   const [gambPhase,setGambPhase]=useState("select");
   const [gambResult,setGambResult]=useState(null);
@@ -1123,15 +1118,14 @@ export default function MintForge(){
         {tab==="vault" && <Vault/>}
 
         {/* ─── HUNT ─── */}
-        {tab==="hunt" && <Hunt/>}
+        {tab==="door" && <Door/>}
+        {tab==="scribe" && <Scribe/>}
 
         {/* ─── FORGE ─── */}
-        {tab==="forge" && <Forge/>}
-
+        
         {/* ─── TAVERN ─── */}
         {/* ─── SHRINE ─── */}
-        {tab==="shrine" && <Shrine/>}
-
+        
         {/* ─── TAVERN ─── */}
         {tab==="tavern" && <Tavern/>}
       </div>
