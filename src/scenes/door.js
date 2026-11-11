@@ -44,7 +44,7 @@ const P = {
 
 const GX = 72, GW = 46;          // the slot
 const HEADY = 242;
-const DRAWER_H = 142;
+const DRAWER_H = 146;
 
 /* sprite metrics, from the forms that own them */
 const HK = GOBLIN_HAND.scale, HT = GOBLIN_HAND.frame;
@@ -260,7 +260,7 @@ function drawScroll(x, y, r, charged) {
 /* ── the inventory drawer ────────────────────────────────── */
 const CELLS = [];
 for (let i = 0; i < 8; i++) CELLS.push({ x: 12 + (i % 4) * 44, y: 24 + ((i / 4) | 0) * 36, w: 40, h: 32 });
-const CONFIRM = { x: 12, y: DRAWER_H - 36, w: W - 24, h: 28 };
+const CONFIRM = { x: 12, y: DRAWER_H - 40, w: W - 24, h: 30 };
 const drawerTop = () => H - DRAWER_H * S.drawer;
 
 function drawDrawer() {
@@ -308,7 +308,7 @@ function drawDrawer() {
   ctx.strokeRect(b.x + 0.5, by + 0.5, b.w - 1, b.h - 1);
   ctx.fillStyle = can ? P.magic : INK.off;
   ctx.font = FONT; ctx.textAlign = "center";
-  ctx.fillText(!scrolls.length ? "TO THE DESK" : S.sel !== null ? "OFFER IT" : "SELECT A SCROLL", W / 2, by + 17);
+  ctx.fillText(!scrolls.length ? "TO THE DESK" : S.sel !== null ? "OFFER IT" : "SELECT A SCROLL", W / 2, by + 18);
 }
 
 /* ── something pushed through the gap ────────────────────────
@@ -464,7 +464,7 @@ function frame() {
 
   // swipe affordance, only when nothing is happening
   if (S.mode === "idle" && S.drawer < 0.01) {
-    ctx.globalAlpha = view.calm ? 0.8 : 0.62 + Math.sin(S.t * 0.04) * 0.2;
+    ctx.globalAlpha = view.calm ? 0.9 : 0.85 + Math.sin(S.t * 0.04) * 0.15;
     ctx.fillStyle = INK.cold;
     ctx.font = FONT; ctx.textAlign = "center";
     ctx.fillText("^", W / 2, H - 20);
@@ -499,7 +499,7 @@ const onUp = e => {
     if (p.x >= c.x && p.x <= c.x + c.w && p.y >= top + c.y && p.y <= top + c.y + c.h) { S.sel = i; bus.feel("tap"); return; }
   }
   const b = CONFIRM;
-  if (p.y >= top + b.y && p.y <= top + b.y + b.h && p.x >= b.x && p.x <= b.x + b.w) {
+  if (p.y >= top + b.y - 4 && p.y <= top + b.y + b.h + 4 && p.x >= b.x && p.x <= b.x + b.w) {
     if (!scrolls.length) { bus.toDesk(); return; }
     if (S.sel !== null) beginGive(S.sel);
   }

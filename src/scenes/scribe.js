@@ -33,11 +33,8 @@ export function mount(cv, bus) {
 const SHEET = { x: 20, y: 84, w: SCRIBE.sheet.w, h: SCRIBE.sheet.h };
 const INK_MAX = SCRIBE.inkMax;
 
-const P = {
-  room:"#080705", deskA:"#17120c", deskEdge:"#2f2518",
-  ink:"#17140d", inkSoft:"#2a2417",
-};
-const BTN = { undo:[20,304,48,28], clear:[74,304,48,28], seal:[128,304,47,28] };
+const P = { room:"#080705", deskA:"#17120c", deskEdge:"#2f2518", ink:"#17140d" };
+const BTN = { undo:[20,304,48,30], clear:[74,304,48,30], seal:[128,304,47,30] };
 
 const S = {
   t: 0, strokes: [], cur: null, ink: 0,
@@ -118,14 +115,6 @@ function drawChrome() {
   plot(W - 20 - 62, 36, 62, 4, "#1d1812");
   plot(W - 20 - 62, 36, Math.round(62 * frac), 4, low ? "#9a5a3a" : "#7d6a44");
 
-  // the one-time prompt: what to do, never how to do it well
-  if (S.fresh && !S.strokes.length && S.phase === "draw") {
-    ctx.textAlign = "center"; ctx.fillStyle = P.inkSoft;
-    ctx.fillText("DRAW ANY MARK.", W / 2, SHEET.y + 96);
-    ctx.fillText("THEN SEAL IT.", W / 2, SHEET.y + 108);
-    ctx.fillText("HE PAYS FOR SCROLLS.", W / 2, SHEET.y + 126);
-  }
-
   const can = S.strokes.length > 0 && S.phase === "draw", full = bus.room() <= 0;
   btn(BTN.undo, "UNDO", can);
   btn(BTN.clear, "CLEAR", can);
@@ -135,6 +124,14 @@ function drawChrome() {
     ctx.textAlign = "center"; ctx.fillStyle = INK.warm;
     ctx.fillText("YOUR SATCHEL IS FULL.", W / 2, 350);
     btn(DOOR_BTN, "TO THE DOOR", true);
+  } else if (S.fresh && !S.strokes.length && S.phase === "draw") {
+    // the one-time prompt: what to do, never how to do it well. It sits
+    // on the desk, not the parchment, where it can be read.
+    ctx.textAlign = "center"; ctx.fillStyle = INK.warmHi;
+    ctx.fillText("DRAW ANY MARK ON THE SHEET.", W / 2, 350);
+    ctx.fillText("THEN SEAL IT.", W / 2, 362);
+    ctx.fillStyle = INK.warm;
+    ctx.fillText("HE PAYS FOR SCROLLS.", W / 2, 380);
   } else if (S.noteA > 0.01) {
     ctx.globalAlpha = Math.min(1, S.noteA);
     ctx.textAlign = "center"; ctx.fillStyle = INK.warmHi;
@@ -143,7 +140,7 @@ function drawChrome() {
     S.noteA -= 0.008;
   }
 }
-const DOOR_BTN = [50, 360, 95, 28];
+const DOOR_BTN = [50, 362, 95, 30];
 function btn([x, y, w, h], label, on) {
   plot(x, y, w, h, on ? "#15110c" : "#0d0b08");
   ctx.strokeStyle = on ? "#4a3e2b" : "#1a1610"; ctx.lineWidth = 1;
@@ -162,7 +159,7 @@ function drawSeal() {
   const col = r ? RARITY[r.rarity].c : "#3a3226";       // no ribbon colour until the verdict is in
 
   ctx.globalAlpha = 0.94 * Math.min(1, e * 2);
-  plot(0, 0, W, H, "#050403");
+  plot(0, 0, W, H, `rgb(${SURROUND})`);       // the desk falls away into the room
   ctx.globalAlpha = 1;
 
   const sp = rolledScroll(col, false);
@@ -200,7 +197,9 @@ function frame() {
 
 /* ─── input ───────────────────────────────────────────────────────── */
 const inSheet = p => p.x >= SHEET.x && p.x <= SHEET.x + SHEET.w && p.y >= SHEET.y && p.y <= SHEET.y + SHEET.h;
-const hit = (p, b) => p.x >= b[0] && p.x <= b[0] + b[2] && p.y >= b[1] && p.y <= b[1] + b[3];
+// buttons take a touch a little above and below what is drawn, so they
+// stay a full 44px target on the smallest phones
+const hit = (p, b) => p.x >= b[0] && p.x <= b[0] + b[2] && p.y >= b[1] - 4 && p.y <= b[1] + b[3] + 4;
 
 function undo()  { if (S.phase !== "draw") return; S.strokes.pop(); recount(); bus.feel("tap"); }
 function clear() { if (S.phase !== "draw") return; S.strokes = []; recount(); bus.feel("tap"); }

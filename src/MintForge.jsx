@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameContext } from "./lib/GameContext.js";
 import { useGameState } from "./state/useGameState.js";
-import { OverlayProvider } from "./ui/Overlay.jsx";
+import { OverlayProvider, useUi } from "./ui/Overlay.jsx";
+import { feel } from "./lib/feel.js";
+import { TITLES, TITLE_LEVELS, FRAMES } from "./lib/data.js";
 import AuthScreen from "./components/AuthScreen.jsx";
 import BottomNav, { TABS } from "./components/BottomNav.jsx";
 import TopBar from "./components/TopBar.jsx";
@@ -49,6 +51,17 @@ function Game({ game }) {
     try { sessionStorage.setItem(TAB_KEY, id); } catch { /* fine */ }
   }, []);
   useEffect(() => { document.title = `${TABS.find(t => t[0] === tab)?.[2] || ""} · MintForge`; }, [tab]);
+
+  // A level gained is said out loud, along with anything it unlocked.
+  const ui = useUi(), seenLevel = useRef(game.level);
+  useEffect(() => {
+    const was = seenLevel.current; seenLevel.current = game.level;
+    if (game.level <= was) return;
+    feel("gift");
+    ui.toast(`LEVEL ${game.level}`, "magic");
+    TITLES.forEach((t, i) => { if (TITLE_LEVELS[i] > was && TITLE_LEVELS[i] <= game.level) ui.toast(`NEW TITLE: ${t}`); });
+    Object.values(FRAMES).forEach(f => { if (!f.premium && f.minLvl > was && f.minLvl <= game.level) ui.toast(`NEW BANNER: ${f.lbl}`); });
+  }, [game.level, ui]);
 
   const ctx = useMemo(() => ({ ...game, tab, setTab }), [game, tab, setTab]);
   const Screen = SCREENS[tab] || Scribe;
