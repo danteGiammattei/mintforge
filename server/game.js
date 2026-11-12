@@ -21,11 +21,12 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { analyse, rollScroll, TRAITS } from "../shared/sigil.js";
-import { SCRIBE, CHESTS, XP, FORGE } from "../shared/tuning.js";
+import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
   resolveToss, resolveCrucible, resolveRoulette, forgeCost,
+  inkFor, wellOf, dailyGift, cleanName,
 } from "../shared/economy.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
@@ -69,11 +70,11 @@ async function seal(db, pid, body, { now, rand }) {
   const strokes = cleanStrokes(body.strokes);
   const a = analyse(strokes, SCRIBE.sheet);
   if (!a) throw new Refusal("Nothing to seal");
-  if (a.ink > SCRIBE.inkMax * SCRIBE.inkSlack) throw new Refusal("More ink than a sheet holds");
 
   const ps = await db.prepare(
-    `SELECT last_seal_at, seal_nonce, seal_count, recent_sigs FROM player_state WHERE player_id = ?1`
+    `SELECT last_seal_at, seal_nonce, seal_count, recent_sigs, well_level FROM player_state WHERE player_id = ?1`
   ).bind(pid).first();
+  if (a.ink > inkFor(ps.well_level) * SCRIBE.inkSlack) throw new Refusal("More ink than your well holds");
   if (now - ps.last_seal_at < SCRIBE.cooldownMs) throw new Refusal("The wax is still warm", 429);
   const held = await db.prepare(`SELECT COUNT(*) AS n FROM scrolls WHERE player_id = ?1`).bind(pid).first();
   if (held.n >= SCRIBE.scrollCap) throw new Refusal("Your satchel is full", 409);
@@ -191,13 +192,18 @@ async function visit(db, pid, _body, { now }) {
   const lean = leanOf({ favour: ps.favour, cost: ps.chest_cost });
   const given = parseList(ps.gifts);
   const gift = nextGift(stats, levelOf(ps.xp), given);
-  if (!gift) return { gift: null, lean };
+  if (!gift) return { gift: await daily(db, pid, stats, ps.stats, now), lean };
 
   // claim it: the list only grows from the value we read
   const claim = await db.prepare(
     `UPDATE player_state SET gifts = ?2 WHERE player_id = ?1 AND gifts = ?3`
   ).bind(pid, JSON.stringify([...given, gift.id]), ps.gifts).run();
   if (!claim.meta.changes) return { gift: null, lean };
+
+  // the welcome chest is also day one of the daily visits
+  if (gift.id === "welcome") await db.prepare(
+    `UPDATE player_state SET stats = json_set(stats, '$.daily', json(?2)) WHERE player_id = ?1`
+  ).bind(pid, JSON.stringify({ at: now, streak: 1 })).run();
 
   const r = gift.reward, out = describeReward(r);
   if (r.type === "chest") {
@@ -215,6 +221,48 @@ async function visit(db, pid, _body, { now }) {
     await db.prepare(`UPDATE player_state SET ${col} = ?2 WHERE player_id = ?1`).bind(pid, JSON.stringify(owned)).run();
   }
   return { gift: out, lean };
+}
+
+/* Nothing owed from the milestones: is today's visit still unclaimed? */
+async function daily(db, pid, stats, statsText, now) {
+  const d = dailyGift(stats.daily, now);
+  if (!d) return null;
+  // claim it against the stats we read, so two tabs cannot both collect
+  const claim = await db.prepare(
+    `UPDATE player_state SET stats = json_set(stats, '$.daily', json(?2)) WHERE player_id = ?1 AND stats = ?3`
+  ).bind(pid, JSON.stringify(d.daily), statsText).run();
+  if (!claim.meta.changes) {
+    const fresh = await db.prepare(`SELECT stats FROM player_state WHERE player_id = ?1`).bind(pid).first();
+    const again = dailyGift(parseObj(fresh.stats).daily, now);
+    if (!again) return null;
+    const retry = await db.prepare(
+      `UPDATE player_state SET stats = json_set(stats, '$.daily', json(?2)) WHERE player_id = ?1 AND stats = ?3`
+    ).bind(pid, JSON.stringify(again.daily), fresh.stats).run();
+    if (!retry.meta.changes) return null;
+  }
+  const out = { ...describeReward(d.reward), daily: true, streak: d.daily.streak };
+  if (d.reward.type === "chest") {
+    out.id = "k_" + randomHex(8);
+    await db.prepare(`INSERT INTO chests (id, player_id, tier, created_at) VALUES (?1, ?2, ?3, ?4)`).bind(out.id, pid, d.reward.tier, now).run();
+  } else {
+    await db.prepare(`UPDATE player_state SET marks = marks + ?2 WHERE player_id = ?1`).bind(pid, d.reward.n).run();
+  }
+  return out;
+}
+
+/* ─── the journal ─────────────────────────────────────────────────────
+ * A statement that records one coin as found. Kinds only ever count up. */
+function journalStmt(db, pid, c) {
+  const k = `$.c."${c.metalIdx}:${c.rarity ?? 0}"`;
+  const value = coinValue(hydrate({ seed: c.seed, metal_idx: c.metalIdx, shiny: c.shiny ? 1 : 0, rarity: c.rarity }));
+  return db.prepare(
+    `UPDATE player_state SET journal = json_set(
+        CASE WHEN json_type(journal, '$.c') IS NULL THEN json_set(journal, '$.c', json('{}')) ELSE journal END,
+        '${k}', COALESCE(json_extract(journal, '${k}'), 0) + 1,
+        '$.shiny', COALESCE(json_extract(journal, '$.shiny'), 0) + ?2,
+        '$.best', MAX(COALESCE(json_extract(journal, '$.best'), 0), ?3))
+      WHERE player_id = ?1`
+  ).bind(pid, c.shiny ? 1 : 0, value);
 }
 
 /* ─── chest → dusty coin → vault ──────────────────────────────────── */
@@ -245,8 +293,10 @@ async function brush(db, pid, body, { now }) {
   ).bind(body.coinId, pid, now).first();
   if (!c) throw new Refusal("That coin is already clean", 404);
   const xp = xpForBrush({ rarity: c.rarity, metalIdx: c.metal_idx, shiny: !!c.shiny });
-  await db.prepare(
-    `UPDATE player_state SET xp = xp + ?2, stats = ${bump("brushed")} WHERE player_id = ?1`).bind(pid, xp).run();
+  await db.batch([
+    db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${bump("brushed")} WHERE player_id = ?1`).bind(pid, xp),
+    journalStmt(db, pid, { seed: c.seed, metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity }),
+  ]);
   return { coin: coinOut(c), xp };
 }
 
@@ -301,11 +351,48 @@ async function forge(db, pid, body, { rand }) {
       throw new Refusal("That coin is gone", 409);
     }
   }
+  if (shiny) await db.prepare(
+    `UPDATE player_state SET journal = json_set(journal, '$.shiny', COALESCE(json_extract(journal, '$.shiny'), 0) + 1) WHERE player_id = ?1`).bind(pid).run();
   const xp = XP.forge.strike + (shiny ? XP.forge.shine : 0);
   const struck = bump("struck");
   const stats = shiny ? `json_set(${struck}, '$.shined', COALESCE(json_extract(stats, '$.shined'), 0) + 1)` : struck;
   await db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${stats} WHERE player_id = ?1`).bind(pid, xp).run();
   return { shiny, cost, xp };
+}
+
+/* A name cut into the coin. Costs marks; clearing one is free. The name
+ * goes wherever the coin goes — a duel winner inherits it. */
+async function engrave(db, pid, body) {
+  if (!idOk(body.coinId)) throw new Refusal("Which coin?");
+  const name = cleanName(body.name);
+  if (name === null) throw new Refusal(`A name is up to ${ENGRAVE.maxLength} letters, digits or spaces`);
+  const c = await db.prepare(
+    `SELECT id, nickname FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`).bind(body.coinId, pid).first();
+  if (!c) throw new Refusal("That coin is gone", 404);
+  if ((c.nickname || "") === name) throw new Refusal(name ? "It already bears that name" : "It has no name to remove", 409);
+  const cost = name ? ENGRAVE.cost : 0;
+  if (cost) {
+    const paid = await db.prepare(
+      `UPDATE player_state SET marks = marks - ?2 WHERE player_id = ?1 AND marks >= ?2`).bind(pid, cost).run();
+    if (!paid.meta.changes) throw new Refusal("Not enough marks", 402);
+  }
+  await db.prepare(`UPDATE coins SET nickname = ?3 WHERE id = ?1 AND player_id = ?2`).bind(c.id, pid, name || null).run();
+  return { name, cost };
+}
+
+/* ─── the desk: a deeper inkwell ──────────────────────────────────────
+ * Bought in order, with marks. The level only moves if it is the one we
+ * read and the balance covers the price, in a single statement. */
+async function well(db, pid) {
+  const ps = await db.prepare(`SELECT well_level FROM player_state WHERE player_id = ?1`).bind(pid).first();
+  const next = ps.well_level + 1;
+  if (next >= SCRIBE.wells.length) throw new Refusal("There is no deeper well", 409);
+  const w = wellOf(next);
+  const paid = await db.prepare(
+    `UPDATE player_state SET marks = marks - ?2, well_level = ?3 WHERE player_id = ?1 AND well_level = ?4 AND marks >= ?2`
+  ).bind(pid, w.cost, next, ps.well_level).run();
+  if (!paid.meta.changes) throw new Refusal("Not enough marks", 402);
+  return { level: next, name: w.name, ink: w.ink, cost: w.cost };
 }
 
 /* ─── the tavern ──────────────────────────────────────────────────── */
@@ -344,6 +431,7 @@ async function gamble(db, pid, body, { now, rand }) {
   });
   const xp = res.won ? g.winXp : g.lossXp;
   await db.batch([
+    ...minted.map(c => journalStmt(db, pid, c)),
     ...minted.map(c => db.prepare(
       `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty)
        VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, ?6, 0)`).bind(c.id, pid, c.seed, c.metalIdx, c.rarity, now)),
@@ -357,7 +445,7 @@ async function gamble(db, pid, body, { now, rand }) {
 
 /* ─── dispatch ────────────────────────────────────────────────────── */
 
-const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge };
+const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, engrave, well };
 
 export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;

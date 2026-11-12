@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS player_state (
   seal_nonce      INTEGER NOT NULL DEFAULT 0,
   seal_count      INTEGER NOT NULL DEFAULT 0,
   last_seal_at    INTEGER NOT NULL DEFAULT 0,
+  journal         TEXT    NOT NULL DEFAULT '{}',
+  well_level      INTEGER NOT NULL DEFAULT 0,
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 
@@ -60,6 +62,7 @@ CREATE TABLE IF NOT EXISTS coins (
   rarity          INTEGER,
   acquired_at     INTEGER NOT NULL,
   dusty           INTEGER NOT NULL DEFAULT 0,         -- fresh from a chest, not yet brushed
+  nickname        TEXT,                               -- engraved at the forge
   PRIMARY KEY (player_id, id),
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );

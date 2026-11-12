@@ -6,7 +6,7 @@ import { login, register, getAuth, hashPin } from "../server/auth.js";
 import { act } from "../server/game.js";
 import { loadState, patchCosmetics } from "../server/state.js";
 import { readFileSync } from "node:fs";
-import { AUTH, SCRIBE, CHESTS, FAVOUR_PER_RARITY, GIFTS, FORGE, SHINY_VALUE_MUL } from "../shared/tuning.js";
+import { AUTH, SCRIBE, CHESTS, FAVOUR_PER_RARITY, GIFTS, FORGE, SHINY_VALUE_MUL, ENGRAVE, DAILY } from "../shared/tuning.js";
 import { forgeCost } from "../shared/economy.js";
 import { TITLES, TITLE_RENAMES, PREMIUM_TITLES } from "../src/lib/data.js";
 import { TRAITS } from "../shared/sigil.js";
@@ -20,8 +20,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migration 009 applies cleanly on top of the pre-rebuild schema", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql"]);
+test("migrations 009 and 011 apply cleanly on top of the pre-rebuild schema", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   for (const t of ["players", "player_state", "coins", "sessions", "scrolls", "chests", "action_log", "login_attempts"]) {
@@ -452,7 +452,76 @@ test("offering several scrolls at once is the same as offering them in turn", as
   assert.equal(all.result.offered, rar.length);
   assert.equal(all.result.chests.length, chestsA);
   const sa = await loadState(a.db, a.pid), sb = all.state;
-  assert.deepEqual([sb.xp, sb.lean, sb.chests.map(c => c.tier), sb.stats.offered], [sa.xp, sa.lean, sa.chests.map(c => c.tier), sa.stats.offered]);
+  const tiers = st => st.chests.map(c => c.tier).sort();     // chests from one handful share a timestamp
+  assert.deepEqual([sb.xp, sb.lean, tiers(sb), sb.stats.offered], [sa.xp, sa.lean, tiers(sa), sa.stats.offered]);
   assert.equal(sb.scrolls.length, 0);
   await refuses(driver(b.db, b.pid, seeded(1))("offer", { scrollIds: [] }), 400);
+});
+
+/* ─── journal, names, wells, the daily visit ──────────────────────── */
+
+test("the journal remembers kinds of coin after they are sold, and counts what was held before it existed", async () => {
+  const { db, pid } = await world();
+  coin(db, pid, "old", 4);                                         // held from before the journal: platinum, common
+  const go = driver(db, pid, seeded(9));
+  const v = await go("visit");
+  const o = await go("open", { chestId: v.state.chests[0].id });
+  const b = await go("brush", { coinId: o.result.coin.id });
+  const c = o.result.coin, k = `${c.metalIdx}:${c.rarity}`;
+  assert.equal(b.state.journal.c[k], 1);
+  assert.equal(b.state.journal.c["4:0"], 1);
+  assert.ok(b.state.journal.best > 0);
+  const s = await go("sell", { coinIds: [c.id, "old"] });
+  assert.equal(s.state.journal.c[k], 1, "selling does not un-find it");
+  assert.equal(s.state.journal.c["4:0"], undefined, "a coin never cleaned here is only counted while held");
+});
+
+test("engraving costs marks, clearing is free, and only sensible names are cut", async () => {
+  const { db, pid } = await world();
+  coin(db, pid, "a", 2);
+  const go = driver(db, pid, seeded(1));
+  await refuses(go("engrave", { coinId: "a", name: "The Rabbit" }), 402);
+  db.raw.prepare(`UPDATE player_state SET marks = ? WHERE player_id = ?`).run(ENGRAVE.cost + 5, pid);
+  for (const bad of ["<b>x</b>", "x".repeat(ENGRAVE.maxLength + 1), "emoji 🐇", 7, null]) await refuses(go("engrave", { coinId: "a", name: bad }), 400);
+  const r = await go("engrave", { coinId: "a", name: "  the   rabbit " });
+  assert.equal(r.result.name, "THE RABBIT");
+  assert.equal(r.state.coins[0].nick, "THE RABBIT");
+  assert.equal(r.state.marks, 5);
+  await refuses(go("engrave", { coinId: "a", name: "the rabbit" }), 409);
+  const cleared = await go("engrave", { coinId: "a", name: "" });
+  assert.equal(cleared.state.coins[0].nick, undefined);
+  assert.equal(cleared.state.marks, 5);
+  await refuses(go("engrave", { coinId: "nope", name: "x" }), 404);
+});
+
+test("a deeper inkwell is bought with marks, in order, and lets a sheet take more ink", async () => {
+  const { db, pid } = await world();
+  const go = driver(db, pid, seeded(3));
+  const long = Array.from({ length: 4 }, (_, i) => line(4, 20 + i * 40, 150, 20 + i * 40, 30, i * 3000)[0]);   // 584px of ink
+  await refuses(go("seal", { strokes: long }), 400);
+  await refuses(go("well"), 402);
+  db.raw.prepare(`UPDATE player_state SET marks = ? WHERE player_id = ?`).run(SCRIBE.wells[1].cost + SCRIBE.wells[2].cost - 1, pid);
+  const w = await go("well");
+  assert.deepEqual([w.result.level, w.state.inkMax, w.state.marks], [1, SCRIBE.wells[1].ink, SCRIBE.wells[2].cost - 1]);
+  await refuses(go("well"), 402);                                   // one mark short of the next
+  assert.equal((await go("seal", { strokes: long })).state.scrolls.length, 1);
+  db.raw.prepare(`UPDATE player_state SET marks = 1e9, well_level = ? WHERE player_id = ?`).run(SCRIBE.wells.length - 1, pid);
+  await refuses(go("well"), 409);
+});
+
+test("the daily visit: once a day, growing over a streak, a chest on the seventh, reset by a long absence", async () => {
+  const { db, pid } = await world();
+  let now = 1e9;
+  const visit = async () => (await act(db, pid, { action: "visit" }, { now, rand: seeded(1) })).result.gift;
+  assert.equal((await visit()).type, "chest");                      // the welcome chest is day one
+  now += 3600e3; assert.equal(await visit(), null);
+  const got = [];
+  for (let day = 2; day <= 8; day++) { now += DAILY.gapMs + 60e3; const g = await visit(); got.push(g.type === "chest" ? "chest" : g.n); assert.equal(g.streak, day); }
+  assert.deepEqual(got, [DAILY.marks[1], DAILY.marks[2], DAILY.marks[3], DAILY.marks[4], DAILY.marks[5], "chest", DAILY.marks[0]]);
+  now += 1000; assert.equal(await visit(), null, "only one a day");
+  now += DAILY.breakMs + 1; const back = await visit();
+  assert.deepEqual([back.streak, back.n], [1, DAILY.marks[0]]);
+  const s = await loadState(db, pid, now);
+  assert.equal(s.streak, 1);
+  assert.ok(!("daily" in s.stats));
 });

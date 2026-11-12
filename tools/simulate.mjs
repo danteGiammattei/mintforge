@@ -327,6 +327,7 @@ head("7. The forge: what a shine costs, and how long that takes to earn");
     const c = forgeCost(v), total = c * tries;
     console.log(`${pad(label, 24)} worth ${String(v).padStart(6)}   strike ${String(c).padStart(6)}   a shine ≈ ${total.toFixed(0).padStart(7)} marks ≈ ${(total / perHour).toFixed(1)}h of play   (it then sells for ${v * SHINY_VALUE_MUL})`);
   }
+  console.log("inkwells:                " + SCRIBE.wells.slice(1).map(w => `${w.name} ${w.ink} ink for ${w.cost} ≈ ${(w.cost / perHour).toFixed(1)}h`).join("   "));
   const edge = FORGE.costMul - FORGE.shinyChance * (SHINY_VALUE_MUL - 1);
   console.log(`marks destroyed per strike, net of the shine's resale: ${(edge * 100).toFixed(0)}% of the coin's value (must stay above 0)`);
 }

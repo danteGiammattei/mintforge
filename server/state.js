@@ -10,8 +10,8 @@
  *  and title to wear, the bio, the cabinet, which coins are locked.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { levelOf, leanOf } from "../shared/economy.js";
-import { SCRIBE } from "../shared/tuning.js";
+import { levelOf, leanOf, inkFor } from "../shared/economy.js";
+import { SCRIBE, DAILY } from "../shared/tuning.js";
 import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
 
@@ -21,25 +21,44 @@ export const parseObj  = (txt) => { try { const v = JSON.parse(txt || "{}"); ret
 export const coinOut = r => ({
   id: r.id, seed: r.seed >>> 0, metalIdx: r.metal_idx, shiny: !!r.shiny, locked: !!r.locked,
   ...(r.rarity != null ? { rarity: r.rarity } : {}),
+  ...(r.nickname ? { nick: r.nickname } : {}),
 });
+
+/* The journal as stored, topped up with what the player holds right now —
+ * so coins from before the journal existed count without a backfill. */
+export function journalOut(stored, coins) {
+  const j = parseObj(stored), c = { ...(j.c || {}) }, held = {};
+  let shinyHeld = 0;
+  for (const r of coins) {
+    if (r.dusty) continue;
+    const k = `${r.metal_idx}:${r.rarity ?? 0}`;
+    held[k] = (held[k] || 0) + 1;
+    if (r.shiny) shinyHeld++;
+  }
+  for (const [k, n] of Object.entries(held)) c[k] = Math.max(c[k] || 0, n);
+  return { c, shiny: Math.max(j.shiny || 0, shinyHeld), best: j.best || 0 };
+}
 
 export async function loadState(db, pid, now = Date.now()) {
   const ps = await db.prepare(
     `SELECT players.username, s.xp, s.marks, s.brush_level, s.frame, s.bio, s.selected_title, s.pinned_ids,
-            s.owned_frames, s.owned_titles, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at
+            s.owned_frames, s.owned_titles, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
+            s.journal, s.well_level
        FROM player_state s JOIN players ON players.id = s.player_id
       WHERE s.player_id = ?1`
   ).bind(pid).first();
   if (!ps) throw new Refusal("State missing — your account may need recreating", 500);
 
   const [coins, scrolls, chests] = await Promise.all([
-    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
+    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
     db.prepare(`SELECT id, rarity, seed FROM scrolls WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
     db.prepare(`SELECT id, tier FROM chests WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
   ]);
   const all = coins.results || [];
   const stats = parseObj(ps.stats);
   delete stats.lastVisitAt;
+  const daily = stats.daily || {};
+  delete stats.daily;
 
   return {
     username: ps.username,
@@ -53,6 +72,9 @@ export async function loadState(db, pid, now = Date.now()) {
     scrolls: (scrolls.results || []).map(r => ({ id: r.id, rarity: r.rarity, seed: r.seed >>> 0 })),
     chests: (chests.results || []).map(r => ({ id: r.id, tier: r.tier })),
     scrollCap: SCRIBE.scrollCap,
+    wellLevel: ps.well_level || 0, inkMax: inkFor(ps.well_level || 0),
+    journal: journalOut(ps.journal, all),
+    streak: daily.at && now - daily.at < DAILY.breakMs ? daily.streak || 0 : 0,
     lean: leanOf({ favour: ps.favour, cost: ps.chest_cost }),
     stats,
     gifts: parseList(ps.gifts).length,

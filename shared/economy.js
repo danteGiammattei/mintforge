@@ -11,7 +11,7 @@
 
 import {
   FAVOUR_PER_RARITY, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
-  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE,
+  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE,
 } from "./tuning.js";
 
 export const MAX_METAL = 8;
@@ -139,4 +139,32 @@ export function nextGift(stats, level, given) {
     if (ok) return g;
   }
   return null;
+}
+
+/* ─── the desk ────────────────────────────────────────────────────── */
+export const wellOf = level => SCRIBE.wells[Math.max(0, Math.min(SCRIBE.wells.length - 1, level | 0))];
+export const inkFor = level => wellOf(level).ink;
+
+/* ─── the daily visit ─────────────────────────────────────────────────
+ * daily is { at, streak } from the player's stats. Returns the reward
+ * and the new { at, streak }, or null if today's has been had. */
+export function dailyGift(daily, now) {
+  const at = daily?.at || 0, since = now - at;
+  if (at && since < DAILY.gapMs) return null;
+  const streak = at && since < DAILY.breakMs ? (daily.streak || 0) + 1 : 1;
+  const reward = streak % DAILY.chestEvery === 0
+    ? { type: "chest", tier: DAILY.chestTier }
+    : { type: "marks", n: DAILY.marks[Math.min(DAILY.marks.length - 1, (streak - 1) % DAILY.chestEvery)] };
+  return { reward, daily: { at: now, streak } };
+}
+
+/* ─── names ───────────────────────────────────────────────────────────
+ * What may be engraved: letters, digits, spaces, apostrophes, hyphens.
+ * Returns the cleaned name, "" to clear, or null if it will not do. */
+export function cleanName(raw) {
+  if (typeof raw !== "string") return null;
+  const name = raw.replace(/\s+/g, " ").trim();
+  if (!name) return "";
+  if (name.length > ENGRAVE.maxLength || !/^[A-Za-z0-9 '-]+$/.test(name)) return null;
+  return name.toUpperCase();
 }

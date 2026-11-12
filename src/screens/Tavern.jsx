@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
-import { coinRarity, mkCoin } from "../lib/coin.js";
+import { coinRarity } from "../lib/coin.js";
+import { hydrate } from "../lib/coinview.js";
 import { METALS, RARITIES, MAX_TIER } from "../lib/data.js";
 import { GAMBLE } from "../../shared/tuning.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
@@ -25,7 +26,6 @@ const OUTCOME_LINE = {
   lose: "IT IS GONE", same: "IT CAME BACK", up1: "IT ROSE A METAL", x2: "IT CAME BACK TWICE",
   up2: "IT ROSE TWO METALS", jackpot: "JACKPOT",
 };
-const hydrate = r => Object.assign(mkCoin(r.seed, 1, r.metalIdx), { id: r.id, shiny: !!r.shiny, rarity: r.rarity });
 const wheelTotal = GAMBLE.roulette.reduce((s, v) => s + v.weight, 0);
 
 export default function Tavern() {

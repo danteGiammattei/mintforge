@@ -15,6 +15,10 @@ the things that are decisions rather than work, or that need real players.
 - **The new title names** are a first pass (`TITLES` and `TITLE_RENAMES` in
   `src/lib/data.js`). Changing one is a one-line edit plus a row in the map.
 
+- **Engraved names are not filtered.** They are limited to 14 letters, digits
+  and spaces and are visible to friends. If the game gets strangers, add a
+  word list in `cleanName` (`shared/economy.js`).
+
 ## Needs real players
 
 - **Sigil thresholds.** They are tuned against generated drawings

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { drawCoin, coinRarity, coinValue } from "../lib/coin.js";
 import { METALS, RARITIES, SHAPE_NAMES } from "../lib/data.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
+import { coinName } from "../lib/coinview.js";
 
 /* ─── COIN MODAL ──────────────────────────────────────────────────────────
  * The coin inspector. Drag to turn the coin over in the light; the canvas
@@ -70,7 +71,7 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
 
   return (
     <div className="veil appear" style={{ zIndex: 500 }} onClick={onClose}>
-      <div className="sheet rise" role="dialog" aria-modal="true" aria-label={`${r.name} ${m.name} coin, ${coin.raw}`}
+      <div className="sheet rise" role="dialog" aria-modal="true" aria-label={`${r.name} ${m.name} coin, ${coinName(coin)}`}
            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }} onClick={e => e.stopPropagation()}>
         <div style={{ cursor: "grab", userSelect: "none", touchAction: "none" }}
              onPointerDown={onStart} onPointerMove={onMove} onPointerUp={onEnd} onPointerCancel={onEnd}>
@@ -84,7 +85,8 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
           <div style={{ padding: 12, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, borderBottom: "2px solid var(--line)" }}>
             <div style={{ minWidth: 0 }}>
               <div className="t-rune" style={{ fontSize: 24, color: m.hl, lineHeight: 1.1 }}>{coin.runes}</div>
-              <div className="t-title">{coin.raw}</div>
+              <div className="t-title">{coinName(coin)}</div>
+              {coin.nick && <div className="t-label">STRUCK AS {coin.raw}</div>}
             </div>
             {coin.shiny && <div style={{ display: "flex", gap: 6, alignItems: "center", animation: "shinyText 1s steps(2) infinite" }}><PixelIcon name="spark" size={11}/>SHINY</div>}
           </div>
@@ -110,7 +112,7 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
               <PixelIcon name="pin" size={11}/>{pinned ? "PINNED" : "PIN"}
             </button>
           )}
-          {onForge && !coin.shiny && (
+          {onForge && (
             <button className="btn btn-gold" style={{ flex: "1 1 120px" }} onClick={() => onForge(coin)}>
               <PixelIcon name="spark" size={11}/>FORGE
             </button>

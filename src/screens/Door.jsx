@@ -30,7 +30,8 @@ export default function Door() {
       say: ui.say, feel,
       received: what => {
         const name = what.name || (CHESTS.names[what.tier] + " CHEST");
-        ui.toast((GIFT_LINE[what.type] || GIFT_LINE.chest)({ ...what, name }), what.type === "chest" ? "" : "magic");
+        const line = (GIFT_LINE[what.type] || GIFT_LINE.chest)({ ...what, name });
+        ui.toast(what.daily ? `DAY ${what.streak}. ${line}` : line, what.type === "chest" ? "" : "magic");
         if (what.type !== "chest") feel("gift");
       },
       toDesk: () => live.current.setTab("scribe"),

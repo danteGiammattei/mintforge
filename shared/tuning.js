@@ -13,7 +13,17 @@
 /* ─── the desk ────────────────────────────────────────────────────── */
 export const SCRIBE = {
   sheet: { w: 155, h: 212 },   // drawable area, in scene pixels
-  inkMax: 520,                 // path length a sheet will take
+  inkMax: 520,                 // path length a sheet takes with the first inkwell
+  // Inkwells are bought with marks at the desk, in order. More ink does
+  // not make a scroll better by itself — it makes room for the drawings
+  // that tend to be: long unbroken lines, knots, page-filling shapes.
+  wells: [
+    { name: "CLAY WELL",   ink: 520, cost: 0 },
+    { name: "HORN WELL",   ink: 620, cost: 600 },
+    { name: "GLASS WELL",  ink: 740, cost: 2500 },
+    { name: "SILVER WELL", ink: 880, cost: 9000 },
+    { name: "VOID WELL",   ink: 1040, cost: 30000 },
+  ],
   inkSlack: 1.06,              // server tolerance over inkMax (float drift)
   maxStrokes: 80,
   maxPoints: 3000,
@@ -129,6 +139,9 @@ export const FORGE = {
   minCost: 120,          // so a copper is not shined for pocket change
 };
 
+/* Engraving a name on a coin, also at the forge. Clearing one is free. */
+export const ENGRAVE = { cost: 250, maxLength: 14 };
+
 /* ─── the tavern ──────────────────────────────────────────────────── */
 export const GAMBLE = {
   toss:     { coins: 1, win: 0.5 },                 // tier up, or lost
@@ -165,6 +178,19 @@ export const GIFTS = [
   { id: "astrarium",    when: { level: 30, chests: 150 },   reward: { type: "frame", id: "astrarium" } },
   { id: "astral",       when: { level: 35, offered: 600 },  reward: { type: "title", id: "astral" } },
 ];
+
+/* ─── the daily visit ─────────────────────────────────────────────────
+ * Once milestone gifts are exhausted for the moment, the first visit of
+ * a "day" still brings something: a pouch of marks that grows over a
+ * streak, and a chest on every seventh day in a row. A day is counted
+ * from the last claim rather than the calendar, so nobody loses a streak
+ * to a time zone. */
+export const DAILY = {
+  gapMs: 20 * 3600e3,                  // this long after a claim, the next is ready
+  breakMs: 48 * 3600e3,                // this long without one, the streak resets
+  marks: [30, 40, 50, 60, 70, 80],     // days 1–6 of a streak (then it holds at the last)
+  chestEvery: 7, chestTier: 1,         // every seventh day in a row: an iron chest instead
+};
 
 /* ─── accounts ────────────────────────────────────────────────────── */
 export const AUTH = {

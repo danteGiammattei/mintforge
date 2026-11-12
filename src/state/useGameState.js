@@ -15,19 +15,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient, TOKEN_KEY } from "../lib/api.js";
 import { createOutbox } from "../lib/outbox.js";
-import { mkCoin, coinRarity } from "../lib/coin.js";
+import { coinRarity } from "../lib/coin.js";
+import { hydrate } from "../lib/coinview.js";
 import { FRAMES } from "../lib/data.js";
 
 export const MAX_PINS = 6;
 
 const readToken = () => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
 
-function hydrate(row) {
-  const c = mkCoin(row.seed, 1, row.metalIdx);
-  c.id = row.id; c.shiny = !!row.shiny; c.locked = !!row.locked;
-  if (typeof row.rarity === "number") c.rarity = row.rarity;
-  return c;
-}
 
 function overlay(snap, pending) {
   if (!snap || !pending) return snap;
@@ -180,6 +175,8 @@ export function useGameState() {
     username: snap?.username || "", xp: snap?.xp || 0, level: snap?.level || 1, marks: snap?.marks || 0,
     brushLevel: snap?.brushLevel || 0, lean: snap?.lean || 0, stats: snap?.stats || {},
     scrollCap: snap?.scrollCap || 8,
+    inkMax: snap?.inkMax || 520, wellLevel: snap?.wellLevel || 0, streak: snap?.streak || 0,
+    journal: snap?.journal || { c: {}, shiny: 0, best: 0 },
     frame: snap?.frame || "stone", fr: FRAMES[snap?.frame] || FRAMES.stone,
     bio: snap?.bio || "", selectedTitle: snap?.selectedTitle || "",
     pinnedIds: snap?.pinnedIds ?? null,

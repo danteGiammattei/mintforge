@@ -5,6 +5,8 @@ import { feel } from "../lib/feel.js";
 import { coinRarity, coinValue } from "../lib/coin.js";
 import { METALS, RARITIES } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
+import Journal from "../components/Journal.jsx";
+import { coinName } from "../lib/coinview.js";
 import CoinModal from "../components/CoinModal.jsx";
 import Forge from "../components/Forge.jsx";
 import { FORGE } from "../../shared/tuning.js";
@@ -25,9 +27,9 @@ export function CoinTile({ coin, selected, pinned, disabled, onClick, label }) {
   return (
     <button className="tile" aria-pressed={selected ? true : undefined} disabled={disabled} onClick={onClick}
             style={{ borderTopColor: r.color }}
-            aria-label={label || `${r.name} ${m.name} coin, ${coin.raw}${coin.shiny ? ", shiny" : ""}${coin.locked ? ", locked" : ""}`}>
+            aria-label={label || `${r.name} ${m.name} coin, ${coinName(coin)}${coin.shiny ? ", shiny" : ""}${coin.locked ? ", locked" : ""}`}>
       <CoinCanvas coin={coin} size={64}/>
-      <span aria-hidden style={{ color: m.hl, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{coin.raw}</span>
+      <span aria-hidden style={{ color: m.hl, maxWidth: "100%", overflowWrap: "anywhere", textAlign: "center", lineHeight: 1.25 }}>{coinName(coin)}</span>
       <span aria-hidden style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 4, color: "var(--candle)" }}>
         {coin.shiny && <PixelIcon name="spark" size={11}/>}
         {coin.locked && <PixelIcon name="lock" size={11}/>}
@@ -46,6 +48,7 @@ export default function Vault() {
   const [openId, setOpenId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [forging, setForging] = useState(null);
+  const [view, setView] = useState("coins");
 
   const pinnedSet = useMemo(() => new Set(g.showcase.filter(Boolean).map(c => c.id)), [g.showcase]);
   const counts = useMemo(() => METALS.map((_, i) => g.coins.filter(c => c.metalIdx === i).length), [g.coins]);
@@ -87,14 +90,19 @@ export default function Vault() {
           <h1 className="t-big" style={{ margin: 0 }}>VAULT</h1>
           <div className="row">
             <span className="t-label">{g.coins.length} {g.coins.length === 1 ? "COIN" : "COINS"}</span>
-            {g.coins.length > 0 && (
+            {g.coins.length > 0 && view === "coins" && (
               <button className={`btn ${selecting ? "btn-gold" : ""}`} aria-pressed={selecting}
                       onClick={() => { setSelecting(s => !s); setPicked(new Set()); }}>{selecting ? "DONE" : "SELECT"}</button>
             )}
           </div>
         </div>
 
-        {g.coins.length === 0 ? (
+        <div className="seg" role="tablist" aria-label="Vault">
+          <button role="tab" aria-selected={view === "coins"} onClick={() => setView("coins")}>COINS</button>
+          <button role="tab" aria-selected={view === "journal"} onClick={() => { setView("journal"); setSelecting(false); }}>JOURNAL</button>
+        </div>
+
+        {view === "journal" ? <Journal/> : g.coins.length === 0 ? (
           <div className="panel" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
             <div className="t-title">THE VAULT IS EMPTY</div>
             <p className="t-dim" style={{ margin: 0 }}>

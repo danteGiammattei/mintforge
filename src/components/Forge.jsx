@@ -5,7 +5,8 @@ import { feel } from "../lib/feel.js";
 import { coinValue, coinRarity } from "../lib/coin.js";
 import { METALS, RARITIES } from "../lib/data.js";
 import { forgeCost } from "../../shared/economy.js";
-import { FORGE } from "../../shared/tuning.js";
+import { FORGE, ENGRAVE } from "../../shared/tuning.js";
+import { coinName } from "../lib/coinview.js";
 import { mount, SURROUND } from "../scenes/forge.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
 
@@ -13,12 +14,18 @@ import PixelIcon from "../ui/PixelIcon.jsx";
  * Where marks go. Take a coin from the vault, pay for a strike, and it may
  * come away shiny. A miss costs the marks and nothing else — the coin is
  * never at risk, which is what separates this from the Tavern. The price
- * and the odds are shown; the server takes the marks and makes the roll. */
+ * and the odds are shown; the server takes the marks and makes the roll.
+ *
+ * The second bench is the engraver's: a name of your own cut into the
+ * coin, for marks. It shows wherever the coin does, to you and to anyone
+ * looking in your cabinet. */
 export default function Forge({ coinId, onClose }) {
   const g = useGame(), ui = useUi();
   const ref = useRef(null), scene = useRef(null), live = useRef(g);
   live.current = g;
   const [busy, setBusy] = useState(false);
+  const [bench, setBench] = useState("strike");
+  const [name, setName] = useState("");
   const coin = g.coins.find(c => c.id === coinId);
 
   useEffect(() => {
@@ -46,6 +53,19 @@ export default function Forge({ coinId, onClose }) {
     p.catch(() => {}).finally(() => setTimeout(() => setBusy(false), 1100));
   };
 
+  const typed = name.replace(/\s+/g, " ").trim().toUpperCase();
+  const engrave = async clear => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await g.act("engrave", { coinId, name: clear ? "" : typed });
+      feel(clear ? "dull" : "strike");
+      ui.toast(res.name ? `IT IS ${res.name} NOW.` : "THE NAME IS GONE.");
+      setName("");
+    } catch (e) { ui.toast(e.message, "bad"); feel("error"); }
+    setBusy(false);
+  };
+
   return (
     <div className="veil appear" style={{ zIndex: 520, flexDirection: "column", padding: 0, background: `rgb(${SURROUND})` }}
          role="dialog" aria-modal="true" aria-label="The forge">
@@ -55,11 +75,16 @@ export default function Forge({ coinId, onClose }) {
       </div>
       <div style={{ width: "100%", maxWidth: 360, padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="between">
-          <span style={{ color: m.hl }}>{coin.raw}</span>
+          <span style={{ color: m.hl }}>{coinName(coin)}</span>
           <span className="t-gold row" style={{ gap: 6 }} aria-label={`You have ${g.marks} marks`}><PixelIcon name="mark" size={11}/>{g.marks.toLocaleString()}</span>
         </div>
-        {coin.shiny ? (
-          <p className="t-gold" style={{ margin: 0, textAlign: "center" }}>IT SHINES. THERE IS NOTHING MORE THE FORGE CAN DO FOR IT.</p>
+        <div className="seg" role="tablist" aria-label="Bench">
+          <button role="tab" aria-selected={bench === "strike"} disabled={busy} onClick={() => setBench("strike")}><PixelIcon name="spark" size={11}/>SHINE</button>
+          <button role="tab" aria-selected={bench === "name"} disabled={busy} onClick={() => setBench("name")}><PixelIcon name="quill" size={11}/>NAME</button>
+        </div>
+
+        {bench === "strike" && (coin.shiny ? (
+          <p className="t-gold" style={{ margin: 0, textAlign: "center" }}>IT SHINES. THERE IS NOTHING MORE THE HAMMER CAN DO FOR IT.</p>
         ) : (
           <>
             <p className="t-dim" style={{ margin: 0 }}>
@@ -70,8 +95,23 @@ export default function Forge({ coinId, onClose }) {
             </button>
             {short && <p className="t-blood" role="status" style={{ margin: 0, textAlign: "center" }}>YOU NEED {(cost - g.marks).toLocaleString()} MORE MARKS.</p>}
           </>
+        ))}
+
+        {bench === "name" && (
+          <form onSubmit={e => { e.preventDefault(); if (typed && g.marks >= ENGRAVE.cost) engrave(false); }} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <label className="t-dim" htmlFor="forge-name" style={{ margin: 0 }}>
+              {coin.nick ? <>IT IS CALLED {coin.nick}. IT WAS STRUCK AS {coin.raw}.</> : <>IT WAS STRUCK AS {coin.raw}. CUT A NAME OF YOUR OWN INTO IT.</>}
+            </label>
+            <input id="forge-name" className="field" value={name} maxLength={ENGRAVE.maxLength} placeholder="THE RABBIT" autoComplete="off" spellCheck={false}
+                   onChange={e => setName(e.target.value.replace(/[^A-Za-z0-9 '-]/g, ""))}/>
+            <button type="submit" className="btn btn-gold btn-block" disabled={busy || !typed || typed === coin.nick || g.marks < ENGRAVE.cost}>
+              <PixelIcon name="mark" size={11}/>ENGRAVE FOR {ENGRAVE.cost}
+            </button>
+            {g.marks < ENGRAVE.cost && <p className="t-blood" role="status" style={{ margin: 0, textAlign: "center" }}>YOU NEED {(ENGRAVE.cost - g.marks).toLocaleString()} MORE MARKS.</p>}
+            {coin.nick && <button type="button" className="btn btn-block" disabled={busy} onClick={() => engrave(true)}>GRIND THE NAME OFF · FREE</button>}
+          </form>
         )}
-        <button className="btn btn-ghost btn-block" disabled={busy} onClick={onClose}>{coin.shiny ? "DONE" : "LEAVE"}</button>
+        <button className="btn btn-ghost btn-block" disabled={busy} onClick={onClose}>LEAVE</button>
       </div>
     </div>
   );

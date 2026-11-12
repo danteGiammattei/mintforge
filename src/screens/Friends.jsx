@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { useSocial } from "../state/useSocial.js";
-import { lvl, mkCoin } from "../lib/coin.js";
+import { lvl } from "../lib/coin.js";
+import { hydrate } from "../lib/coinview.js";
 import { FRAMES, METALS, PREMIUM_TITLES } from "../lib/data.js";
 import { FEATURES } from "../../shared/tuning.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
@@ -17,7 +18,6 @@ import { CoinTile } from "./Vault.jsx";
  * duels are switched on (FEATURES.duels in shared/tuning.js; they were
  * hidden before the rebuild and still are). */
 
-const hydrate = r => Object.assign(mkCoin(r.seed, 1, r.metalIdx), { id: r.id, shiny: !!r.shiny, ...(r.rarity != null ? { rarity: r.rarity } : {}) });
 export const TitleText = ({ label }) => {
   const p = PREMIUM_TITLES.find(t => t.label === label);
   return p ? <span className={`title-${p.effect}`}>{label}</span> : <span>{label}</span>;

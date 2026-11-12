@@ -14,6 +14,9 @@
  *    bus.say(text)       for the aria-live region
  *    bus.feel(name)      sound + haptics hook
  *    bus.toDoor()        the satchel is full and the player asked to go
+ *    bus.inkMax()        ink a sheet takes with the player's inkwell
+ *    bus.deeper()        true if a deeper well can still be bought
+ *    bus.well()          the player tapped the ink: offer the next well
  *
  *  The player is never told what makes a scroll good. Nothing in here
  *  may hint at it.
@@ -31,7 +34,8 @@ export function mount(cv, bus) {
 
 /* the sheet: where ink may land */
 const SHEET = { x: 20, y: 84, w: SCRIBE.sheet.w, h: SCRIBE.sheet.h };
-const INK_MAX = SCRIBE.inkMax;
+const inkMax = () => bus.inkMax();          // the well on the desk decides
+const WELL = [W - 96, 14, 80, 34];           // the ink meter is a button: a deeper well
 
 const P = { room:"#080705", deskA:"#17120c", deskEdge:"#2f2518", ink:"#17140d" };
 const BTN = { undo:[20,304,48,30], clear:[74,304,48,30], seal:[128,304,47,30] };
@@ -109,11 +113,12 @@ function drawChrome() {
   ctx.fillText("SCRIBE", 20, 30);
 
   // ink remaining
-  const frac = Math.max(0, 1 - S.ink / INK_MAX), low = frac < 0.18;
+  const frac = Math.max(0, 1 - S.ink / inkMax()), low = frac < 0.18;
   ctx.textAlign = "right"; ctx.fillStyle = low ? INK.warn : INK.warm;
   ctx.fillText("INK", W - 20, 30);
   plot(W - 20 - 62, 36, 62, 4, "#1d1812");
   plot(W - 20 - 62, 36, Math.round(62 * frac), 4, low ? "#9a5a3a" : "#7d6a44");
+  if (bus.deeper()) { ctx.textAlign = "left"; ctx.fillStyle = INK.warmHi; ctx.fillText("+", W - 20 - 62, 30); }
 
   const can = S.strokes.length > 0 && S.phase === "draw", full = bus.room() <= 0;
   btn(BTN.undo, "UNDO", can);
@@ -208,11 +213,12 @@ const onDown = e => {
   const p = pointer(cv, e);
   if (S.phase === "sealed") { if (S.sealT > 58) newSheet(); return; }
   if (S.phase !== "draw") return;
+  if (hit(p, WELL) && bus.deeper()) return bus.well();
   if (hit(p, BTN.undo))  return undo();
   if (hit(p, BTN.clear)) return clear();
   if (hit(p, BTN.seal))  return seal();
   if (bus.room() <= 0 && hit(p, DOOR_BTN)) return bus.toDoor();
-  if (!inSheet(p) || S.ink >= INK_MAX) return;
+  if (!inSheet(p) || S.ink >= inkMax()) return;
   S.cur = [{ x: p.x, y: p.y, t: performance.now() }];
   S.strokes.push(S.cur);
   cv.setPointerCapture?.(e.pointerId);
@@ -224,7 +230,11 @@ const onMove = e => {
   const last = S.cur[S.cur.length - 1];
   const d = Math.hypot(p.x - last.x, p.y - last.y);
   if (d < 1) return;
-  if (S.ink + d > INK_MAX) { S.cur = null; bus.feel("dry"); return; }
+  if (S.ink + d > inkMax()) {
+    S.cur = null; bus.feel("dry");
+    if (bus.deeper()) note("THE WELL IS DRY. TAP THE INK FOR A DEEPER ONE.", 4);
+    return;
+  }
   S.ink += d;
   S.cur.push({ x: p.x, y: p.y, t: performance.now() });
 };
@@ -281,10 +291,10 @@ teardown.undo = undo; teardown.clear = clear;
 /* A mark made without a pointer: one wandering stroke. It is judged like
  * any other, so nobody is shut out of the loop for being unable to drag. */
 teardown.scrawl = () => {
-  if (S.phase !== "draw" || S.ink >= INK_MAX - 20) return;
+  if (S.phase !== "draw" || S.ink >= inkMax() - 20) return;
   let x = SHEET.x + 20 + Math.random() * (SHEET.w - 40), y = SHEET.y + 20 + Math.random() * (SHEET.h - 40);
   let a = Math.random() * 6.283, t = performance.now();
-  const stroke = [{ x, y, t }], budget = Math.min(140, INK_MAX - S.ink - 1);
+  const stroke = [{ x, y, t }], budget = Math.min(140, inkMax() - S.ink - 1);
   for (let used = 0; used + 4 <= budget; used += 4) {
     a += (Math.random() - 0.5) * 1.1;
     x = Math.max(SHEET.x + 2, Math.min(SHEET.x + SHEET.w - 2, x + Math.cos(a) * 4));
