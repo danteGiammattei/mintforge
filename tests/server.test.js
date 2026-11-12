@@ -440,3 +440,19 @@ test("migration 010 rewrites stored titles and can be run twice", async () => {
   db.raw.exec(sql); db.raw.exec(sql);
   assert.equal(db.raw.prepare(`SELECT selected_title t FROM player_state WHERE player_id = ?`).get(pid).t, "Sigil-Wright");
 });
+
+test("offering several scrolls at once is the same as offering them in turn", async () => {
+  const a = await world("one"), b = await world("many");
+  const rar = [0, 2, 1, 4, 0, 3];
+  const idsA = rar.map(r => plant(a.db, a.pid, r, "closed")), idsB = rar.map(r => plant(b.db, b.pid, r, "closed"));
+  const goA = driver(a.db, a.pid, seeded(77));
+  let chestsA = 0;
+  for (const id of idsA) { const r = await goA("offer", { scrollId: id }); chestsA += r.result.chests.length; }
+  const all = await driver(b.db, b.pid, seeded(77))("offer", { scrollIds: [...idsB, idsB[0], "s_not_mine"] });
+  assert.equal(all.result.offered, rar.length);
+  assert.equal(all.result.chests.length, chestsA);
+  const sa = await loadState(a.db, a.pid), sb = all.state;
+  assert.deepEqual([sb.xp, sb.lean, sb.chests.map(c => c.tier), sb.stats.offered], [sa.xp, sa.lean, sa.chests.map(c => c.tier), sa.stats.offered]);
+  assert.equal(sb.scrolls.length, 0);
+  await refuses(driver(b.db, b.pid, seeded(1))("offer", { scrollIds: [] }), 400);
+});

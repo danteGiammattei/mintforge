@@ -105,12 +105,11 @@ async function seal(db, pid, body, { now, rand }) {
 
 /* ─── offer ───────────────────────────────────────────────────────── */
 
-async function offer(db, pid, body, { now, rand }) {
-  if (!idOk(body.scrollId)) throw new Refusal("Which scroll?");
+async function offerOne(db, pid, scrollId, { now, rand }) {
   const sc = await db.prepare(
     `DELETE FROM scrolls WHERE id = ?1 AND player_id = ?2 RETURNING rarity, hint`
-  ).bind(body.scrollId, pid).first();
-  if (!sc) throw new Refusal("That scroll is gone", 404);
+  ).bind(scrollId, pid).first();
+  if (!sc) return null;
 
   let pot, chest;
   for (let attempt = 0; ; attempt++) {
@@ -144,6 +143,27 @@ async function offer(db, pid, body, { now, rand }) {
   // He only ever praises, and only what actually lifted the scroll.
   const hint = sc.hint && TRAITS[sc.hint] && rand() < CHESTS.hintChance ? TRAITS[sc.hint].hint : null;
   return { rarity: sc.rarity, hint, lean: leanOf(pot), chest: given, xp };
+}
+
+/* One scroll (`scrollId`) or a handful at once (`scrollIds`). A handful
+ * is exactly the same as offering them one after another, in order —
+ * each fills the pot, each can release a chest, each can earn a remark —
+ * so offering together is a convenience and never a better or worse deal. */
+async function offer(db, pid, body, ctx) {
+  const ids = Array.isArray(body.scrollIds) ? [...new Set(body.scrollIds.filter(idOk))].slice(0, SCRIBE.scrollCap)
+            : idOk(body.scrollId) ? [body.scrollId] : [];
+  if (!ids.length) throw new Refusal("Which scroll?");
+  const done = [];
+  for (const id of ids) { const r = await offerOne(db, pid, id, ctx); if (r) done.push(r); }
+  if (!done.length) throw new Refusal("That scroll is gone", 404);
+  const last = done[done.length - 1];
+  const hints = [...new Set(done.map(r => r.hint).filter(Boolean))];
+  const chests = done.map(r => r.chest).filter(Boolean);
+  return {
+    offered: done.length, rarity: Math.max(...done.map(r => r.rarity)),
+    hint: hints[0] || null, hints, lean: last.lean,
+    chest: chests[0] || null, chests, xp: done.reduce((s, r) => s + r.xp, 0),
+  };
 }
 
 /* ─── visit: he may have something for you ────────────────────────── */

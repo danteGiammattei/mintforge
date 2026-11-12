@@ -25,7 +25,7 @@ export default function Door() {
     scene.current = mount(ref.current, {
       scrolls: () => live.current.scrolls,
       lean: () => live.current.lean / CHESTS.leanSteps,
-      offer: scroll => live.current.act("offer", { scrollId: scroll.id }),
+      offer: scrolls => live.current.act("offer", { scrollIds: scrolls.map(s => s.id) }),
       visit: () => live.current.act("visit"),
       say: ui.say, feel,
       received: what => {
@@ -45,6 +45,7 @@ export default function Door() {
               style={{ touchAction: "none", display: "block" }}/>
       <div className="sr-only">
         {g.scrolls.length === 0 && <button onClick={() => g.setTab("scribe")}>You have no scrolls. Go to the desk.</button>}
+        {g.scrolls.length > 1 && <button onClick={() => scene.current?.offer(g.scrolls.map(s => s.id))}>Offer all {g.scrolls.length} scrolls</button>}
         {g.scrolls.map((s, i) => (
           <button key={s.id} onClick={() => scene.current?.offer(s.id)}>Offer scroll {i + 1}, {RARITY[s.rarity].n}</button>
         ))}

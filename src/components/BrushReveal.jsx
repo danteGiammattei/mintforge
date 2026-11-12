@@ -15,8 +15,8 @@ import Sprite from "../ui/Sprite.jsx";
  * opened, so nothing is rolled here; and the cursor is a pixel brush
  * rather than an emoji. */
 const RS = 180;
-const BW = 28;
-const BH = 10;
+const BW = 25;      // 20% less area than the original 28×10 brush, so a coin takes a little longer
+const BH = 9;
 const SS = 4;
 
 /* Two-canvas reveal: bottom canvas is the painted coin, top canvas is dirt

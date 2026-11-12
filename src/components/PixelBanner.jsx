@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import { BANNERS } from "../lib/data.js";
 
-/* A profile banner, brought onto the pixel grid. Banners are either a
- * gradient or a painted image; both are drawn small (96×28) and shown
- * large, so a painterly premium banner sits in the same world as
- * everything else instead of looking pasted in. */
+/* A profile banner. Banners are either a gradient or a painted image.
+ * A gradient is redrawn small (96×28) in hard bands and shown large, so
+ * it sits on the pixel grid. A painted banner is already pixel art: it
+ * is shown exactly as it was made, never resampled. */
 const BW = 96, BH = 28;
 
 function stops(css) {
@@ -18,17 +18,7 @@ export default function PixelBanner({ frame, height = 112, dim = false, children
     const cv = ref.current; if (!cv) return;
     const ctx = cv.getContext("2d");
     const v = BANNERS[frame] || BANNERS.stone;
-    let cancelled = false;
-    if (v.startsWith("image:")) {
-      const img = new Image();
-      img.onload = () => {
-        if (cancelled) return;
-        const s = Math.max(BW / img.width, BH / img.height);
-        ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(img, (BW - img.width * s) / 2, (BH - img.height * s) / 2, img.width * s, img.height * s);
-      };
-      img.src = v.slice(6);
-    } else {
+    if (!v.startsWith("image:")) {
       // a diagonal sweep through the gradient's own colours, in hard bands
       const c = stops(v), img = ctx.createImageData(BW, BH), d = img.data;
       for (let y = 0; y < BH; y++) for (let x = 0; x < BW; x++) {
@@ -39,11 +29,12 @@ export default function PixelBanner({ frame, height = 112, dim = false, children
       }
       ctx.putImageData(img, 0, 0);
     }
-    return () => { cancelled = true; };
   }, [frame]);
+  const painted = (BANNERS[frame] || "").startsWith("image:") ? BANNERS[frame].slice(6) : null;
   return (
     <div style={{ position: "relative", height, overflow: "hidden", borderBottom: "2px solid #000" }}>
-      <canvas ref={ref} width={BW} height={BH} aria-hidden
+      {painted && <img src={painted} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", filter: dim ? "grayscale(.5) brightness(.6)" : "none" }}/>}
+      <canvas ref={ref} hidden={!!painted} width={BW} height={BH} aria-hidden
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", imageRendering: "pixelated", filter: dim ? "grayscale(.5) brightness(.6)" : "none" }}/>
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,9,0) 40%, rgba(5,6,9,.7) 100%)" }}/>
       {children}

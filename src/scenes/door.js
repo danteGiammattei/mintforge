@@ -11,7 +11,7 @@
  *
  *    bus.scrolls()        the player's scrolls, [{ id, rarity, seed }]
  *    bus.lean()           0..1, how far the pot has filled — his posture
- *    bus.offer(scroll)    → Promise<{ hint, lean, chest }>
+ *    bus.offer(scrolls)   → Promise<{ hints, lean, chests }>  one or several at once
  *    bus.visit()          → Promise<{ gift }>
  *    bus.say(text)        for the aria-live region
  *    bus.feel(name)       sound + haptics hook
@@ -59,7 +59,7 @@ const S = {
   t: 0,
   mode: "idle",            // idle | drawer | give | arrive
   drawer: 0,               // 0..1 slide
-  sel: null,               // index into bus.scrolls()
+  sel: new Set(),          // ids of the scrolls picked to offer
   phase: "", anim: 0,
   lean: bus.lean(),
   reach: 0, want: 0, curl: 0, glow: 0,
@@ -69,6 +69,7 @@ const S = {
   res: null, fail: null,   // the server's answer to an offer
   line: "", lineA: 0,      // what the scene says, top of frame
   blink: 0,
+  hurry: false, say: [], queue: [],   // skip-ahead; hints and chests still to come
   arriving: null,          // { kind: "chest"|"gift", tier, k, what }
   dust: Array.from({ length: 22 }, () => ({ x: GX + Math.random() * GW, y: Math.random() * H, v: 0.04 + Math.random() * 0.10, p: Math.random() * 6.28 })),
   motes: [],
@@ -276,7 +277,11 @@ function drawDrawer() {
   ctx.fillStyle = INK.cold; ctx.font = FONT;
   ctx.textAlign = "left";
   ctx.fillText("YOUR SCROLLS", 12, top + 15);
-  if (scrolls.length) { ctx.textAlign = "right"; ctx.fillText("TAP ONE", W - 12, top + 15); }
+  if (scrolls.length) {                                 // pick them all in one touch
+    const all = scrolls.every(s => S.sel.has(s.id));
+    ctx.textAlign = "right"; ctx.fillStyle = all ? P.magic : INK.coldHi; ctx.fillText(all ? "NONE" : "ALL", W - 12, top + 15);
+    ctx.fillStyle = INK.cold;
+  }
 
   if (!scrolls.length) {
     ctx.textAlign = "center";
@@ -287,7 +292,7 @@ function drawDrawer() {
     const c = CELLS[i], s = scrolls[i];
     const bx = c.x, by = top + c.y;
     if (!s) { if (scrolls.length) px(bx, by, c.w, c.h, "#070910"); continue; }
-    const on = (S.sel === i), col = colourOf(s.rarity);
+    const on = S.sel.has(s.id), col = colourOf(s.rarity);
     px(bx, by, c.w, c.h, on ? "#141822" : "#0e1118");
     ctx.strokeStyle = on ? col : "#1c2029";
     ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, c.w - 1, c.h - 1);
@@ -302,13 +307,14 @@ function drawDrawer() {
   }
 
   // confirm, or the way to the desk
-  const b = CONFIRM, by = top + b.y, can = S.sel !== null || !scrolls.length;
+  const picked = scrolls.filter(s => S.sel.has(s.id)).length;
+  const b = CONFIRM, by = top + b.y, can = picked > 0 || !scrolls.length;
   px(b.x, by, b.w, b.h, can ? "#1b2a22" : "#0c0e13");
   ctx.strokeStyle = can ? P.magic : "#1c2029"; ctx.lineWidth = 1;
   ctx.strokeRect(b.x + 0.5, by + 0.5, b.w - 1, b.h - 1);
   ctx.fillStyle = can ? P.magic : INK.off;
   ctx.font = FONT; ctx.textAlign = "center";
-  ctx.fillText(!scrolls.length ? "TO THE DESK" : S.sel !== null ? "OFFER IT" : "SELECT A SCROLL", W / 2, by + 18);
+  ctx.fillText(!scrolls.length ? "TO THE DESK" : picked > 1 ? "OFFER " + picked : picked ? "OFFER IT" : "SELECT A SCROLL", W / 2, by + 18);
 }
 
 /* ── something pushed through the gap ────────────────────────
@@ -356,7 +362,8 @@ function stepGive() {
       if (!view.calm && Math.random() < 0.5) S.motes.push({ life: 1, a: Math.random() * 6.28 });
       if (S.orb.t >= 1) {
         S.phase = "close"; S.anim = 0; bus.feel("taken");
-        if (S.res.hint) speak(S.res.hint);
+        S.say = [...(S.res.hints || [])];
+        if (S.say.length) speak(S.say.shift());
       }
     }
   } else if (S.phase === "close") {
@@ -367,9 +374,9 @@ function stepGive() {
   } else if (S.phase === "withdraw") {
     S.want = 0; S.ourK = Math.max(0, S.ourK - 0.03);
     if (S.reach < 0.08) {
-      const got = S.res?.chest;
+      const got = S.res?.chests || [];
       endGive();
-      if (got) arrive({ kind: "chest", tier: got.tier, what: { type: "chest", ...got } }, "HE PUSHES A CHEST THROUGH THE GAP");
+      for (const c of got) S.queue.push({ kind: "chest", tier: c.tier, what: { type: "chest", ...c } });
     }
   } else if (S.phase === "refuse") {
     S.ourK = Math.max(0, S.ourK - 0.03);
@@ -385,20 +392,25 @@ function arrive(a, text) {
 }
 function stepArrive() {
   const a = S.arriving;
+  if (S.hurry) a.k = Math.min(1, a.k + 0.02);
   a.k = Math.min(1, a.k + 0.0065);
   if (a.k >= 1) { S.arriving = null; S.mode = "idle"; bus.received(a.what); }
 }
 
-function beginGive(index) {
-  const scroll = bus.scrolls()[index];
-  if (!scroll || S.mode === "give" || S.mode === "arrive") return;
+function beginGive(ids) {
+  const scrolls = bus.scrolls().filter(s => ids.includes(s.id));
+  if (!scrolls.length || S.mode === "give" || S.mode === "arrive") return;
+  // the hand holds out the finest of them; the rest go with it
+  const scroll = scrolls.reduce((a, b) => (b.rarity > a.rarity ? b : a));
   S.mode = "give"; S.phase = "reach"; S.anim = 0; S.ourK = 0; S.orb = null; S.motes = [];
-  S.giftR = scroll.rarity; S.sel = null; S.res = null; S.fail = null;
+  S.giftR = scroll.rarity; S.sel = new Set(); S.res = null; S.fail = null; S.hurry = false;
   bus.feel("offer");
-  bus.offer(scroll).then(
+  bus.offer(scrolls).then(
     res => { S.res = res; },
     err => { S.fail = (err && err.message ? String(err.message).toUpperCase() : "THE DOOR DOES NOT ANSWER"); });
 }
+
+function stepHands() { S.reach += (S.want - S.reach) * (S.phase === "withdraw" ? 0.05 : 0.035); }
 
 function frame() {
   S.t++;
@@ -408,14 +420,20 @@ function frame() {
   S.drawer += ((S.mode === "drawer" ? 1 : 0) - S.drawer) * 0.18;
   if (S.drawer < 0.001) S.drawer = 0;
 
-  if (S.mode === "give") stepGive();
+  // a tap during the exchange hurries it along: the same steps, four at a time
+  if (S.mode === "give") for (let n = 0, N = S.hurry ? 4 : 1; n < N && S.mode === "give"; n++) { stepGive(); if (n) stepHands(); }
   if (S.mode === "arrive") stepArrive();
+  if (S.mode === "idle") {
+    S.hurry = false;
+    if (S.say?.length && S.lineA < 1) speak(S.say.shift());           // anything else he had to say
+    else if (S.queue.length && S.drawer < 0.01) arrive(S.queue.shift(), "HE PUSHES A CHEST THROUGH THE GAP");
+  }
 
   // his posture follows the pot, slowly: he does not jump
   S.lean += (bus.lean() - S.lean) * 0.02;
   const patience = 0.3 + 0.7 * S.lean;
   if (S.mode !== "give") S.want = 0.74 + patience * 0.2;
-  S.reach += (S.want - S.reach) * (S.phase === "withdraw" ? 0.05 : 0.035);
+  stepHands();
   if (S.mode !== "give" && S.curl > 0.001) S.curl += (0 - S.curl) * 0.1;
 
   drawGap(flick);
@@ -483,25 +501,36 @@ const onMove = e => {
 const onUp = e => {
   if (!down) return;
   const p = pointer(cv, e), start = down; down = null;
+  if (S.mode === "give" || S.mode === "arrive") { S.hurry = true; return; }
   if (S.mode === "idle") {
     // a tap low in the frame opens the satchel too: a swipe is not the only way in
     if (p.y > H - 64 && Math.abs(p.y - start.y) < 10) { S.mode = "drawer"; bus.feel("drawer"); }
     return;
   }
   if (S.mode !== "drawer") return;
-  if (p.y - start.y > 26) { S.mode = "idle"; S.sel = null; return; }       // swipe back down closes it
+  if (p.y - start.y > 26) { S.mode = "idle"; S.sel = new Set(); return; }       // swipe back down closes it
   const top = drawerTop();
-  if (p.y < top) { S.mode = "idle"; S.sel = null; return; }
+  if (p.y < top) { S.mode = "idle"; S.sel = new Set(); return; }
   const scrolls = bus.scrolls();
   for (let i = 0; i < CELLS.length; i++) {
     const c = CELLS[i];
     if (!scrolls[i]) continue;
-    if (p.x >= c.x && p.x <= c.x + c.w && p.y >= top + c.y && p.y <= top + c.y + c.h) { S.sel = i; bus.feel("tap"); return; }
+    if (p.x >= c.x && p.x <= c.x + c.w && p.y >= top + c.y && p.y <= top + c.y + c.h) {
+      const id = scrolls[i].id;
+      S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); bus.feel("tap"); return;
+    }
   }
   const b = CONFIRM;
   if (p.y >= top + b.y - 4 && p.y <= top + b.y + b.h + 4 && p.x >= b.x && p.x <= b.x + b.w) {
     if (!scrolls.length) { bus.toDesk(); return; }
-    if (S.sel !== null) beginGive(S.sel);
+    const ids = scrolls.filter(s => S.sel.has(s.id)).map(s => s.id);
+    if (ids.length) beginGive(ids);
+    return;
+  }
+  // ALL / NONE, top right of the drawer
+  if (scrolls.length && p.x > W - 60 && p.y >= top && p.y < top + 22) {
+    const all = scrolls.every(s => S.sel.has(s.id));
+    S.sel = all ? new Set() : new Set(scrolls.map(s => s.id)); bus.feel("tap");
   }
 };
 const onCancel = () => { down = null; };
@@ -534,9 +563,9 @@ const teardown = () => {
   cv.removeEventListener("pointercancel", onCancel);
 };
 /* for controls outside the canvas (keyboard, screen readers) */
-teardown.offer = id => {
-  const i = bus.scrolls().findIndex(s => s.id === id);
-  if (i >= 0 && (S.mode === "idle" || S.mode === "drawer")) beginGive(i);
+teardown.offer = ids => {
+  const want = (Array.isArray(ids) ? ids : [ids]).filter(id => bus.scrolls().some(s => s.id === id));
+  if (want.length && (S.mode === "idle" || S.mode === "drawer")) beginGive(want);
 };
 return teardown;
 }
