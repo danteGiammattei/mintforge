@@ -13,6 +13,8 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { hashPin, validateUsername, validatePin } from "../server/auth.js";
 import { randomHex } from "../server/http.js";
 import { AUTH } from "../shared/tuning.js";
@@ -36,8 +38,11 @@ const sql = [
 ].join("; ") + ";";
 
 console.log(`Resetting the PIN for ${username} on the ${remote ? "PRODUCTION" : "local"} database…`);
-const out = execFileSync("npx", ["wrangler", "d1", "execute", "mintforge", remote ? "--remote" : "--local", "--command", sql, "--json"],
-  { encoding: "utf8", shell: process.platform === "win32", stdio: ["inherit", "pipe", "inherit"] });
+// Run the project's own wrangler with this same Node, and no shell between:
+// a shell (cmd.exe in particular) would split the SQL into words.
+const wrangler = join(dirname(createRequire(import.meta.url).resolve("wrangler/package.json")), "bin", "wrangler.js");
+const out = execFileSync(process.execPath, [wrangler, "d1", "execute", "mintforge", remote ? "--remote" : "--local", "--command", sql, "--json"],
+  { encoding: "utf8", stdio: ["inherit", "pipe", "inherit"] });
 
 let found = false;
 try { found = JSON.parse(out).some(r => (r.results || []).some(x => x.username)); } catch { found = /"username"/.test(out); }
