@@ -13,8 +13,10 @@
  *  the table's status change moves any coin.
  *
  *  The deck is shuffled when the guest sits down and never leaves the
- *  server; a card is only shown once both players have flipped for it,
- *  so walking away can never dodge a loss that is already decided.
+ *  server. Each round the host is fanned the top WAR.fan cards and the
+ *  guest the next WAR.fan, face down, and each picks one: the pick is
+ *  real, the card under it is what they play. A card is only shown once
+ *  both have picked, so walking away can never dodge a decided loss.
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { WAR } from "../shared/tuning.js";
@@ -36,16 +38,21 @@ export function shuffled(rand) {
   return d;
 }
 
-/* Deal the next round from `deck` at `pos`. After a tie it is war: each
- * lays WAR.warDown face down, then one up. Null when the deck is out. */
-export function dealRound(deck, pos, war) {
-  const each = war ? WAR.warDown + 1 : 1;
-  if (pos + each * 2 > deck.length) return null;
-  const host = deck.slice(pos, pos + each), guest = deck.slice(pos + each, pos + each * 2);
-  const h = host[host.length - 1], g = guest[guest.length - 1];
+/* Play a round from what is left of `deck`: the host's card is the one
+ * at their pick in the first fan, the guest's at theirs in the second.
+ * After a tie it is war, and each also lays WAR.warDown face down from
+ * the top. The cards not picked stay in the deck, in order. Returns the
+ * deck left and the round, or null when there are too few cards. */
+export function dealRound(deck, hp, gp, war) {
+  const F = WAR.fan, down = war ? WAR.warDown : 0;
+  if (deck.length < 2 * F + 2 * down) return null;
+  const h = deck[hp], g = deck[F + gp];
+  let left = deck.filter((_, i) => i !== hp && i !== F + gp);
+  left = left.slice(2 * down);
   const result = cardValue(h) > cardValue(g) ? "host" : cardValue(g) > cardValue(h) ? "guest" : "tie";
-  return { pos: pos + each * 2, entry: { war, down: each - 1, host: h, guest: g, result } };
+  return { deck: left, entry: { war, down, host: h, guest: g, hp, gp, result } };
 }
+const pickOk = v => Number.isInteger(v) && v >= 0 && v < WAR.fan;
 
 const coinJson = `json_object('id', id, 'seed', seed, 'metal_idx', metal_idx, 'shiny', shiny,
   'rarity', COALESCE(rarity, ?R), 'nickname', nickname, 'acquired_at', acquired_at)`;
@@ -166,8 +173,10 @@ async function flip(db, pid, body, now) {
   if (t.status !== "playing") throw new Refusal("That table is closed", 409);
   const side = t.host_id === pid ? "host" : "guest";
   if (t[`${side}_flip`] < t.round) {
-    await db.prepare(`UPDATE war_tables SET ${side}_flip = ?2, updated_at = ?3 WHERE id = ?1 AND status = 'playing' AND round = ?2`)
-      .bind(t.id, t.round, now).run();
+    if (!pickOk(body.pick)) throw new Refusal("Pick a card");
+    await db.prepare(`UPDATE war_tables SET ${side}_flip = ?2, ${side}_pick = ?4, updated_at = ?3
+                       WHERE id = ?1 AND status = 'playing' AND round = ?2 AND ${side}_flip < ?2`)
+      .bind(t.id, t.round, now, body.pick).run();
     t = await getTable(db, t.id, pid);
   }
   if (t.status !== "playing" || t.host_flip < t.round || t.guest_flip < t.round) return { tableId: t.id };
@@ -175,7 +184,7 @@ async function flip(db, pid, body, now) {
   // both have flipped for this round: deal it
   const log = parse(t.log) || [], deck = parse(t.deck) || [];
   const war = log.length > 0 && log[log.length - 1].result === "tie";
-  const dealt = dealRound(deck, t.pos, war);
+  const dealt = dealRound(deck, t.host_pick, t.guest_pick, war);
   if (!dealt) { await voidTable(db, t, "deck", now); return { tableId: t.id }; }
   log.push(dealt.entry);
   const done = dealt.entry.result !== "tie";
@@ -183,9 +192,9 @@ async function flip(db, pid, body, now) {
   const nonce = randomHex(8);
   const out = await db.batch([
     db.prepare(
-      `UPDATE war_tables SET round = round + 1, pos = ?3, log = ?4, status = ?5, winner_id = ?6, settle = ?7, updated_at = ?8
+      `UPDATE war_tables SET round = round + 1, deck = ?3, log = ?4, status = ?5, winner_id = ?6, settle = ?7, updated_at = ?8
         WHERE id = ?1 AND round = ?2 AND status = 'playing'`
-    ).bind(t.id, t.round, dealt.pos, JSON.stringify(log), done ? "done" : "playing", winner, done ? nonce : null, now),
+    ).bind(t.id, t.round, JSON.stringify(dealt.deck), JSON.stringify(log), done ? "done" : "playing", winner, done ? nonce : null, now),
     ...(done ? [release(db, t, "host", winner, nonce, now), release(db, t, "guest", winner, nonce, now)] : []),
   ]);
   if (done && out[0].meta.changes) {
@@ -201,7 +210,7 @@ export async function warState(db, pid, now = Date.now()) {
   await sweep(db, pid, now);
   const rows = (await db.prepare(
     `SELECT w.id, w.host_id, w.guest_id, w.host_coin, w.guest_coin, w.status, w.round, w.host_flip, w.guest_flip,
-            w.log, w.winner_id, w.why, w.updated_at, w.expires_at, h.username AS host_name, g.username AS guest_name
+            w.log, w.winner_id, w.host_pick, w.guest_pick, w.why, w.updated_at, w.expires_at, h.username AS host_name, g.username AS guest_name
        FROM war_tables w JOIN players h ON h.id = w.host_id JOIN players g ON g.id = w.guest_id
       WHERE (w.host_id = ?1 OR w.guest_id = ?1) AND (w.status IN ${ACTIVE} OR w.updated_at > ?2)
       ORDER BY w.updated_at DESC LIMIT 20`
@@ -213,6 +222,10 @@ export async function warState(db, pid, now = Date.now()) {
       id: r.id, role: me, other: r[`${them}_name`], status: r.status,
       mine: coinOut(parse(r[`${me}_coin`])), theirs: coinOut(parse(r[`${them}_coin`])),
       round: r.round, youFlipped: r[`${me}_flip`] >= r.round, theyFlipped: r[`${them}_flip`] >= r.round,
+      // which face-down card each pulled this round (says nothing of what it is)
+      yourPick: r[`${me}_flip`] >= r.round ? r[`${me}_pick`] : null,
+      theirPick: r[`${them}_flip`] >= r.round ? r[`${them}_pick`] : null,
+      fan: WAR.fan,
       // rounds dealt, from this player's side
       log: (parse(r.log) || []).map(e => ({ war: e.war, down: e.down, mine: e[me], theirs: e[them], result: e.result === "tie" ? "tie" : e.result === me ? "won" : "lost" })),
       outcome: r.status === "done" ? (r.winner_id === pid ? "won" : "lost") : r.status === "void" ? r.why : null,

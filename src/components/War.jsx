@@ -56,51 +56,91 @@ function Stack({ up, down = 0, fresh, ready }) {
   );
 }
 
-function Seat({ name, coin, up, down, fresh, ready, flipped, mine }) {
+/* A fan of face-down cards, low at the ends and high in the middle (whole
+ * pixels, nothing turned or scaled). Yours are buttons; theirs show only
+ * their tops, across the table. */
+const ARC = [8, 4, 1, 0, 1, 4, 8, 13, 19];
+function Fan({ count, step, chosen, played, onChoose, ready, theirs, label }) {
+  const mid = (count - 1) / 2;
+  const lift = i => (i === played ? (theirs ? 14 : -18) : i === chosen ? -10 : 0);
+  const arc = i => ARC[Math.round(Math.abs(i - mid))] * (theirs ? -1 : 1);
+  const w = CARD_W + step * (count - 1);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, flexDirection: mine ? "row" : "row-reverse", justifyContent: "space-between" }}>
-      <Stack key={fresh} up={up} down={down} fresh={fresh > 0} ready={ready}/>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
-        {coin && <CoinCanvas coin={hydrate(coin)} size={64}/>}
-        <span className="t-label t-plain" style={{ overflowWrap: "anywhere", textAlign: "center" }}>{mine ? "YOU" : name}</span>
-        <span className="t-label" style={{ color: flipped ? "var(--candle)" : "var(--mute)" }}>{flipped ? "FLIPPED" : "THINKING"}</span>
-      </div>
+    <div role={theirs ? "img" : "group"} aria-label={label}
+         style={{ position: "relative", width: w, maxWidth: "100%", height: theirs ? 72 : CARD_H + 30, margin: "0 auto", overflow: theirs ? "hidden" : "visible" }}>
+      {Array.from({ length: count }, (_, i) => {
+        const y = (theirs ? -64 : 14) + arc(i) + lift(i);
+        const dim = played != null && i !== played;
+        const card = <Card n={null} ready={ready}/>;
+        const style = { position: "absolute", left: i * step, top: y, filter: dim ? "brightness(.5)" : "none", transition: "top .12s steps(2)", padding: 0, border: 0, background: "none" };
+        return theirs ? <div key={i} style={style} aria-hidden>{card}</div> : (
+          <button key={i} style={{ ...style, cursor: played == null ? "pointer" : "default", outline: i === chosen && played == null ? "2px solid var(--candle)" : "none", outlineOffset: -2 }}
+                  disabled={played != null} aria-pressed={i === chosen} aria-label={`Card ${i + 1} of ${count}, face down`}
+                  onClick={() => onChoose(i)}>{card}</button>
+        );
+      })}
     </div>
   );
 }
 
 function Felt({ t, ready }) {
   const g = useGame(), ui = useUi();
+  const [chosen, setChosen] = useState(null);
   const [sending, setSending] = useState(false);
   const last = t.log[t.log.length - 1];
   const tie = last?.result === "tie";
   const idle = useLeft(t.idleIn);
-  const flip = async () => {
-    setSending(true); feel("tap");
-    try { await g.war.move("flip", { tableId: t.id }); }
+  useEffect(() => { setChosen(null); }, [t.round]);
+
+  const play = async (pick = chosen) => {
+    if (pick == null || t.youFlipped) return;
+    setSending(true); feel("offer");
+    try { await g.war.move("flip", { tableId: t.id, pick }); }
     catch (e) { ui.toast(e.message, "bad"); }
     finally { setSending(false); }
   };
+  // tap a card to draw it out of the fan; tap it again to play it
+  const choose = i => { if (i === chosen) play(i); else { feel("tap"); setChosen(i); } };
+
   const said = useRef(t.log.length);
   useEffect(() => {
     if (t.log.length > said.current && last) ui.say(`YOU ${cardName(last.mine)}, ${t.other} ${cardName(last.theirs)}. ${tie ? "WAR." : ""}`);
     said.current = t.log.length;
   }, [t.log.length, last, tie, t.other, ui]);
 
+  const slot = <div style={{ width: CARD_W, height: CARD_H, border: "2px dashed var(--line)" }} aria-hidden/>;
+  const played = t.youFlipped ? t.yourPick : null;
+
   return (
-    <section className="panel" aria-label={`War with ${t.other}`} style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12, background: "var(--felt)" }}>
-      <Seat name={t.other} coin={t.theirs} up={last?.theirs} down={last?.down} fresh={t.log.length} ready={ready} flipped={t.theyFlipped}/>
-      <div style={{ textAlign: "center", minHeight: 24 }} aria-live="polite">
-        {tie ? <span className="t-big" style={{ color: "var(--danger, #ff7060)" }}>WAR!</span>
-             : <span className="t-dim">{t.log.length ? "" : "HIGH CARD TAKES BOTH COINS"}</span>}
-        {tie && <div className="t-label">THREE DOWN, ONE UP. FLIP AGAIN.</div>}
+    <section className="panel" aria-label={`War with ${t.other}`} style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10, background: "var(--felt)" }}>
+      <div className="between" style={{ gap: 8 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="t-title t-plain" style={{ overflowWrap: "anywhere" }}>{t.other}</div>
+          <div className="t-label" style={{ color: t.theyFlipped ? "var(--candle)" : "var(--mute)" }}>{t.theyFlipped ? "HAS PICKED A CARD" : "CHOOSING…"}</div>
+        </div>
+        {t.theirs && <CoinCanvas coin={hydrate(t.theirs)} size={64}/>}
       </div>
-      <Seat mine coin={t.mine} up={last?.mine} down={last?.down} fresh={t.log.length} ready={ready} flipped={t.youFlipped}/>
-      <button className="btn btn-gold" disabled={t.youFlipped || sending} onClick={flip} style={{ minHeight: 52 }}>
-        {t.youFlipped ? `WAITING FOR ${t.other}` : tie ? "FLIP FOR WAR" : "FLIP"}
-      </button>
+      <Fan theirs count={t.fan} step={26} played={t.theirPick} ready={ready} label={`${t.other}'s cards, face down`}/>
+
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 12 }} aria-live="polite">
+        {last ? <Stack key={"t" + t.log.length} up={last.theirs} down={last.down} fresh ready={ready}/> : slot}
+        {last ? <Stack key={"m" + t.log.length} up={last.mine} down={last.down} fresh ready={ready}/> : slot}
+      </div>
+      <div style={{ textAlign: "center", minHeight: 20 }}>
+        {tie ? <><span className="t-big" style={{ color: "#ff7060" }}>WAR!</span><div className="t-label">THREE GO DOWN. PICK AGAIN.</div></>
+             : last ? <span className="t-label">{last.result === "won" ? "YOURS WAS HIGHER" : "THEIRS WAS HIGHER"}</span>
+             : <span className="t-dim">PICK A CARD. HIGH CARD TAKES BOTH COINS.</span>}
+      </div>
+
+      <Fan count={t.fan} step={34} chosen={chosen} played={played} onChoose={choose} ready={ready} label="Your cards, face down"/>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {t.mine && <CoinCanvas coin={hydrate(t.mine)} size={64}/>}
+        <button className="btn btn-gold" style={{ flex: 1, minHeight: 52 }} disabled={t.youFlipped || sending || chosen == null} onClick={() => play()}>
+          {t.youFlipped ? `WAITING FOR ${t.other}` : chosen == null ? "TAP A CARD" : tie ? "PLAY IT FOR WAR" : "PLAY THIS CARD"}
+        </button>
+      </div>
       {idle != null && idle < 60_000 && <p className="t-label" style={{ margin: 0, textAlign: "center" }}>
-        IF NOBODY FLIPS IN {clock(idle)} THE TABLE IS CALLED OFF AND BOTH COINS GO HOME</p>}
+        IF NOBODY PLAYS IN {clock(idle)} THE TABLE IS CALLED OFF AND BOTH COINS GO HOME</p>}
     </section>
   );
 }

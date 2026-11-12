@@ -143,10 +143,12 @@ CREATE TABLE IF NOT EXISTS war_tables (
   guest_coin  TEXT,                      -- JSON, once the guest sits down
   status      TEXT    NOT NULL,          -- invited · playing · done · void
   deck        TEXT,                      -- JSON card order. Never sent to a client.
-  pos         INTEGER NOT NULL DEFAULT 0,  -- next card to deal
+  pos         INTEGER NOT NULL DEFAULT 0,  -- unused since 014: the deck shrinks instead
   round       INTEGER NOT NULL DEFAULT 0,
   host_flip   INTEGER NOT NULL DEFAULT -1, -- the round each has flipped for
   guest_flip  INTEGER NOT NULL DEFAULT -1,
+  host_pick   INTEGER,                   -- which card of the fan each pulled (migration 014)
+  guest_pick  INTEGER,
   log         TEXT    NOT NULL DEFAULT '[]', -- the rounds dealt so far, face up
   winner_id   INTEGER,
   why         TEXT,                      -- how a void table ended

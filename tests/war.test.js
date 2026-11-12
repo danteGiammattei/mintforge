@@ -20,22 +20,26 @@ async function table() {
   await coin(b, "c_b2", 4);
   const ids = async pid => (await db.prepare(`SELECT id FROM coins WHERE player_id = ?1 ORDER BY id`).bind(pid).all()).results.map(r => r.id);
   const go = (pid, body, now = T0 + 1000) => warMove(db, pid, body, { now, rand: seeded(7) });
-  // set the deck so the next cards dealt are these (host first, guest second, …)
-  const stack = async (tid, cards) => {
-    const rest = Array.from({ length: 52 }, (_, i) => i).filter(n => !cards.includes(n));
-    await db.prepare(`UPDATE war_tables SET deck = ?2 WHERE id = ?1`).bind(tid, JSON.stringify([...cards, ...rest])).run();
+  // set the deck so these positions hold these cards ({ position: card })
+  const stack = async (tid, at) => {
+    const fixed = Object.values(at), rest = Array.from({ length: 52 }, (_, i) => i).filter(n => !fixed.includes(n));
+    const deck = Array.from({ length: 52 }, (_, i) => (i in at ? at[i] : rest.shift()));
+    await db.prepare(`UPDATE war_tables SET deck = ?2 WHERE id = ?1`).bind(tid, JSON.stringify(deck)).run();
   };
   return { db, a, b, ids, go, stack };
 }
 const refused = async (p, re) => { await assert.rejects(p, e => re.test(e.message)); };
 
-test("cards: ace is high, a tie turns to war with three face down", () => {
+test("cards: each plays the card they picked from their fan; ace is high; war lays three down", () => {
   assert.equal(cardValue(0), 14); assert.equal(cardValue(12), 13); assert.equal(cardValue(14), 2);
-  const r = dealRound([12, 11], 0, false);
-  assert.equal(r.entry.result, "host");
-  const w = dealRound([0, 1, 2, 5, 9, 9, 9, 6], 0, true);
-  assert.equal(w.pos, 8); assert.equal(w.entry.down, 3); assert.equal(w.entry.host, 5); assert.equal(w.entry.guest, 6);
-  assert.equal(dealRound([1, 2, 3], 0, true), null);
+  const d = Array.from({ length: 52 }, (_, i) => i), F = WAR.fan;
+  const r = dealRound(d, 0, 0, false);
+  assert.equal(r.entry.host, 0); assert.equal(r.entry.guest, F); assert.equal(r.entry.result, "host");
+  assert.equal(r.deck.length, 50); assert.equal(r.deck[0], 1, "the cards not picked stay, in order");
+  const w = dealRound(d, 2, 3, true);
+  assert.equal(w.entry.host, 2); assert.equal(w.entry.guest, F + 3); assert.equal(w.entry.down, 3);
+  assert.equal(w.deck.length, 52 - 2 - 6);
+  assert.equal(dealRound(d.slice(0, 2 * F + 5), 0, 0, true), null);
 });
 
 test("war: stake, sit, flip — the winner holds both coins, name and all", async () => {
@@ -46,12 +50,14 @@ test("war: stake, sit, flip — the winner holds both coins, name and all", asyn
   await refused(go(b, { op: "join", tableId, coinId: "c_b1" }), /at least as rare/);
   await go(b, { op: "join", tableId, coinId: "c_b2" });
   assert.deepEqual(await ids(b), ["c_b1"]);
-  await stack(tableId, [12, 11]);                         // king beats queen: the host wins
+  await stack(tableId, { 2: 12, [WAR.fan + 4]: 11 });   // the host picks a king, the guest a queen
 
-  let r = await go(a, { op: "flip", tableId });
+  await refused(go(a, { op: "flip", tableId }), /Pick a card/);
+  let r = await go(a, { op: "flip", tableId, pick: 2 });
   assert.equal(r.war.table.youFlipped, true); assert.equal(r.war.table.theyFlipped, false);
   assert.equal(r.war.table.log.length, 0, "nothing shown until both flip");
-  r = await go(b, { op: "flip", tableId });
+  assert.equal(r.war.table.yourPick, 2);
+  r = await go(b, { op: "flip", tableId, pick: 4 });
   assert.equal(r.war.table, null);
   assert.equal(r.war.recent[0].outcome, "lost");
   assert.equal(r.war.recent[0].log[0].mine, 11);
@@ -64,13 +70,14 @@ test("war: a tie goes to war and the guest can take it", async () => {
   const { a, b, ids, go, stack } = await table();
   const { result: { tableId } } = await go(a, { op: "invite", friend: "guesty", coinId: "c_a1" });
   await go(b, { op: "join", tableId, coinId: "c_b2" });
-  await stack(tableId, [4, 17, /* war */ 1, 2, 3, 5, 20, 21, 22, 12]);   // 5 v 5, then 6 v king
-  await go(a, { op: "flip", tableId });
-  let r = await go(b, { op: "flip", tableId });
+  // round one: 5 v 5. Then positions 0 and 7 are gone, so the old 1 and 9 lead the fans: 6 v king
+  await stack(tableId, { 0: 4, 7: 17, 1: 5, 9: 12 });
+  await go(a, { op: "flip", tableId, pick: 0 });
+  let r = await go(b, { op: "flip", tableId, pick: 0 });
   assert.equal(r.war.table.log[0].result, "tie");
   assert.equal(r.war.table.round, 1);
-  await go(b, { op: "flip", tableId });
-  r = await go(a, { op: "flip", tableId });
+  await go(b, { op: "flip", tableId, pick: 0 });
+  r = await go(a, { op: "flip", tableId, pick: 0 });
   assert.equal(r.war.recent[0].outcome, "lost");
   assert.equal(r.war.recent[0].log[1].war, true);
   assert.deepEqual(await ids(b), ["c_a1", "c_b1", "c_b2"]);
@@ -93,8 +100,8 @@ test("war: declined, cancelled, unanswered and abandoned tables send the coins h
 
   ({ result: { tableId } } = await go(a, { op: "invite", friend: "guesty", coinId: "c_a1" }, later));
   await go(b, { op: "join", tableId, coinId: "c_b2" }, later);
-  await go(a, { op: "flip", tableId }, later);
-  const r = await go(a, { op: "flip", tableId }, later + WAR.idleMs + 1).catch(e => e);
+  await go(a, { op: "flip", tableId, pick: 3 }, later);
+  const r = await go(a, { op: "flip", tableId, pick: 3 }, later + WAR.idleMs + 1).catch(e => e);
   assert.match(String(r.message || ""), /closed/);
   assert.deepEqual(await ids(a), ["c_a1", "c_a2"]);
   assert.deepEqual(await ids(b), ["c_b1", "c_b2"]);

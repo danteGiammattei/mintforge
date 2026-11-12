@@ -255,5 +255,6 @@ export const WAR = {
   inviteMs: 180_000,     // an unanswered challenge lapses after this
   idleMs:   120_000,     // a table nobody flips at for this long is called off
   warDown:  3,           // cards laid face down at each war
+  fan:      7,           // face-down cards each player picks from, every round
   recentMs: 600_000,     // how long a finished table is still shown
 };
