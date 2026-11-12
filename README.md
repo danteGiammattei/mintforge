@@ -87,6 +87,15 @@ npm test             # 55 tests, no network, no browser
 npm run sim          # the balance report (npm run sim -- --quick while iterating)
 ```
 
+To give a player a new PIN (it also signs them out everywhere and clears any
+lockout):
+
+```sh
+node tools/reset-pin.mjs <username> <new-pin> --remote
+```
+
+Leave off `--remote` to do it on the local database.
+
 ## Deploying
 
 The project is Cloudflare Pages + D1 (`wrangler.toml`).
