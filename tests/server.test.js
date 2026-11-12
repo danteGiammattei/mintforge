@@ -512,23 +512,37 @@ test("a deeper inkwell is bought with marks, in order, and lets a sheet take mor
   await refuses(go("well"), 409);
 });
 
-test("the daily visit: once a day, growing over a streak, a chest on the seventh, reset by a long absence", async () => {
+test("the daily visit: once per calendar day, growing over a streak, a chest on the seventh", async () => {
   const { db, pid } = await world();
-  let now = 1e9;
-  const visit = async () => (await act(db, pid, { action: "visit" }, { now, rand: seeded(1) })).result.gift;
-  assert.equal((await visit()).type, "chest");                      // the welcome chest is day one
-  now += 3600e3; assert.equal(await visit(), null);
+  const DAY = 86400e3, H = 3600e3, BNE = 600;                       // Brisbane, UTC+10
+  const local = (d, h) => d * DAY + h * H - BNE * 60e3;               // day d, h o'clock in Brisbane
+  const visit = async t => (await act(db, pid, { action: "visit" }, { now: t, rand: seeded(1), tz: BNE })).result.gift;
+  const D0 = 20000;
+  assert.equal((await visit(local(D0, 22))).type, "chest");          // the welcome chest at 10pm is day one
+  assert.equal(await visit(local(D0, 23)), null, "not twice in a day");
+  const morning = await visit(local(D0 + 1, 6));                     // 6am the next morning: day two is ready
+  assert.deepEqual([morning.streak, morning.n], [2, DAILY.marks[1]]);
   const got = [];
-  for (let day = 2; day <= 8; day++) { now += DAILY.gapMs + 60e3; const g = await visit(); got.push(g.type === "chest" ? "chest" : g.n); assert.equal(g.streak, day); }
-  assert.deepEqual(got, [DAILY.marks[1], DAILY.marks[2], DAILY.marks[3], DAILY.marks[4], DAILY.marks[5], "chest", DAILY.marks[0]]);
-  now += 1000; assert.equal(await visit(), null, "only one a day");
-  now += DAILY.breakMs + 1; const back = await visit();
+  for (let d = 2; d <= 7; d++) { const g = await visit(local(D0 + d, 12)); got.push(g.type === "chest" ? "chest" : g.n); }
+  assert.deepEqual(got, [DAILY.marks[2], DAILY.marks[3], DAILY.marks[4], DAILY.marks[5], "chest", DAILY.marks[0]]);
+  const back = await visit(local(D0 + 9, 9));                         // a whole day skipped: it starts again
   assert.deepEqual([back.streak, back.n], [1, DAILY.marks[0]]);
-  const s = await loadState(db, pid, now);
-  assert.equal(s.streak, 1);
+  await visit(local(D0 + 10, 23.5));                                 // a late claim…
+  assert.equal(await visit(local(D0 + 11, 0.5)), null, "…then just past midnight is too soon");
+  assert.ok(await visit(local(D0 + 11, 4)));
+  const s = await loadState(db, pid, local(D0 + 11, 5), BNE);
+  assert.deepEqual([s.dailyReady, s.streak], [false, 3]);
+  assert.ok(s.dailyIn > 18 * H && s.dailyIn <= 19 * H, "ready again at midnight");
   assert.ok(!("daily" in s.stats));
 });
 
+test("an old daily record from before calendar days still counts", async () => {
+  const { db, pid } = await world();
+  const t = 30000 * 86400e3;
+  db.raw.prepare(`UPDATE player_state SET gifts = '["welcome"]', stats = json_set(stats, '$.daily', json(?)) WHERE player_id = ?`).run(JSON.stringify({ at: t - 20 * 3600e3, streak: 3 }), pid);
+  const g = (await act(db, pid, { action: "visit" }, { now: t, rand: seeded(1), tz: 0 })).result.gift;
+  assert.equal(g.streak, 4);
+});
 
 test("the journal earns gifts: kinds found, and the first of a rarity", async () => {
   const { db, pid } = await world();
@@ -580,13 +594,13 @@ test("the engraver will not cut a rude word, however it is spelt", async () => {
 
 test("the daily gift says when it is ready", async () => {
   const { db, pid } = await world();
-  let now = 2e9;
+  const now = 25000 * 86400e3 + 9 * 3600e3;                          // 9am UTC
   assert.equal((await loadState(db, pid, now)).dailyReady, true, "a new player has one waiting");
   await act(db, pid, { action: "visit" }, { now, rand: seeded(1) });
   const after = await loadState(db, pid, now + 1000);
   assert.equal(after.dailyReady, false);
-  assert.ok(after.dailyIn > DAILY.gapMs - 2000);
-  assert.equal((await loadState(db, pid, now + DAILY.gapMs + 1)).dailyReady, true);
+  assert.ok(Math.abs(after.dailyIn - 15 * 3600e3) < 2000, "until midnight");
+  assert.equal((await loadState(db, pid, now + 15 * 3600e3 + 1)).dailyReady, true);
 });
 
 test("player search uses the username index", () => {

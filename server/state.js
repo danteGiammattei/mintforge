@@ -10,8 +10,8 @@
  *  and title to wear, the bio, the cabinet, which coins are locked.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { levelOf, leanOf, inkFor, dailyGift } from "../shared/economy.js";
-import { SCRIBE, DAILY } from "../shared/tuning.js";
+import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait } from "../shared/economy.js";
+import { SCRIBE } from "../shared/tuning.js";
 import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
 
@@ -39,7 +39,7 @@ export function journalOut(stored, coins) {
   return { c, shiny: Math.max(j.shiny || 0, shinyHeld), best: j.best || 0 };
 }
 
-export async function loadState(db, pid, now = Date.now()) {
+export async function loadState(db, pid, now = Date.now(), tz = 0) {
   const ps = await db.prepare(
     `SELECT players.username, s.xp, s.marks, s.brush_level, s.frame, s.bio, s.selected_title, s.pinned_ids,
             s.owned_frames, s.owned_titles, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
@@ -74,10 +74,10 @@ export async function loadState(db, pid, now = Date.now()) {
     scrollCap: SCRIBE.scrollCap,
     wellLevel: ps.well_level || 0, inkMax: inkFor(ps.well_level || 0),
     journal: journalOut(ps.journal, all),
-    streak: daily.at && now - daily.at < DAILY.breakMs ? daily.streak || 0 : 0,
+    streak: dailyStreak(daily, now, tz),
     // the door's daily gift: waiting now, or how long until it is
-    dailyReady: !!dailyGift(daily, now),
-    dailyIn: daily.at ? Math.max(0, daily.at + DAILY.gapMs - now) : 0,
+    dailyReady: !!dailyGift(daily, now, tz),
+    dailyIn: dailyWait(daily, now, tz),
     lean: leanOf({ favour: ps.favour, cost: ps.chest_cost }),
     stats,
     gifts: parseList(ps.gifts).length,

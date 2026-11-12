@@ -197,14 +197,12 @@ export const GIFTS = [
 ];
 
 /* ─── the daily visit ─────────────────────────────────────────────────
- * Once milestone gifts are exhausted for the moment, the first visit of
- * a "day" still brings something: a pouch of marks that grows over a
- * streak, and a chest on every seventh day in a row. A day is counted
- * from the last claim rather than the calendar, so nobody loses a streak
- * to a time zone. */
+ * The first visit to the door on each calendar day — the player's own,
+ * from their device's time zone — brings a pouch of marks that grows over
+ * a streak, and a chest on every seventh day in a row. Skip a whole day
+ * and the streak starts again. */
 export const DAILY = {
-  gapMs: 20 * 3600e3,                  // this long after a claim, the next is ready
-  breakMs: 48 * 3600e3,                // this long without one, the streak resets
+  minGapMs: 4 * 3600e3,                // however the clock is turned, never two claims closer than this
   marks: [30, 40, 50, 60, 70, 80],     // days 1–6 of a streak (then it holds at the last)
   chestEvery: 7, chestTier: 1,         // every seventh day in a row: an iron chest instead
 };

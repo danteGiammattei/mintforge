@@ -16,3 +16,9 @@ export async function guarded(fn) {
     return bad("Something went wrong on our side", 500);
   }
 }
+
+/* The player's time zone, minutes east of UTC, from their device. */
+export const tzOf = request => {
+  const v = Number(request.headers.get("X-TZ-Offset"));
+  return Number.isFinite(v) ? Math.max(-840, Math.min(840, Math.round(v))) : 0;
+};

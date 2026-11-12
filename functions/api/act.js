@@ -1,4 +1,4 @@
-import { json, bad, getAuth, readJson, guarded } from "./_utils.js";
+import { json, bad, getAuth, readJson, guarded, tzOf } from "./_utils.js";
 import { act } from "../../server/game.js";
 
 /* POST /api/act  { action, opId?, … }
@@ -11,5 +11,5 @@ export const onRequestPost = ({ request, env }) => guarded(async () => {
   const auth = await getAuth(request, env);
   if (!auth) return bad("Unauthorized", 401);
   const body = await readJson(request);
-  return json(await act(env.DB, auth.player.id, body));
+  return json(await act(env.DB, auth.player.id, body, { tz: tzOf(request) }));
 });

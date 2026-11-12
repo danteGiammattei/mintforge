@@ -177,16 +177,31 @@ export const wellOf = level => SCRIBE.wells[Math.max(0, Math.min(SCRIBE.wells.le
 export const inkFor = level => wellOf(level).ink;
 
 /* ─── the daily visit ─────────────────────────────────────────────────
- * daily is { at, streak } from the player's stats. Returns the reward
- * and the new { at, streak }, or null if today's has been had. */
-export function dailyGift(daily, now) {
-  const at = daily?.at || 0, since = now - at;
-  if (at && since < DAILY.gapMs) return null;
-  const streak = at && since < DAILY.breakMs ? (daily.streak || 0) + 1 : 1;
+ * Days are the player's calendar days: `tz` is their offset east of UTC
+ * in minutes (Brisbane is +600), sent by their device. daily is
+ * { at, day, tz, streak } as stored; an older { at, streak } still works. */
+export const clampTz = tz => (Number.isFinite(+tz) ? Math.max(-840, Math.min(840, Math.round(+tz))) : 0);
+export const localDay = (t, tz) => Math.floor((t + clampTz(tz) * 60e3) / 86400e3);
+const lastDayOf = (daily, tz) => (daily?.day ?? (daily?.at ? localDay(daily.at, daily.tz ?? tz) : -Infinity));
+
+export function dailyGift(daily, now, tz = 0) {
+  const at = daily?.at || 0, day = localDay(now, tz), last = lastDayOf(daily, tz);
+  if (at && (day <= last || now - at < DAILY.minGapMs)) return null;
+  const streak = at && day === last + 1 ? (daily.streak || 0) + 1 : 1;
   const reward = streak % DAILY.chestEvery === 0
     ? { type: "chest", tier: DAILY.chestTier }
     : { type: "marks", n: DAILY.marks[Math.min(DAILY.marks.length - 1, (streak - 1) % DAILY.chestEvery)] };
-  return { reward, daily: { at: now, streak } };
+  return { reward, daily: { at: now, day, tz: clampTz(tz), streak } };
+}
+/* The streak as it stands: still alive today or tomorrow, else gone. */
+export function dailyStreak(daily, now, tz = 0) {
+  return daily?.at && localDay(now, tz) <= lastDayOf(daily, tz) + 1 ? daily.streak || 0 : 0;
+}
+/* How long until the next one can be had. */
+export function dailyWait(daily, now, tz = 0) {
+  if (!daily?.at || dailyGift(daily, now, tz)) return 0;
+  const midnight = (localDay(now, tz) + 1) * 86400e3 - clampTz(tz) * 60e3;
+  return Math.max(midnight - now, daily.at + DAILY.minGapMs - now);
 }
 
 /* ─── names ───────────────────────────────────────────────────────────

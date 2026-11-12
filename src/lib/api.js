@@ -29,6 +29,8 @@ const RETRY_AFTER = [400, 1200, 3000];
 export function apiClient(token, onUnauthorized) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  // so "a day" is the player's own day: minutes east of UTC (Brisbane is 600)
+  headers["X-TZ-Offset"] = String(-new Date().getTimezoneOffset());
 
   const call = async (path, method = "GET", body) => {
     let r;

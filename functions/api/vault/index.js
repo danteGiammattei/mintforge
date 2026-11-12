@@ -1,11 +1,11 @@
-import { json, bad, getAuth, readJson, guarded } from "../_utils.js";
+import { json, bad, getAuth, readJson, guarded, tzOf } from "../_utils.js";
 import { loadState, patchCosmetics } from "../../../server/state.js";
 
 /* GET /api/vault — the player's whole state, as the client may know it. */
 export const onRequestGet = ({ request, env }) => guarded(async () => {
   const auth = await getAuth(request, env);
   if (!auth) return bad("Unauthorized", 401);
-  return json(await loadState(env.DB, auth.player.id));
+  return json(await loadState(env.DB, auth.player.id, Date.now(), tzOf(request)));
 });
 
 /* POST /api/vault — choices only: frame, title, bio, cabinet, locks.

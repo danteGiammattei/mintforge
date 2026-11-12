@@ -26,7 +26,7 @@ import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
   resolveToss, resolveCrucible, resolveRoulette, resolvePlinko, forgeCost,
-  inkFor, wellOf, dailyGift, cleanName, nameAllowed,
+  inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz,
 } from "../shared/economy.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
@@ -183,7 +183,7 @@ function describeReward(reward) {
   return { type: "marks", n: reward.n, name: reward.n + " MARKS" };
 }
 
-async function visit(db, pid, _body, { now }) {
+async function visit(db, pid, _body, { now, tz }) {
   let ps = await db.prepare(
     `SELECT xp, stats, gifts, favour, chest_cost, journal FROM player_state WHERE player_id = ?1`).bind(pid).first();
   let stats = parseObj(ps.stats);
@@ -196,7 +196,7 @@ async function visit(db, pid, _body, { now }) {
   const lean = leanOf({ favour: ps.favour, cost: ps.chest_cost });
   const given = parseList(ps.gifts);
   const gift = nextGift(stats, levelOf(ps.xp), given, parseObj(ps.journal));
-  if (!gift) return { gift: await daily(db, pid, stats, ps.stats, now), lean };
+  if (!gift) return { gift: await daily(db, pid, stats, ps.stats, now, tz), lean };
 
   // claim it: the list only grows from the value we read
   const claim = await db.prepare(
@@ -207,7 +207,7 @@ async function visit(db, pid, _body, { now }) {
   // the welcome chest is also day one of the daily visits
   if (gift.id === "welcome") await db.prepare(
     `UPDATE player_state SET stats = json_set(stats, '$.daily', json(?2)) WHERE player_id = ?1`
-  ).bind(pid, JSON.stringify({ at: now, streak: 1 })).run();
+  ).bind(pid, JSON.stringify({ at: now, day: localDay(now, tz), tz: clampTz(tz), streak: 1 })).run();
 
   const r = gift.reward, out = describeReward(r);
   if (r.type === "chest") {
@@ -228,8 +228,8 @@ async function visit(db, pid, _body, { now }) {
 }
 
 /* Nothing owed from the milestones: is today's visit still unclaimed? */
-async function daily(db, pid, stats, statsText, now) {
-  const d = dailyGift(stats.daily, now);
+async function daily(db, pid, stats, statsText, now, tz) {
+  const d = dailyGift(stats.daily, now, tz);
   if (!d) return null;
   // claim it against the stats we read, so two tabs cannot both collect
   const claim = await db.prepare(
@@ -237,7 +237,7 @@ async function daily(db, pid, stats, statsText, now) {
   ).bind(pid, JSON.stringify(d.daily), statsText).run();
   if (!claim.meta.changes) {
     const fresh = await db.prepare(`SELECT stats FROM player_state WHERE player_id = ?1`).bind(pid).first();
-    const again = dailyGift(parseObj(fresh.stats).daily, now);
+    const again = dailyGift(parseObj(fresh.stats).daily, now, tz);
     if (!again) return null;
     const retry = await db.prepare(
       `UPDATE player_state SET stats = json_set(stats, '$.daily', json(?2)) WHERE player_id = ?1 AND stats = ?3`
@@ -453,7 +453,7 @@ async function gamble(db, pid, body, { now, rand }) {
 
 const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, engrave, well };
 
-export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand } = {}) {
+export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, tz = 0 } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;
   if (!fn) throw new Refusal("Unknown action");
   const opId = typeof body.opId === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(body.opId) ? body.opId : null;
@@ -466,13 +466,13 @@ export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand }
       const prev = await db.prepare(
         `SELECT response FROM action_log WHERE player_id = ?1 AND op_id = ?2`).bind(pid, opId).first();
       if (!prev?.response) throw new Refusal("Still working on that", 409);
-      return { result: JSON.parse(prev.response), state: await loadState(db, pid, now), replayed: true };
+      return { result: JSON.parse(prev.response), state: await loadState(db, pid, now, tz), replayed: true };
     }
   }
 
   let result;
   try {
-    result = await fn(db, pid, body, { now, rand });
+    result = await fn(db, pid, body, { now, rand, tz });
   } catch (e) {
     // a refused action left nothing behind, so the op id is free to try again
     if (opId) await db.prepare(`DELETE FROM action_log WHERE player_id = ?1 AND op_id = ?2`).bind(pid, opId).run();
@@ -483,5 +483,5 @@ export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand }
       `UPDATE action_log SET response = ?3 WHERE player_id = ?1 AND op_id = ?2`).bind(pid, opId, JSON.stringify(result)).run();
     if (rand() < 0.02) await db.prepare(`DELETE FROM action_log WHERE created_at < ?1`).bind(now - 2 * 86400e3).run();
   }
-  return { result, state: await loadState(db, pid, now) };
+  return { result, state: await loadState(db, pid, now, tz) };
 }
