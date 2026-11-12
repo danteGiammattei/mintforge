@@ -15,7 +15,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { chestParts, CHEST, dirtClod } from "../lib/forms.js";
-import { chestClosed, chestOpening, CHEST_FRAME, OPEN_FRAMES } from "../lib/chestArt.js";
+import { chestClosed, chestOpening, chestHeight, CHEST_W, OPEN_FRAMES, RATTLE, OPEN_FROM } from "../lib/chestArt.js";
 import { CHESTS } from "../../shared/tuning.js";
 import { stage, FONT, INK, lerp, ease, feather } from "./kit.js";
 
@@ -37,8 +37,8 @@ export function mount(cv, bus, { tier = 0 } = {}) {
   const bx = Math.round((CW - CHEST.w * SC) / 2), by = 92;
   // the drawn chest, when its sheets are loaded: 32px frames at a whole 4×,
   // standing on the same table line as the procedural one
-  const drawn = !!chestClosed(tier, "candle"), DS = 4;
-  const dyBase = by + CHEST.h * SC - CHEST_FRAME * DS + 6;
+  const drawn = !!chestClosed(tier, "candle"), DS = 3;
+  const dyBase = by + CHEST.h * SC - chestHeight(tier) * DS + 6;
   let alive = true;
 
   function frame() {
@@ -62,7 +62,7 @@ export function mount(cv, bus, { tier = 0 } = {}) {
 
     const shake = (S.phase === "hold" && S.held && !view.calm) ? Math.round(Math.sin(S.t * 1.3) * S.p * 2) : 0;
     const x = bx + shake;
-    const dx = Math.round((CW - CHEST_FRAME * DS) / 2) + shake, dy = dyBase;
+    const dx = Math.round((CW - CHEST_W * DS) / 2) + shake, dy = dyBase;
 
     // what is inside shows first as light through the seam
     const strain = S.phase === "hold" ? S.p : Math.max(0, 1 - S.anim / 50);
@@ -74,13 +74,15 @@ export function mount(cv, bus, { tier = 0 } = {}) {
     }
 
     if (drawn) {
-      // held: the lid rattles harder as the seal strains (the first open
-      // frames are the rattle); broken: it flies up at 12 frames a second
+      // held: the lid jumps against the lock, more often as the seal
+      // strains; broken: it swings up through the open frames
       let f = null;
-      if (S.phase === "hold") f = S.held && S.p > 0.35 && !view.calm ? chestOpening(tier, "candle", ((S.t >> 2) % 3) + (S.p > 0.75 ? 1 : 0)) : chestClosed(tier, "candle");
-      else if (S.failed) f = chestClosed(tier, "candle");
-      else f = chestOpening(tier, "candle", Math.min(OPEN_FRAMES - 1, Math.floor(S.anim / (view.calm ? 1 : 5))));
-      ctx.drawImage(f, dx, dy, CHEST_FRAME * DS, CHEST_FRAME * DS);
+      if (S.phase === "hold") {
+        const jump = S.held && !view.calm && S.p > 0.25 && ((S.t >> (S.p > 0.7 ? 1 : 2)) % 3 === 0);
+        f = jump ? chestOpening(tier, "candle", RATTLE) : chestClosed(tier, "candle");
+      } else if (S.failed) f = chestClosed(tier, "candle");
+      else f = chestOpening(tier, "candle", Math.min(OPEN_FRAMES - 1, OPEN_FROM + Math.floor(S.anim / (view.calm ? 1 : 6))));
+      ctx.drawImage(f, dx, dy, CHEST_W * DS, f.height * DS);
     } else {
       ctx.drawImage(body, x, by, CHEST.w * SC, CHEST.h * SC);
       let lidY = by, lidA = 1;
@@ -102,7 +104,7 @@ export function mount(cv, bus, { tier = 0 } = {}) {
 
     // and the coin, which is all dirt
     if (S.phase !== "hold" && S.coin) {
-      const rise = drawn ? (view.calm ? 12 : 52) : 30;   // once the lid is up
+      const rise = drawn ? (view.calm ? 6 : 26) : 30;    // once the lid is up
       const k = ease(Math.min(1, Math.max(0, (S.anim - rise) / 50)));
       if (S.anim > rise) {
         const sp = dirtClod(S.coin.seed);

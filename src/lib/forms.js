@@ -340,8 +340,8 @@ export function chestParts(tier = 0, light = "candle") {
     return { body, lid };
   });
 }
-/* The chest shut, as one sprite: the Frakassets chest (lib/chestArt.js)
- * once its sheets have loaded, this procedural one if they never do. */
+/* The chest shut, as one sprite: the drawn chest (lib/chestArt.js) once
+ * its sheet has loaded, this procedural one if it never does. */
 export function chest(tier = 0, light = "candle") {
   const drawn = chestClosed(tier, light);
   if (drawn) return drawn;
