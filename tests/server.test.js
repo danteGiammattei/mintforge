@@ -20,8 +20,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009, 011 and 012 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql"]);
+test("migrations 009, 011, 012 and 013 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -34,7 +34,7 @@ test("migrations 009, 011 and 012 bring the pre-rebuild schema to schema.sql exa
 test("schema.sql has every table the code reads", () => {
   const db = makeDb();
   const have = new Set(db.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all().map(r => r.name));
-  for (const t of ["players", "player_state", "coins", "sessions", "friends", "scrolls", "chests", "action_log", "login_attempts", "seal_log"]) {
+  for (const t of ["players", "player_state", "coins", "sessions", "friends", "scrolls", "chests", "action_log", "login_attempts", "seal_log", "war_tables"]) {
     assert.ok(have.has(t), `missing table ${t}`);
   }
 });
@@ -617,8 +617,8 @@ test("cabinet score: rarity counts most, six coins, grades in order", async () =
   assert.equal(cabinetPoints({ ...mythicCopper, shiny: true }), 2 * cabinetPoints(mythicCopper));
   assert.equal(cabinetScore([]).grade, "AN EMPTY SHELF");
   const seven = Array(7).fill(mythicCopper);
-  assert.equal(cabinetScore(seven).score, 6 * 150);
-  assert.equal(cabinetScore([null, mythicCopper]).score, 150);
+  assert.equal(cabinetScore(seven).score, 6 * 3750);
+  assert.equal(cabinetScore([null, mythicCopper]).score, 3750);
   const top = cabinetScore(Array(6).fill({ metalIdx: 8, rarity: 5, shiny: true }));
   assert.equal(top.next, null);
   assert.equal(top.grade, "A MYTHIC HOARD");

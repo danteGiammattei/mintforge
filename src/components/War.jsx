@@ -1,0 +1,256 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useGame } from "../lib/GameContext.js";
+import { useUi } from "../ui/Overlay.jsx";
+import { feel } from "../lib/feel.js";
+import { coinRarity } from "../lib/coin.js";
+import { hydrate } from "../lib/coinview.js";
+import { METALS, RARITIES } from "../lib/data.js";
+import { CARD_W, CARD_H, cardImage, cardName, loadCards } from "../lib/cards.js";
+import CoinCanvas from "./CoinCanvas.jsx";
+import { CoinTile } from "../screens/Vault.jsx";
+
+/* ─── WAR ─────────────────────────────────────────────────────────────────
+ * Two friends at one table. Each stakes a coin; the friend's must be at
+ * least as rare. Both flip; high card takes both coins, aces high. A tie
+ * is war: three face down, one up, again. The server deals (server/war.js)
+ * and nothing is shown until both have flipped. */
+
+const SEEN_KEY = "mintforge:war-seen";
+const readSeen = () => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "[]"); } catch { return []; } };
+const writeSeen = ids => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids.slice(-30))); } catch { /* fine */ } };
+const clock = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const coinLine = c => `${RARITIES[coinRarity(c)].name} ${METALS[c.metalIdx].name}`.toUpperCase();
+
+/* ms left on a server countdown, ticking down here between polls */
+function useLeft(ms) {
+  const [at, setAt] = useState(() => ({ ms, t: Date.now() }));
+  const [, tick] = useState(0);
+  useEffect(() => { setAt({ ms, t: Date.now() }); }, [ms]);
+  useEffect(() => { const i = setInterval(() => tick(n => n + 1), 1000); return () => clearInterval(i); }, []);
+  return ms == null ? null : Math.max(0, at.ms - (Date.now() - at.t));
+}
+
+function Card({ n, fresh, ready }) {
+  const ref = useRef();
+  useEffect(() => {
+    const cv = ref.current; if (!cv) return;
+    const g = cv.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, CARD_W, CARD_H);
+    g.drawImage(cardImage(n == null ? "back" : n), 0, 0, CARD_W, CARD_H);
+  }, [n, ready]);
+  return <canvas ref={ref} width={CARD_W} height={CARD_H} role="img" aria-label={n == null ? "A card, face down" : cardName(n)}
+                 style={{ display: "block", width: CARD_W, height: CARD_H, imageRendering: "pixelated", animation: fresh ? "cardDeal .32s steps(4) both" : undefined }}/>;
+}
+
+/* a card face up with `down` cards fanned beneath it, or a face-down pile */
+function Stack({ up, down = 0, fresh, ready }) {
+  const fan = 8;
+  return (
+    <div style={{ position: "relative", width: CARD_W + down * fan, height: CARD_H, flexShrink: 0 }}>
+      {Array.from({ length: down }, (_, i) => (
+        <div key={i} style={{ position: "absolute", left: i * fan, top: 0 }}><Card n={null} ready={ready} fresh={fresh}/></div>
+      ))}
+      <div style={{ position: "absolute", left: down * fan, top: 0 }}><Card n={up} ready={ready} fresh={fresh}/></div>
+    </div>
+  );
+}
+
+function Seat({ name, coin, up, down, fresh, ready, flipped, mine }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, flexDirection: mine ? "row" : "row-reverse", justifyContent: "space-between" }}>
+      <Stack key={fresh} up={up} down={down} fresh={fresh > 0} ready={ready}/>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 0 }}>
+        {coin && <CoinCanvas coin={hydrate(coin)} size={64}/>}
+        <span className="t-label t-plain" style={{ overflowWrap: "anywhere", textAlign: "center" }}>{mine ? "YOU" : name}</span>
+        <span className="t-label" style={{ color: flipped ? "var(--candle)" : "var(--mute)" }}>{flipped ? "FLIPPED" : "THINKING"}</span>
+      </div>
+    </div>
+  );
+}
+
+function Felt({ t, ready }) {
+  const g = useGame(), ui = useUi();
+  const [sending, setSending] = useState(false);
+  const last = t.log[t.log.length - 1];
+  const tie = last?.result === "tie";
+  const idle = useLeft(t.idleIn);
+  const flip = async () => {
+    setSending(true); feel("tap");
+    try { await g.war.move("flip", { tableId: t.id }); }
+    catch (e) { ui.toast(e.message, "bad"); }
+    finally { setSending(false); }
+  };
+  const said = useRef(t.log.length);
+  useEffect(() => {
+    if (t.log.length > said.current && last) ui.say(`YOU ${cardName(last.mine)}, ${t.other} ${cardName(last.theirs)}. ${tie ? "WAR." : ""}`);
+    said.current = t.log.length;
+  }, [t.log.length, last, tie, t.other, ui]);
+
+  return (
+    <section className="panel" aria-label={`War with ${t.other}`} style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12, background: "var(--felt)" }}>
+      <Seat name={t.other} coin={t.theirs} up={last?.theirs} down={last?.down} fresh={t.log.length} ready={ready} flipped={t.theyFlipped}/>
+      <div style={{ textAlign: "center", minHeight: 24 }} aria-live="polite">
+        {tie ? <span className="t-big" style={{ color: "var(--danger, #ff7060)" }}>WAR!</span>
+             : <span className="t-dim">{t.log.length ? "" : "HIGH CARD TAKES BOTH COINS"}</span>}
+        {tie && <div className="t-label">THREE DOWN, ONE UP. FLIP AGAIN.</div>}
+      </div>
+      <Seat mine coin={t.mine} up={last?.mine} down={last?.down} fresh={t.log.length} ready={ready} flipped={t.youFlipped}/>
+      <button className="btn btn-gold" disabled={t.youFlipped || sending} onClick={flip} style={{ minHeight: 52 }}>
+        {t.youFlipped ? `WAITING FOR ${t.other}` : tie ? "FLIP FOR WAR" : "FLIP"}
+      </button>
+      {idle != null && idle < 60_000 && <p className="t-label" style={{ margin: 0, textAlign: "center" }}>
+        IF NOBODY FLIPS IN {clock(idle)} THE TABLE IS CALLED OFF AND BOTH COINS GO HOME</p>}
+    </section>
+  );
+}
+
+const VOID_LINE = {
+  declined:   (r) => `${r.other} TURNED YOU DOWN. YOUR COIN IS BACK.`,
+  cancelled:  (r) => `${r.other} WITHDREW THE CHALLENGE.`,
+  unanswered: (r) => r.role === "host" ? `NO ANSWER FROM ${r.other}. YOUR COIN IS BACK.` : `THE CHALLENGE FROM ${r.other} LAPSED.`,
+  abandoned:  () => "THE TABLE WENT QUIET. BOTH COINS WENT HOME.",
+  deck:       () => "THE DECK RAN OUT. BOTH COINS WENT HOME.",
+};
+
+function Result({ r, ready, onDone }) {
+  const last = r.log[r.log.length - 1];
+  const won = r.outcome === "won", done = r.outcome === "won" || r.outcome === "lost";
+  const wars = r.log.filter(e => e.war).length;
+  useEffect(() => { if (done) feel(won ? "win" : "lose"); }, [done, won]);
+  return (
+    <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12, alignItems: "center", textAlign: "center", background: done ? "var(--felt)" : undefined }}>
+      {done ? (
+        <>
+          <div className="t-big" style={{ color: won ? "var(--candle)" : "var(--mute)" }}>{won ? "YOU WIN" : `${r.other} WINS`}</div>
+          {last && (
+            <div style={{ display: "flex", gap: 16, alignItems: "flex-end", justifyContent: "center", flexWrap: "wrap" }}>
+              <figure style={{ margin: 0 }}><Card n={last.mine} ready={ready}/><figcaption className="t-label">YOU</figcaption></figure>
+              <figure style={{ margin: 0 }}><Card n={last.theirs} ready={ready}/><figcaption className="t-label t-plain">{r.other}</figcaption></figure>
+            </div>
+          )}
+          {wars > 0 && <div className="t-label">AFTER {wars === 1 ? "A WAR" : `${wars} WARS`}</div>}
+          <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+            {[r.mine, r.theirs].filter(Boolean).map(c => <CoinCanvas key={c.id} coin={hydrate(c)} size={64}/>)}
+          </div>
+          <p className="t-dim" style={{ margin: 0 }}>{won ? `BOTH COINS ARE IN YOUR VAULT, ${coinLine(r.theirs)} INCLUDED.` : `${r.other} TAKES YOUR ${coinLine(r.mine)}.`}</p>
+        </>
+      ) : <p className="t-dim" style={{ margin: 0 }}>{(VOID_LINE[r.outcome] || (() => "THE TABLE IS CLOSED."))(r)}</p>}
+      <button autoFocus className="btn btn-gold" style={{ minWidth: 200 }} onClick={onDone}>OK</button>
+    </section>
+  );
+}
+
+function Waiting({ t }) {
+  const g = useGame(), ui = useUi();
+  const left = useLeft(t.expiresIn);
+  const cancel = async () => { try { await g.war.move("cancel", { tableId: t.id }); } catch (e) { ui.toast(e.message, "bad"); } };
+  return (
+    <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12, alignItems: "center", textAlign: "center" }}>
+      <CoinCanvas coin={hydrate(t.mine)} size={64}/>
+      <div className="t-title t-plain">WAITING FOR {t.other}</div>
+      <p className="t-dim" style={{ margin: 0 }}>THEY NEED THE GAME OPEN TO SEE IT. {left != null && `THE CHALLENGE STANDS FOR ${clock(left)}.`}</p>
+      <p className="t-label" style={{ margin: 0 }}>YOUR {coinLine(t.mine)} IS ON THE TABLE</p>
+      <button className="btn btn-ghost" onClick={cancel}>WITHDRAW</button>
+    </section>
+  );
+}
+
+function Invite({ inv }) {
+  const g = useGame(), ui = useUi();
+  const [pick, setPick] = useState(null);
+  const left = useLeft(inv.expiresIn);
+  const need = coinRarity(inv.theirs);
+  const eligible = g.coins.filter(c => !c.locked && coinRarity(c) >= need);
+  const sit = async () => {
+    const c = g.coins.find(x => x.id === pick); if (!c) return;
+    if ((c.shiny || coinRarity(c) >= 3) && !(await ui.confirm({
+      title: "STAKE THIS ONE?", body: `YOUR ${c.shiny ? "SHINY " : ""}${coinLine(c)} AGAINST ${inv.other}'S ${coinLine(inv.theirs)}. HIGH CARD TAKES BOTH.`,
+      yes: "STAKE IT", tone: "danger" }))) return;
+    feel("offer");
+    try { await g.war.move("join", { tableId: inv.id, coinId: c.id }); } catch (e) { ui.toast(e.message, "bad"); }
+  };
+  const decline = async () => { try { await g.war.move("decline", { tableId: inv.id }); } catch (e) { ui.toast(e.message, "bad"); } };
+  return (
+    <section className="panel" aria-label={`Challenge from ${inv.other}`} style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="between" style={{ gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="t-title t-plain" style={{ overflowWrap: "anywhere" }}>{inv.other} CHALLENGES YOU</div>
+          <div className="t-label">{coinLine(inv.theirs)} ON THE TABLE{left != null && ` · ${clock(left)} LEFT`}</div>
+        </div>
+        <CoinCanvas coin={hydrate(inv.theirs)} size={64}/>
+      </div>
+      {eligible.length ? (
+        <>
+          <p className="t-label" style={{ margin: 0 }}>STAKE A COIN AT LEAST AS RARE ({RARITIES[need].name.toUpperCase()} OR BETTER)</p>
+          <div className="grid-coins" style={{ maxHeight: 260, overflowY: "auto" }}>
+            {eligible.map(c => <CoinTile key={c.id} coin={c} selected={pick === c.id} onClick={() => { feel("tap"); setPick(p => (p === c.id ? null : c.id)); }}/>)}
+          </div>
+        </>
+      ) : <p className="t-dim" style={{ margin: 0 }}>YOU HAVE NO UNLOCKED COIN AS RARE AS THAT.</p>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn btn-ghost" style={{ flex: 1 }} onClick={decline}>DECLINE</button>
+        <button className="btn btn-gold" style={{ flex: 1 }} disabled={!pick} onClick={sit}>SIT DOWN</button>
+      </div>
+    </section>
+  );
+}
+
+function Challenge() {
+  const g = useGame(), ui = useUi();
+  const [friends, setFriends] = useState(null);
+  const [who, setWho] = useState(null);
+  const [pick, setPick] = useState(null);
+  useEffect(() => { g.api.listFriends().then(r => setFriends(r.friends || [])).catch(() => setFriends([])); }, [g.api]);
+  const free = useMemo(() => g.coins.filter(c => !c.locked), [g.coins]);
+  const send = async () => {
+    const c = g.coins.find(x => x.id === pick); if (!c || !who) return;
+    if ((c.shiny || coinRarity(c) >= 3) && !(await ui.confirm({
+      title: "STAKE THIS ONE?", body: `YOUR ${c.shiny ? "SHINY " : ""}${coinLine(c)}. IF ${who} TAKES THE CHALLENGE AND WINS, IT IS THEIRS.`,
+      yes: "STAKE IT", tone: "danger" }))) return;
+    feel("offer");
+    try { await g.war.move("invite", { friend: who, coinId: c.id }); setPick(null); } catch (e) { ui.toast(e.message, "bad"); }
+  };
+  return (
+    <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+      <p className="t-dim" style={{ margin: 0 }}>CHALLENGE A FRIEND. YOU EACH STAKE A COIN, THEIRS AT LEAST AS RARE AS YOURS. HIGH CARD TAKES BOTH. ACES HIGH. A TIE IS WAR.</p>
+      <div>
+        <div className="t-label" style={{ marginBottom: 8 }}>WHO</div>
+        {friends == null ? <span className="t-label">…</span> : friends.length ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {friends.map(f => <button key={f.id} className="chip t-plain" aria-pressed={who === f.username} onClick={() => setWho(w => (w === f.username ? null : f.username))}>{f.username}</button>)}
+          </div>
+        ) : <span className="t-dim">ADD A FRIEND FIRST, FROM YOUR PROFILE.</span>}
+      </div>
+      <div>
+        <div className="t-label" style={{ marginBottom: 8 }}>YOUR STAKE</div>
+        {free.length ? (
+          <div className="grid-coins" style={{ maxHeight: 260, overflowY: "auto" }}>
+            {free.map(c => <CoinTile key={c.id} coin={c} selected={pick === c.id} onClick={() => { feel("tap"); setPick(p => (p === c.id ? null : c.id)); }}/>)}
+          </div>
+        ) : <span className="t-dim">NO UNLOCKED COINS TO STAKE.</span>}
+      </div>
+      <button className="btn btn-gold" disabled={!who || !pick} onClick={send}>{who ? `CHALLENGE ${who}` : "CHALLENGE"}</button>
+    </section>
+  );
+}
+
+export default function War() {
+  const g = useGame(), w = g.war;
+  const [ready, setReady] = useState(false);
+  const [seen, setSeen] = useState(readSeen);
+  useEffect(() => { loadCards().then(() => setReady(true)); }, []);
+  const mute = r => (r.outcome === "cancelled" && r.role === "host") || (r.outcome === "declined" && r.role === "guest");
+  const result = w.recent.find(r => !seen.includes(r.id) && !mute(r));
+  const dismiss = id => setSeen(s => { const n = [...s, id]; writeSeen(n); return n; });
+
+  if (w.table?.status === "playing") return <Felt t={w.table} ready={ready}/>;
+  if (result) return <Result r={result} ready={ready} onDone={() => dismiss(result.id)}/>;
+  return (
+    <>
+      {w.invites.map(inv => <Invite key={inv.id} inv={inv}/>)}
+      {w.table?.status === "invited" ? <Waiting t={w.table}/> : <Challenge/>}
+      {w.error && <p className="t-label" style={{ margin: 0 }}>THE TABLE IS HARD TO HEAR: {w.error}</p>}
+    </>
+  );
+}

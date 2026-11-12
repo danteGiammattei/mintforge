@@ -11,6 +11,7 @@ import RouletteWheel, { SECTOR_COLOURS } from "../components/RouletteWheel.jsx";
 import Plinko from "../components/Plinko.jsx";
 import { plinkoOdds } from "../../shared/economy.js";
 import { CoinTile } from "./Vault.jsx";
+import War from "../components/War.jsx";
 
 /* ─── TAVERN ──────────────────────────────────────────────────────────────
  * Three wagers, all staked in coins, all resolved by the server:
@@ -18,6 +19,7 @@ import { CoinTile } from "./Vault.jsx";
  *   CRUCIBLE  three of one metal. All rise, or you keep one.
  *   ROULETTE  one coin on a six-sector wheel.
  *   PLINKO    one coin down eight rows of pegs into one of nine slots.
+ *   WAR       a friend's coin against yours, high card (components/War.jsx).
  * The odds are printed. Locked coins cannot be staked. */
 const pct = p => Math.round(p * 100) + "%";
 const GAMES = {
@@ -25,6 +27,7 @@ const GAMES = {
   crucible: { label: "CRUCIBLE", need: 3, rule: `3 COINS OF ONE METAL · ${pct(GAMBLE.crucible.win)} ALL THREE RISE · OTHERWISE YOU KEEP ONE` },
   roulette: { label: "ROULETTE", need: 1, rule: "1 COIN ON THE WHEEL" },
   plinko:   { label: "PLINKO",   need: 1, rule: "1 COIN DOWN THE PEGS. IT BOUNCES LEFT OR RIGHT AT EVERY ROW" },
+  war:      { label: "WAR",      need: 0, rule: "" },
 };
 const OUTCOME_LINE = {
   lose: "IT IS GONE", same: "IT CAME BACK", up1: "IT ROSE A METAL", x2: "IT CAME BACK TWICE",
@@ -41,7 +44,8 @@ const plinkoTable = (() => {
 
 export default function Tavern() {
   const g = useGame(), ui = useUi();
-  const [game, setGame] = useState("toss");
+  // a challenge waiting, or a table open, brings you straight to war
+  const [game, setGame] = useState(() => (g.war.table || g.war.invites.length ? "war" : "toss"));
   const [ids, setIds] = useState([]);
   const [phase, setPhase] = useState("pick");       // pick | working | result
   const [stake, setStake] = useState([]);           // snapshot of the staked coins
@@ -92,13 +96,16 @@ export default function Tavern() {
     <div className="page">
       <div className="page-in">
         <h1 className="t-big" style={{ margin: 0 }}>TAVERN</h1>
-        <div className="seg" role="tablist" aria-label="Game">
+        <div className="seg" role="tablist" aria-label="Game" style={{ flexWrap: "wrap" }}>
           {Object.entries(GAMES).map(([id, d]) => (
             <button key={id} role="tab" aria-selected={game === id} disabled={phase === "working"}
-                    onClick={() => { setGame(id); reset(); }}>{d.label}</button>
+                    style={{ flex: "1 0 30%" }} onClick={() => { setGame(id); reset(); }}>
+              {d.label}{id === "war" && g.war.invites.length > 0 && <span className="t-gold"> !</span>}
+            </button>
           ))}
         </div>
 
+        {game === "war" ? <War/> : (
         <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
           <p className="t-dim" style={{ margin: 0 }}>{def.rule}</p>
 
@@ -184,6 +191,7 @@ export default function Tavern() {
             )
           )}
         </section>
+        )}
         <p className="t-label" style={{ margin: 0, textAlign: "center" }}>WAGERS ARE COINS ONLY. NOTHING HERE COSTS OR PAYS REAL MONEY.</p>
       </div>
     </div>

@@ -73,5 +73,7 @@ export function apiClient(token, onUnauthorized) {
     listFriends:  ()              => call("/api/friends",       "GET"),
     addFriend:    (username)      => call("/api/friends",       "POST",   { username }),
     removeFriend: (username)      => call("/api/friends",       "DELETE", { username }),
+    getWar:       ()              => call("/api/war",           "GET"),
+    war:          (op, payload)   => call("/api/war",           "POST",   { op, ...payload }),
   };
 }

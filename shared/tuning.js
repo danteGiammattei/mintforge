@@ -229,19 +229,31 @@ export const AUTH = {
  * What the six coins on show are worth to a collector, which is mostly
  * how rare they are: points by rarity, a little more for a finer metal
  * (+25% a step, so an astral counts ×3), double for a shine. Six common
- * astrals score 18; one mythic copper scores 150. The grades are for
+ * astrals score 450; one mythic copper scores 3,750. The grades are for
  * the profile; each is reached by a cabinet of roughly that rarity. */
 export const CABINET_SCORE = {
   slots: 6,
-  rarity: [1, 3, 8, 20, 50, 150],
+  rarity: [25, 75, 200, 500, 1250, 3750],
   perMetal: 0.25,
   shiny: 2,
   grades: [
-    [0,    "AN EMPTY SHELF"],
-    [20,   "A FEW CURIOS"],
-    [80,   "A FINE CABINET"],
-    [250,  "A COLLECTOR'S CABINET"],
-    [700,  "A LEGENDARY HOARD"],
-    [1600, "A MYTHIC HOARD"],
+    [0,     "AN EMPTY SHELF"],
+    [500,   "A FEW CURIOS"],
+    [2000,  "A FINE CABINET"],
+    [6250,  "A COLLECTOR'S CABINET"],
+    [17500, "A LEGENDARY HOARD"],
+    [40000, "A MYTHIC HOARD"],
   ],
+};
+
+/* ─── war at the tavern ───────────────────────────────────────────────
+ * Two friends, one coin each, high card takes both. The guest's coin
+ * must be at least as rare as the host's. A tie is war: three cards face
+ * down and one up, until someone wins or the deck runs out (then the
+ * coins go home). Nothing is lost to a table nobody finishes. */
+export const WAR = {
+  inviteMs: 180_000,     // an unanswered challenge lapses after this
+  idleMs:   120_000,     // a table nobody flips at for this long is called off
+  warDown:  3,           // cards laid face down at each war
+  recentMs: 600_000,     // how long a finished table is still shown
 };

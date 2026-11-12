@@ -256,7 +256,7 @@ async function daily(db, pid, stats, statsText, now, tz) {
 
 /* ─── the journal ─────────────────────────────────────────────────────
  * A statement that records one coin as found. Kinds only ever count up. */
-function journalStmt(db, pid, c) {
+export function journalStmt(db, pid, c) {
   const k = `$.c."${c.metalIdx}:${c.rarity ?? 0}"`;
   const value = coinValue(hydrate({ seed: c.seed, metal_idx: c.metalIdx, shiny: c.shiny ? 1 : 0, rarity: c.rarity }));
   return db.prepare(

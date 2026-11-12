@@ -95,7 +95,8 @@ The project is Cloudflare Pages + D1 (`wrangler.toml`). Migrations go in
 
 ```sh
 npx wrangler d1 export mintforge --remote --output=backup.sql      # always, first
-node tools/migrate.mjs migrations/012_tidy_and_seal_log.sql --remote
+node tools/migrate.mjs migrations/013_war.sql --remote
+node tools/cards.mjs path/to/Jorels_Card_Pack.zip                  # once per machine
 npm run build
 npx wrangler pages deploy dist --project-name mintforge --branch main
 ```
@@ -110,6 +111,12 @@ login. Either works when it works. Each migration runs once.
 | 010 | renames the old digging-game titles in stored rows (safe to repeat) |
 | 011 | engraved names, the journal, inkwells |
 | 012 | **deletes** the duels, tarot and artefact tables and six dead columns; better indexes; the seal log |
+| 013 | war at the tavern: the tables, with staked coins held in them |
+
+The playing cards for war are Jorel's Card Pack, whose licence allows them
+in the game but not in this public repo, so `public/sprites/cards/` is
+git-ignored and `tools/cards.mjs` fills it from the pack's zip on the
+machine you build on. Without it, war deals plain pixel cards of its own.
 
 A fresh database takes `schema.sql` instead, which is all of them applied.
 

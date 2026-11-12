@@ -5,6 +5,8 @@ import { OverlayProvider, useUi } from "./ui/Overlay.jsx";
 import { TITLES, TITLE_LEVELS, FRAMES } from "./lib/data.js";
 import { RewardHost, useCelebrate } from "./components/Reward.jsx";
 import { loadChestArt } from "./lib/chestArt.js";
+import { useWar } from "./state/useWar.js";
+import { feel } from "./lib/feel.js";
 import AuthScreen from "./components/AuthScreen.jsx";
 import BottomNav, { TABS } from "./components/BottomNav.jsx";
 import TopBar from "./components/TopBar.jsx";
@@ -66,6 +68,20 @@ function DailyNudge({ ready, onDoor }) {
   return null;
 }
 
+/* A challenge to war arrives while you are elsewhere: say so, once each. */
+function WarNudge({ invites, inTavern }) {
+  const ui = useUi(), told = useRef(new Set());
+  useEffect(() => {
+    for (const inv of invites) {
+      if (told.current.has(inv.id)) continue;
+      told.current.add(inv.id);
+      if (!inTavern) ui.toast(`${inv.other} CHALLENGES YOU TO WAR AT THE TAVERN.`, "magic");
+      feel("rarity2");
+    }
+  }, [invites, inTavern, ui]);
+  return null;
+}
+
 function Game({ game }) {
   // A new player starts at the door, where the first chest is waiting.
   const [tab, setTabRaw] = useState(() => {
@@ -81,7 +97,9 @@ function Game({ game }) {
   useEffect(() => { document.title = `${TABS.find(t => t[0] === tab)?.[2] || ""} · MintForge`; }, [tab]);
 
 
-  const ctx = useMemo(() => ({ ...game, tab, setTab }), [game, tab, setTab]);
+  const war = useWar(game.api, game.refresh, tab === "tavern");
+  const ctx = useMemo(() => ({ ...game, tab, setTab, war }), [game, tab, setTab, war]);
+  const warBadge = war.invites.length || (war.table?.status === "playing" && !war.table.youFlipped ? "!" : 0);
   const Screen = SCREENS[tab] || Scribe;
   const waiting = game.chests.length + game.dusty.length;
 
@@ -90,6 +108,7 @@ function Game({ game }) {
       <RewardHost>
       <LevelWatch level={game.level}/>
       <DailyNudge ready={game.dailyReady} onDoor={tab === "door"}/>
+      <WarNudge invites={war.invites} inTavern={tab === "tavern"}/>
       <div className="app">
         <a className="sr-only" href="#main">Skip to the game</a>
         {!BARE.has(tab) && <TopBar marks={game.marks} level={game.level} xp={game.xp} onRetry={game.retrySaves}
@@ -97,7 +116,7 @@ function Game({ game }) {
         <main id="main" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: BARE.has(tab) ? "env(safe-area-inset-top, 0px)" : 0 }}>
           <Screen key={tab}/>
         </main>
-        <BottomNav tab={tab} setTab={setTab} badges={{ satchel: waiting, door: game.dailyReady && tab !== "door" ? "!" : 0 }}/>
+        <BottomNav tab={tab} setTab={setTab} badges={{ satchel: waiting, door: game.dailyReady && tab !== "door" ? "!" : 0, tavern: tab !== "tavern" ? warBadge : 0 }}/>
       </div>
       </RewardHost>
     </GameContext.Provider>

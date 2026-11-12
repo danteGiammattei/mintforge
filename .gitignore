@@ -5,3 +5,7 @@ dist
 .env*
 .wrangler/state
 .wrangler/tmp
+
+# card art from Jorel's Card Pack: its licence forbids redistribution, so it
+# never goes in this public repo. node tools/cards.mjs <the zip> puts it here.
+public/sprites/cards/

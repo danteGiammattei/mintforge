@@ -168,6 +168,8 @@ export function useGameState() {
   return {
     boot, token, api, snap,
     onAuthed, signOut, reload: () => setRetry(n => n + 1),
+    // fetch the state again quietly, without the loading screen
+    refresh: () => api.getState().then(apply).catch(() => {}),
     retrySaves: () => outboxRef.current?.retryNow(),
     act, sell,
     coins, dusty,
