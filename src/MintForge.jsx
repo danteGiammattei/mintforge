@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameContext } from "./lib/GameContext.js";
 import { useGameState } from "./state/useGameState.js";
-import { OverlayProvider } from "./ui/Overlay.jsx";
+import { OverlayProvider, useUi } from "./ui/Overlay.jsx";
 import { TITLES, TITLE_LEVELS, FRAMES } from "./lib/data.js";
 import { RewardHost, useCelebrate } from "./components/Reward.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
@@ -53,6 +53,18 @@ function LevelWatch({ level }) {
   return null;
 }
 
+/* Once a session, if today's gift is waiting and the player is elsewhere, say so. */
+function DailyNudge({ ready, onDoor }) {
+  const ui = useUi(), said = useRef(false);
+  useEffect(() => {
+    if (!ready || onDoor || said.current) return;
+    said.current = true;
+    const t = setTimeout(() => ui.toast("SOMETHING WAITS FOR YOU AT THE DOOR.", "magic"), 1200);
+    return () => clearTimeout(t);
+  }, [ready, onDoor, ui]);
+  return null;
+}
+
 function Game({ game }) {
   // A new player starts at the door, where the first chest is waiting.
   const [tab, setTabRaw] = useState(() => {
@@ -76,13 +88,15 @@ function Game({ game }) {
     <GameContext.Provider value={ctx}>
       <RewardHost>
       <LevelWatch level={game.level}/>
+      <DailyNudge ready={game.dailyReady} onDoor={tab === "door"}/>
       <div className="app">
         <a className="sr-only" href="#main">Skip to the game</a>
-        {!BARE.has(tab) && <TopBar marks={game.marks} level={game.level} xp={game.xp} onRetry={game.retrySaves}/>}
+        {!BARE.has(tab) && <TopBar marks={game.marks} level={game.level} xp={game.xp} onRetry={game.retrySaves}
+                                   daily={game.dailyReady} onDaily={() => setTab("door")}/>}
         <main id="main" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: BARE.has(tab) ? "env(safe-area-inset-top, 0px)" : 0 }}>
           <Screen key={tab}/>
         </main>
-        <BottomNav tab={tab} setTab={setTab} badges={{ satchel: waiting }}/>
+        <BottomNav tab={tab} setTab={setTab} badges={{ satchel: waiting, door: game.dailyReady && tab !== "door" ? "!" : 0 }}/>
       </div>
       </RewardHost>
     </GameContext.Provider>

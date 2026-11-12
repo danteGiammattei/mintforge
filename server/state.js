@@ -10,7 +10,7 @@
  *  and title to wear, the bio, the cabinet, which coins are locked.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { levelOf, leanOf, inkFor } from "../shared/economy.js";
+import { levelOf, leanOf, inkFor, dailyGift } from "../shared/economy.js";
 import { SCRIBE, DAILY } from "../shared/tuning.js";
 import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
@@ -75,6 +75,9 @@ export async function loadState(db, pid, now = Date.now()) {
     wellLevel: ps.well_level || 0, inkMax: inkFor(ps.well_level || 0),
     journal: journalOut(ps.journal, all),
     streak: daily.at && now - daily.at < DAILY.breakMs ? daily.streak || 0 : 0,
+    // the door's daily gift: waiting now, or how long until it is
+    dailyReady: !!dailyGift(daily, now),
+    dailyIn: daily.at ? Math.max(0, daily.at + DAILY.gapMs - now) : 0,
     lean: leanOf({ favour: ps.favour, cost: ps.chest_cost }),
     stats,
     gifts: parseList(ps.gifts).length,

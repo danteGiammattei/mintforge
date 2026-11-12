@@ -111,35 +111,66 @@ export function resolveCrucible(metal, rand) {
   return { won: false, lose: [0, 1, 2].filter(i => i !== kept), make: [], outcome: "lose", kept };
 }
 
+const makeFor = (outcome, metal) => ({
+  lose:    [],
+  same:    [metal],
+  up1:     [Math.min(MAX_METAL, metal + 1)],
+  x2:      [metal, metal],
+  up2:     [Math.min(MAX_METAL, metal + 2)],
+  jackpot: [MAX_METAL],
+}[outcome]);
+
 export function resolveRoulette(metal, rand) {
   const sector = weighted(GAMBLE.roulette.map(s => s.weight), rand());
   const outcome = GAMBLE.roulette[sector].outcome;
-  const make = {
-    lose:    [],
-    same:    [metal],
-    up1:     [Math.min(MAX_METAL, metal + 1)],
-    x2:      [metal, metal],
-    up2:     [Math.min(MAX_METAL, metal + 2)],
-    jackpot: [MAX_METAL],
-  }[outcome];
-  return { won: outcome !== "lose", lose: [0], make, outcome, sector };
+  return { won: outcome !== "lose", lose: [0], make: makeFor(outcome, metal), outcome, sector };
+}
+
+/* The path is the board: one left-or-right per row, and the slot is how
+ * many rights. The client replays the path it is given. */
+export function resolvePlinko(metal, rand) {
+  const path = Array.from({ length: GAMBLE.plinko.rows }, () => (rand() < 0.5 ? 0 : 1));
+  const slot = path.reduce((a, b) => a + b, 0);
+  const outcome = GAMBLE.plinko.slots[slot];
+  return { won: outcome !== "lose", lose: [0], make: makeFor(outcome, metal), outcome, slot, path };
+}
+
+/* Each slot's chance: C(rows, k) / 2^rows. */
+export function plinkoOdds() {
+  const n = GAMBLE.plinko.rows, out = [];
+  let c = 1;
+  for (let k = 0; k <= n; k++) { out.push(c / 2 ** n); c = c * (n - k) / (k + 1); }
+  return out;
 }
 
 /* ─── gifts ───────────────────────────────────────────────────────────
  * The first gift not yet given whose every condition is met. */
-export function nextGift(stats, level, given) {
-  const have = new Set(given);
+export function nextGift(stats, level, given, journal = {}) {
+  const have = new Set(given), j = journalCounts(journal);
   for (const g of GIFTS) {
     if (have.has(g.id)) continue;
     let ok = true;
     for (const [k, min] of Object.entries(g.when)) {
-      const v = k === "level" ? level : (stats[k] || 0);
+      const v = k === "level" ? level : k === "kinds" ? j.kinds : k === "found" ? j.found : (stats[k] || 0);
       if (v < min) { ok = false; break; }
     }
     if (ok) return g;
   }
   return null;
 }
+
+/* How far the journal has got: kinds found, and the rarest rarity found
+ * (-1 for none). `journal` is the stored { c: { "metal:rarity": n } }. */
+export function journalCounts(journal) {
+  let kinds = 0, found = -1;
+  for (const [k, n] of Object.entries(journal?.c || {})) {
+    if (!(n > 0)) continue;
+    kinds++;
+    found = Math.max(found, Number(k.split(":")[1]) || 0);
+  }
+  return { kinds, found };
+}
+export const LEDGER_MARKS = GIFTS.filter(g => g.when.kinds).map(g => g.when.kinds).sort((a, b) => a - b);
 
 /* ─── the desk ────────────────────────────────────────────────────── */
 export const wellOf = level => SCRIBE.wells[Math.max(0, Math.min(SCRIBE.wells.length - 1, level | 0))];
@@ -167,4 +198,24 @@ export function cleanName(raw) {
   if (!name) return "";
   if (name.length > ENGRAVE.maxLength || !/^[A-Za-z0-9 '-]+$/.test(name)) return null;
   return name.toUpperCase();
+}
+
+/* Words the engraver will not cut. Checked after undoing the usual
+ * disguises (4 for A, spaces between letters). STEMS match anywhere in
+ * the name; WORDS only as a whole word, so "PEACOCK" and "ASSASSIN"
+ * pass. Deliberately short: it is a backstop, not a moderation system. */
+const STEMS = ["FUCK", "CUNT", "NIGG", "FAGG", "RETARD", "WHORE", "RAPIST", "NAZI", "HITLER", "PEDO", "PAEDO", "SHIT", "BITCH", "WANK", "DILDO", "PENIS", "VAGINA", "CUM", "SPERM"];
+const WORDS = ["ASS", "ARSE", "COCK", "DICK", "TIT", "TITS", "FAG", "SLUT", "KIKE", "SPIC", "CHINK", "COON", "TWAT", "PRICK", "PUSSY", "BOOB", "BOOBS", "RAPE", "SEX", "KKK", "NIGA"];
+const UNLEET = { 0: "O", 1: "I", 3: "E", 4: "A", 5: "S", 7: "T", 8: "B", 9: "G" };
+const FALSE_HITS = ["CUMBER", "SCUM", "CIRCUM", "CUMUL", "DOCUMENT", "ACCUM", "CUMIN", "SHITAKE"];
+export function nameAllowed(name) {
+  const clean = String(name).toUpperCase().replace(/[0-9]/g, d => UNLEET[d] || d).replace(/['-]/g, "");
+  const joined = clean.replace(/ /g, "");
+  let scan = joined;
+  for (const ok of FALSE_HITS) scan = scan.split(ok).join("_");
+  if (STEMS.some(w => scan.includes(w))) return false;
+  const words = clean.split(" ").filter(Boolean);
+  // single letters spaced out ("F U C K") are read as one word
+  const spaced = words.every(w => w.length === 1) ? [joined] : [];
+  return ![...words, ...spaced, joined].some(w => WORDS.includes(w));
 }

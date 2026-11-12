@@ -121,6 +121,10 @@ export const PREMIUM_TITLES = [
   { id:"astral",       label:"Of the Astral Hour",  minLvl:35, effect:"astral" },
   { id:"bone_reaper",  label:"Bone Quill",          minLvl:18, effect:"shimmer" },   // id kept: it is what players own
   { id:"fortunes_hand",label:"Fortune's Hand",      minLvl:25, effect:"shimmer" },
+  // for the journal
+  { id:"cataloguer",   label:"The Cataloguer",      minLvl:1,  effect:"shimmer" },
+  { id:"mythbound",    label:"Mythbound",           minLvl:1,  effect:"void" },
+  { id:"keeper",       label:"Keeper of the Ledger",minLvl:1,  effect:"astral" },
 ];
 export const PREMIUM_TITLE_BY_ID  = Object.fromEntries(PREMIUM_TITLES.map(t => [t.id, t]));
 export const PREMIUM_TITLE_LABELS = new Set(PREMIUM_TITLES.map(t => t.label));

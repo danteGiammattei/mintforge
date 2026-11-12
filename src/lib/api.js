@@ -71,10 +71,5 @@ export function apiClient(token, onUnauthorized) {
     listFriends:  ()              => call("/api/friends",       "GET"),
     addFriend:    (username)      => call("/api/friends",       "POST",   { username }),
     removeFriend: (username)      => call("/api/friends",       "DELETE", { username }),
-    listDuels:    ()                       => call("/api/duels", "GET"),
-    createDuel:   (friendUsername, coinId) => call("/api/duels", "POST", { action: "create",  friendUsername, coinId }),
-    acceptDuel:   (duelId, coinId)         => call("/api/duels", "POST", { action: "accept",  duelId, coinId }),
-    declineDuel:  (duelId)                 => call("/api/duels", "POST", { action: "decline", duelId }),
-    flipDuel:     (duelId)                 => call("/api/duels", "POST", { action: "flip",    duelId }),
   };
 }

@@ -147,13 +147,20 @@ export const GAMBLE = {
   toss:     { coins: 1, win: 0.5 },                 // tier up, or lost
   crucible: { coins: 3, win: 0.38 },                // three of one metal: all tier up, or keep one
   roulette: [
-    { outcome: "lose",    label: "LOSE",    weight: 38 },
-    { outcome: "same",    label: "SAME",    weight: 24 },
+    { outcome: "lose",    label: "LOSE",    weight: 50 },
+    { outcome: "same",    label: "SAME",    weight: 12 },
     { outcome: "up1",     label: "TIER UP", weight: 20 },
     { outcome: "x2",      label: "x2 BACK", weight: 10 },
     { outcome: "up2",     label: "TIER +2", weight: 6  },
     { outcome: "jackpot", label: "JACKPOT", weight: 2  },
   ],
+  // A coin dropped through eight rows of pegs, bouncing left or right at
+  // each with even odds, lands in one of nine slots. Odds follow from the
+  // board: the edges are rare (1 in 256 each), the middle is common.
+  plinko: {
+    rows: 8,
+    slots: ["jackpot", "up2", "up1", "lose", "same", "lose", "up1", "up2", "jackpot"],
+  },
 };
 
 /* ─── what he gives away ──────────────────────────────────────────────
@@ -164,6 +171,16 @@ export const GAMBLE = {
 export const GIFTS = [
   { id: "welcome",      when: { visits: 1 },                reward: { type: "chest", tier: 0 } },
   { id: "brush1",       when: { brushed: 3 },               reward: { type: "brush", level: 1 } },
+  // the journal: `kinds` is how many of the 54 metal × rarity kinds have
+  // been cleaned or won, `found` the rarest rarity ever found
+  { id: "ledger9",      when: { kinds: 9 },                 reward: { type: "chest", tier: 1 } },
+  { id: "firstEpic",    when: { found: 3 },                 reward: { type: "marks", n: 150 } },
+  { id: "ledger18",     when: { kinds: 18 },                reward: { type: "chest", tier: 2 } },
+  { id: "firstLegend",  when: { found: 4 },                 reward: { type: "chest", tier: 3 } },
+  { id: "cataloguer",   when: { kinds: 27 },                reward: { type: "title", id: "cataloguer" } },
+  { id: "firstMythic",  when: { found: 5 },                 reward: { type: "title", id: "mythbound" } },
+  { id: "ledger40",     when: { kinds: 40 },                reward: { type: "chest", tier: 4 } },
+  { id: "keeper",       when: { kinds: 54 },                reward: { type: "title", id: "keeper" } },
   { id: "pouch1",       when: { offered: 10 },              reward: { type: "marks", n: 40 } },
   { id: "brush2",       when: { brushed: 15 },              reward: { type: "brush", level: 2 } },
   { id: "goldspun",     when: { level: 10, chests: 12 },    reward: { type: "title", id: "goldspun" } },
@@ -207,6 +224,3 @@ export const AUTH = {
   regLockMs: 12 * 3600e3,
 };
 
-/* Kept off by default: duels were hidden before the rebuild and stay so
- * until they are reworked. The server endpoint is untouched. */
-export const FEATURES = { duels: false };

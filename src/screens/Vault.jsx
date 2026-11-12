@@ -59,6 +59,10 @@ export default function Vault() {
   }, [g.coins, filter, sort]);
   const open = g.coins.find(c => c.id === openId) || null;
   const pickedCoins = g.coins.filter(c => picked.has(c.id) && !c.locked);
+  // what a bulk pick may take: never a locked, pinned or named coin
+  const chosen = new Set((g.pinnedIds || []).filter(Boolean));     // pinned by hand, not the automatic six
+  const spare = shown.filter(c => !c.locked && !chosen.has(c.id) && !c.nick);
+  const pickWhere = test => { setPicked(new Set(spare.filter(test).map(c => c.id))); feel("tap"); };
   const pickedTotal = pickedCoins.reduce((s, c) => s + coinValue(c), 0);
 
   const sell = async (coins) => {
@@ -133,6 +137,20 @@ export default function Vault() {
             <div className="seg" role="group" aria-label="Sort">
               {SORTS.map(([id, label]) => <button key={id} aria-pressed={sort === id} onClick={() => setSort(id)}>{label}</button>)}
             </div>
+            {selecting && (
+              <div className="panel" style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} role="group" aria-label="Pick coins">
+                  {RARITIES.slice(0, 3).map((r, i) => (
+                    <button key={r.name} className="chip" style={{ color: r.color }} onClick={() => pickWhere(c => coinRarity(c) <= i)}>
+                      {i === 0 ? "COMMONS" : `${r.name} AND BELOW`}
+                    </button>
+                  ))}
+                  <button className="chip" onClick={() => pickWhere(() => true)}>ALL</button>
+                  <button className="chip" onClick={() => setPicked(new Set())}>NONE</button>
+                </div>
+                <span className="t-label">{filter === -1 ? "FROM ALL METALS" : `${METALS[filter].name} ONLY`}. PINNED, LOCKED AND NAMED COINS ARE LEFT OUT.</span>
+              </div>
+            )}
             <div className="grid-coins">
               {shown.map(coin => (
                 <CoinTile key={coin.id} coin={coin} pinned={pinnedSet.has(coin.id)}

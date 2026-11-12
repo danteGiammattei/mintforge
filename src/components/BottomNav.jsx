@@ -21,7 +21,7 @@ export default function BottomNav({ tab, setTab, badges = {} }) {
         const on = tab === id, n = badges[id] || 0;
         return (
           <button key={id} onClick={() => setTab(id)} aria-current={on ? "page" : undefined}
-                  aria-label={n ? `${label}, ${n} waiting` : label}
+                  aria-label={n ? `${label}, ${typeof n === "number" ? n : "something"} waiting` : label}
                   style={{
                     flex: 1, minWidth: 0, height: "var(--nav-h)", padding: 0, position: "relative",
                     display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
@@ -31,7 +31,7 @@ export default function BottomNav({ tab, setTab, badges = {} }) {
                   }}>
             <PixelIcon name={icon} size={22}/>
             <span style={{ fontSize: 12, lineHeight: 1, letterSpacing: 0 }} aria-hidden>{label}</span>
-            {n > 0 && <span className="badge" aria-hidden style={{ position: "absolute", top: 6, left: "50%", marginLeft: 8 }}>{n > 9 ? "9+" : n}</span>}
+            {n !== 0 && <span className="badge" aria-hidden style={{ position: "absolute", top: 6, left: "50%", marginLeft: 8, ...(typeof n === "number" ? {} : { background: "var(--magic)" }) }}>{typeof n === "number" && n > 9 ? "9+" : n}</span>}
           </button>
         );
       })}

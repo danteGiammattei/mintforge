@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel, isMuted, setMuted } from "../lib/feel.js";
-import { rarityScore, unlockedTitles, rune } from "../lib/coin.js";
+import { unlockedTitles, rune } from "../lib/coin.js";
+import { journalCounts } from "../../shared/economy.js";
 import { FRAMES, METALS, PREMIUM_TITLE_BY_ID, TITLES, TITLE_LEVELS, BRUSH_UPS } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
 import CoinModal from "../components/CoinModal.jsx";
@@ -91,7 +92,7 @@ function You({ g }) {
           </div>
         </div>
         <dl style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, margin: 0, padding: "0 12px 12px" }}>
-          {[["COINS", g.coins.length], ["SCORE", rarityScore(g.coins).toLocaleString()], ["SHINY", g.coins.filter(c => c.shiny).length]].map(([k, v]) => (
+          {[["COINS", g.coins.length], ["KINDS", `${journalCounts(g.journal).kinds} / 54`], ["SHINY", g.coins.filter(c => c.shiny).length]].map(([k, v]) => (
             <div key={k} className="panel" style={{ padding: 8, textAlign: "center" }}>
               <dd className="t-title" style={{ margin: 0 }}>{v}</dd><dt className="t-label">{k}</dt>
             </div>

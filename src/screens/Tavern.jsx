@@ -8,6 +8,8 @@ import { METALS, RARITIES, MAX_TIER } from "../lib/data.js";
 import { GAMBLE } from "../../shared/tuning.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
 import RouletteWheel, { SECTOR_COLOURS } from "../components/RouletteWheel.jsx";
+import Plinko from "../components/Plinko.jsx";
+import { plinkoOdds } from "../../shared/economy.js";
 import { CoinTile } from "./Vault.jsx";
 
 /* ─── TAVERN ──────────────────────────────────────────────────────────────
@@ -15,18 +17,27 @@ import { CoinTile } from "./Vault.jsx";
  *   TOSS      one coin. It rises a metal, or it is gone.
  *   CRUCIBLE  three of one metal. All rise, or you keep one.
  *   ROULETTE  one coin on a six-sector wheel.
+ *   PLINKO    one coin down eight rows of pegs into one of nine slots.
  * The odds are printed. Locked coins cannot be staked. */
 const pct = p => Math.round(p * 100) + "%";
 const GAMES = {
   toss:     { label: "TOSS",     need: 1, rule: `1 COIN · ${pct(GAMBLE.toss.win)} IT RISES A METAL · OTHERWISE IT IS LOST` },
   crucible: { label: "CRUCIBLE", need: 3, rule: `3 COINS OF ONE METAL · ${pct(GAMBLE.crucible.win)} ALL THREE RISE · OTHERWISE YOU KEEP ONE` },
   roulette: { label: "ROULETTE", need: 1, rule: "1 COIN ON THE WHEEL" },
+  plinko:   { label: "PLINKO",   need: 1, rule: "1 COIN DOWN THE PEGS. IT BOUNCES LEFT OR RIGHT AT EVERY ROW" },
 };
 const OUTCOME_LINE = {
   lose: "IT IS GONE", same: "IT CAME BACK", up1: "IT ROSE A METAL", x2: "IT CAME BACK TWICE",
   up2: "IT ROSE TWO METALS", jackpot: "JACKPOT",
 };
 const wheelTotal = GAMBLE.roulette.reduce((s, v) => s + v.weight, 0);
+const LABEL = Object.fromEntries(GAMBLE.roulette.map(s => [s.outcome, s.label]));
+// each outcome's chance on the plinko board, summed over the slots that give it
+const plinkoTable = (() => {
+  const odds = plinkoOdds(), t = {};
+  GAMBLE.plinko.slots.forEach((o, k) => { t[o] = (t[o] || 0) + odds[k]; });
+  return Object.entries(t).sort((a, b) => b[1] - a[1]);
+})();
 
 export default function Tavern() {
   const g = useGame(), ui = useUi();
@@ -65,7 +76,7 @@ export default function Tavern() {
       const r = await g.act("gamble", { game, coinIds: ids });
       const out = { ...r, minted: r.minted.map(hydrate), keptCoins: coins.filter(c => r.kept.includes(c.id)) };
       setRes(out);
-      if (game !== "roulette") {
+      if (game !== "roulette" && game !== "plinko") {
         // let the toss or the pour play out before the answer shows
         setTimeout(() => finish(out), Math.max(0, 1500 - (Date.now() - started)));
       }
@@ -107,7 +118,23 @@ export default function Tavern() {
             </>
           )}
 
-          {phase === "working" && game !== "roulette" && (
+          {game === "plinko" && (
+            <>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <Plinko dropping={phase === "working"} path={res ? res.path : null} metal={stake[0]?.metalIdx ?? 0} onLanded={() => res && finish(res)}/>
+              </div>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px" }}>
+                {plinkoTable.map(([o, p]) => (
+                  <li key={o} className="between" style={{ color: SECTOR_COLOURS[o][1] }}>
+                    <span className="row"><i aria-hidden style={{ width: 8, height: 8, background: SECTOR_COLOURS[o][1] }}/>{LABEL[o]}</span>
+                    <span>{p < 0.01 ? (p * 100).toFixed(1) : Math.round(p * 100)}%</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {phase === "working" && game !== "roulette" && game !== "plinko" && (
             <div style={{ display: "flex", justifyContent: "center", gap: 8, padding: "16px 0" }} role="status" aria-label="Working">
               {stake.map((c, i) => (
                 <div key={c.id} style={{ animation: `coinFlip .5s steps(8) ${i * 0.12}s infinite` }}><CoinCanvas coin={c} size={64}/></div>
@@ -151,7 +178,7 @@ export default function Tavern() {
                   ))}
                 </div>
                 <button className="btn btn-danger btn-block" disabled={!ready} onClick={play}>
-                  {ready ? (game === "roulette" ? "SPIN" : game === "toss" ? "TOSS IT" : "POUR THEM IN") : `PICK ${def.need - ids.length} MORE`}
+                  {ready ? ({ roulette: "SPIN", plinko: "DROP IT", toss: "TOSS IT", crucible: "POUR THEM IN" })[game] : `PICK ${def.need - ids.length} MORE`}
                 </button>
               </>
             )

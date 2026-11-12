@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { useGame } from "../lib/GameContext.js";
 import { feel } from "../lib/feel.js";
 import { BRUSH_UPS, BA, FRAMES, PREMIUM_TITLES } from "../lib/data.js";
-import { SCRIBE } from "../../shared/tuning.js";
+import { SCRIBE, DAILY, CHESTS } from "../../shared/tuning.js";
 import PixelBanner from "./PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { TitleText } from "../screens/Friends.jsx";
@@ -122,6 +122,39 @@ function Body({ r }) {
       </>
     );
   }
+  if (r.kind === "daily") {
+    const week = DAILY.chestEvery, day = ((r.streak - 1) % week) + 1, g = r.gift;
+    const markFor = d => DAILY.marks[Math.min(DAILY.marks.length - 1, d - 1)];
+    return (
+      <>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${week}, 1fr)`, gap: 4 }} role="list" aria-label={`Day ${day} of ${week}`}>
+          {Array.from({ length: week }, (_, i) => {
+            const d = i + 1, done = d < day, now = d === day, chest = d === week;
+            return (
+              <div key={d} role="listitem" aria-label={`Day ${d}${chest ? ", a chest" : ""}${done ? ", collected" : now ? ", today" : ""}`}
+                   style={{ padding: "6px 0", textAlign: "center", border: `2px solid ${now ? "var(--magic)" : done ? "var(--line-hi)" : "var(--line)"}`,
+                            background: now ? "var(--magic-lo)" : "var(--stone-0)", color: now ? "var(--magic)" : done ? "var(--bone-dim)" : "var(--mute)" }}>
+                <div aria-hidden style={{ fontSize: 12 }}>{d}</div>
+                <div aria-hidden style={{ display: "flex", justifyContent: "center", marginTop: 2 }}>
+                  {done ? <PixelIcon name="check" size={11}/> : <PixelIcon name={chest ? "chest" : "mark"} size={11}/>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="t-title" style={{ textAlign: "center" }}>
+          {g.type === "chest" ? <span className="t-gold">{CHESTS.names[g.tier]} CHEST</span>
+                              : <span className="t-gold row" style={{ justifyContent: "center", gap: 8 }}><PixelIcon name="mark" size={11}/>{g.n} MARKS</span>}
+        </div>
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>
+          {day === week ? "A WHOLE WEEK. COME BACK TOMORROW AND IT BEGINS AGAIN."
+            : day === week - 1 ? "COME BACK TOMORROW. ON THE SEVENTH DAY HE GIVES A CHEST."
+            : `COME BACK TOMORROW FOR ${markFor(day + 1)}. ON THE SEVENTH DAY, A CHEST.`}
+          <br/>MISS TWO DAYS AND IT STARTS OVER.
+        </p>
+      </>
+    );
+  }
   if (r.kind === "marks") {
     return (
       <>
@@ -140,8 +173,9 @@ const HEADS = {
   frame: ["A NEW BANNER", "HE PUSHED IT THROUGH THE GAP"],
   level: ["LEVEL UP", ""],
   marks: ["A POUCH OF MARKS", "HE PUSHED IT THROUGH THE GAP"],
+  daily: ["TODAY'S GIFT", ""],
 };
-const COLOUR = { brush: "#e0b860", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860" };
+const COLOUR = { brush: "#e0b860", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4" };
 
 function Card({ r, onClose }) {
   const g = useGame();
@@ -153,7 +187,8 @@ function Card({ r, onClose }) {
     return () => window.removeEventListener("keydown", key);
   }, [onClose]);
 
-  const [head, sub] = HEADS[r.kind];
+  const [head0, sub] = HEADS[r.kind];
+  const head = r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : head0;
   const subline = r.from === "level" ? "" : sub;
   // something wearable can be put on from here
   const wear = r.kind === "title" ? { on: g.selectedTitle === r.label, go: () => g.setSelectedTitle(r.label) }

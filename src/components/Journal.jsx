@@ -1,6 +1,7 @@
 import { useGame } from "../lib/GameContext.js";
 import { METALS, RARITIES } from "../lib/data.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
+import { LEDGER_MARKS } from "../../shared/economy.js";
 
 /* ─── JOURNAL ─────────────────────────────────────────────────────────────
  * Every kind of coin you have ever cleaned or won: nine metals by six
@@ -13,6 +14,7 @@ export default function Journal() {
   const found = METALS.reduce((n, _, m) => n + RARITIES.filter((_r, r) => count(m, r) > 0).length, 0);
   const total = METALS.length * RARITIES.length;
   const everything = Object.values(j.c).reduce((a, b) => a + b, 0);
+  const next = LEDGER_MARKS.find(k => k > found);
 
   return (
     <>
@@ -23,9 +25,15 @@ export default function Journal() {
           </div>
         ))}
       </dl>
-      <div className="meter" role="progressbar" aria-label="Kinds found" aria-valuemin={0} aria-valuemax={total} aria-valuenow={found}>
-        <i style={{ width: `${found / total * 100}%` }}/>
+      <div style={{ position: "relative" }}>
+        <div className="meter" role="progressbar" aria-label="Kinds found" aria-valuemin={0} aria-valuemax={total} aria-valuenow={found}>
+          <i style={{ width: `${found / total * 100}%` }}/>
+        </div>
+        {/* where the goblin is watching for */}
+        {LEDGER_MARKS.map(k => <i key={k} aria-hidden style={{ position: "absolute", top: -2, left: `calc(${k / total * 100}% - 1px)`, width: 2, height: 12, background: k <= found ? "var(--candle)" : "var(--bone-dim)" }}/>)}
       </div>
+      {next ? <p className="t-magic" style={{ margin: 0, textAlign: "center" }}>HE IS KEEPING COUNT. SOMETHING WAITS AT {next} KINDS.</p>
+            : <p className="t-gold" style={{ margin: 0, textAlign: "center" }}>EVERY KIND THERE IS. THE LEDGER IS COMPLETE.</p>}
 
       <section className="panel" style={{ padding: 8, overflowX: "auto" }} aria-label="Kinds of coin found">
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 4, tableLayout: "fixed" }}>

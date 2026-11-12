@@ -6,8 +6,8 @@ import { login, register, getAuth, hashPin } from "../server/auth.js";
 import { act } from "../server/game.js";
 import { loadState, patchCosmetics } from "../server/state.js";
 import { readFileSync } from "node:fs";
-import { AUTH, SCRIBE, CHESTS, FAVOUR_PER_RARITY, GIFTS, FORGE, SHINY_VALUE_MUL, ENGRAVE, DAILY } from "../shared/tuning.js";
-import { forgeCost } from "../shared/economy.js";
+import { AUTH, SCRIBE, CHESTS, FAVOUR_PER_RARITY, GIFTS, FORGE, SHINY_VALUE_MUL, ENGRAVE, DAILY, GAMBLE } from "../shared/tuning.js";
+import { forgeCost, plinkoOdds } from "../shared/economy.js";
 import { TITLES, TITLE_RENAMES, PREMIUM_TITLES } from "../src/lib/data.js";
 import { TRAITS } from "../shared/sigil.js";
 import { coinValue, mkCoin } from "../src/lib/coin.js";
@@ -20,19 +20,21 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 apply cleanly on top of the pre-rebuild schema", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql"]);
+test("migrations 009, 011 and 012 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
-  for (const t of ["players", "player_state", "coins", "sessions", "scrolls", "chests", "action_log", "login_attempts"]) {
-    assert.deepEqual(cols(db, t), cols(fresh, t), `${t} matches schema.sql`);
-  }
+  const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
+  const indexes = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL ORDER BY name`).all().map(r => r.name);
+  assert.deepEqual(tables(db), tables(fresh));
+  assert.deepEqual(indexes(db), indexes(fresh));
+  for (const t of tables(fresh)) assert.deepEqual(cols(db, t), cols(fresh, t), `${t} matches schema.sql`);
 });
 
 test("schema.sql has every table the code reads", () => {
   const db = makeDb();
   const have = new Set(db.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all().map(r => r.name));
-  for (const t of ["players", "player_state", "coins", "sessions", "friends", "duels", "scrolls", "chests", "action_log", "login_attempts"]) {
+  for (const t of ["players", "player_state", "coins", "sessions", "friends", "scrolls", "chests", "action_log", "login_attempts", "seal_log"]) {
     assert.ok(have.has(t), `missing table ${t}`);
   }
 });
@@ -241,7 +243,8 @@ test("later gifts wait for their conditions", async () => {
 
 test("every gift names something that exists", async () => {
   const { db, pid } = await world();
-  db.raw.prepare(`UPDATE player_state SET xp = 220 * 10000, stats = '{"visits":999,"sealed":999,"offered":999,"chests":999,"brushed":999,"gambles":999}' WHERE player_id = ?`).run(pid);
+  const full = { c: Object.fromEntries(Array.from({ length: 54 }, (_, i) => [`${i % 9}:${(i / 9) | 0}`, 1])) };
+  db.raw.prepare(`UPDATE player_state SET xp = 220 * 10000, journal = ?, stats = '{"visits":999,"sealed":999,"offered":999,"chests":999,"brushed":999,"gambles":999}' WHERE player_id = ?`).run(JSON.stringify(full), pid);
   const go = driver(db, pid, seeded(2));
   const got = [];
   for (let i = 0; i < GIFTS.length + 2; i++) { const r = await go("visit"); if (r.result.gift) got.push(r.result.gift.name); }
@@ -249,7 +252,7 @@ test("every gift names something that exists", async () => {
   const s = await loadState(db, pid);
   assert.equal(s.brushLevel, 4);
   assert.equal(s.ownedFrames.length, 4);
-  assert.equal(s.ownedTitles.length, 5);
+  assert.equal(s.ownedTitles.length, PREMIUM_TITLES.length);
 });
 
 /* ─── chest → coin → vault → marks ────────────────────────────────── */
@@ -524,4 +527,70 @@ test("the daily visit: once a day, growing over a streak, a chest on the seventh
   const s = await loadState(db, pid, now);
   assert.equal(s.streak, 1);
   assert.ok(!("daily" in s.stats));
+});
+
+
+test("the journal earns gifts: kinds found, and the first of a rarity", async () => {
+  const { db, pid } = await world();
+  const go = driver(db, pid, seeded(5));
+  await go("visit");                                                // the welcome chest
+  const set = j => db.raw.prepare(`UPDATE player_state SET journal = ? WHERE player_id = ?`).run(JSON.stringify({ c: j }), pid);
+  set(Object.fromEntries(Array.from({ length: 8 }, (_, i) => [`${i}:0`, 1])));
+  assert.equal((await go("visit")).result.gift?.daily ?? null, null, "eight kinds is not nine");
+  set(Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`${i}:0`, 1])));
+  const g = await go("visit");
+  assert.deepEqual([g.result.gift.type, g.result.gift.tier], ["chest", 1]);
+  set({ "0:0": 1, "2:3": 1 });                                      // an epic: the first-epic pouch
+  const e = await go("visit");
+  assert.deepEqual([e.result.gift.type, e.result.gift.n], ["marks", 150]);
+});
+
+test("plinko follows the path it reports, and its odds are the board's", async () => {
+  const { db, pid } = await world();
+  coin(db, pid, "a", 3); coin(db, pid, "b", 3);
+  // every bounce right: the far edge, a jackpot
+  const jp = await driver(db, pid, () => 0.9)("gamble", { game: "plinko", coinIds: ["a"] });
+  assert.deepEqual([jp.result.path.join(""), jp.result.slot, jp.result.outcome], ["11111111", 8, "jackpot"]);
+  assert.equal(jp.result.minted[0].metalIdx, 8);
+  const mid = await driver(db, pid, scripted(0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9))("gamble", { game: "plinko", coinIds: ["b"] });
+  assert.deepEqual([mid.result.slot, mid.result.outcome, mid.result.minted.length], [4, "same", 1]);
+  const odds = plinkoOdds();
+  assert.equal(odds.length, GAMBLE.plinko.slots.length);
+  assert.ok(Math.abs(odds.reduce((a, b) => a + b, 0) - 1) < 1e-12);
+});
+
+test("each seal leaves a row of numbers for tuning, and never the drawing", async () => {
+  const { db, pid } = await world();
+  await driver(db, pid, seeded(2))("seal", { strokes: circle() });
+  const row = db.raw.prepare(`SELECT * FROM seal_log`).get();
+  const m = JSON.parse(row.m);
+  for (const k of ["symmetry", "enclosed", "crossings", "filled", "span", "pace", "ink", "strokes"]) assert.ok(k in m, k);
+  assert.ok(!/"x"|"y"|"t"/.test(row.m), "no points");
+  assert.equal(row.player_id, pid);
+});
+
+test("the engraver will not cut a rude word, however it is spelt", async () => {
+  const { db, pid } = await world();
+  coin(db, pid, "a", 2);
+  db.raw.prepare(`UPDATE player_state SET marks = 9999 WHERE player_id = ?`).run(pid);
+  const go = driver(db, pid, seeded(1));
+  for (const bad of ["FUCK", "f u c k", "SH1T", "big ass"]) await refuses(go("engrave", { coinId: "a", name: bad }), 400);
+  for (const ok of ["PEACOCK", "ASSASSIN", "CUCUMBER", "THE RABBIT"]) assert.equal((await go("engrave", { coinId: "a", name: ok })).result.name, ok);
+});
+
+test("the daily gift says when it is ready", async () => {
+  const { db, pid } = await world();
+  let now = 2e9;
+  assert.equal((await loadState(db, pid, now)).dailyReady, true, "a new player has one waiting");
+  await act(db, pid, { action: "visit" }, { now, rand: seeded(1) });
+  const after = await loadState(db, pid, now + 1000);
+  assert.equal(after.dailyReady, false);
+  assert.ok(after.dailyIn > DAILY.gapMs - 2000);
+  assert.equal((await loadState(db, pid, now + DAILY.gapMs + 1)).dailyReady, true);
+});
+
+test("player search uses the username index", () => {
+  const db = makeDb();
+  const plan = db.raw.prepare(`EXPLAIN QUERY PLAN SELECT id FROM players WHERE username LIKE ?1 COLLATE NOCASE`).all("ale%").map(r => r.detail).join(" ");
+  assert.match(plan, /USING (COVERING )?INDEX/);
 });

@@ -6,25 +6,23 @@ the things that are decisions rather than work, or that need real players.
 
 ## Decisions waiting on you
 
-- **Duels** are kept and still hidden (`FEATURES.duels` in `shared/tuning.js`),
-  as they were before the rebuild. The server endpoint is unchanged; the client
-  UI is ported and lives under Profile → Friends. Flip the flag to try them.
+
 - **The Tavern is simulated gambling.** It is coins-only and says so, but if
   this is ever distributed in Australia that is the feature that sets its
   classification.
 - **The new title names** are a first pass (`TITLES` and `TITLE_RENAMES` in
   `src/lib/data.js`). Changing one is a one-line edit plus a row in the map.
 
-- **Engraved names are not filtered.** They are limited to 14 letters, digits
-  and spaces and are visible to friends. If the game gets strangers, add a
-  word list in `cleanName` (`shared/economy.js`).
+- **The name filter is a backstop**, not moderation: a short word list in
+  `nameAllowed` (`shared/economy.js`). It blocks "MOBY DICK"; that is the price.
 
 ## Needs real players
 
-- **Sigil thresholds.** They are tuned against generated drawings
-  (`npm run sim`), not people. The first real stroke logs should replace the
-  generators in `tools/simulate.mjs`. `deliberate` (drawing pace) is the trait
-  most likely to be wrong.
+- **Sigil thresholds.** They were tuned against generated drawings. Every seal
+  is now logged (numbers only, never the drawing): after a week of play, run
+  `node tools/seal-report.mjs --remote` and move any trait that fires on most
+  drawings, or almost none. `deliberate` (drawing pace) is the likeliest to
+  be off.
 - **Forge prices.** A shine costs about 1,000 marks on an ordinary coin —
   roughly twenty minutes of selling — and five times a coin's worth above
   that. Whether that makes shinies too common is a question for real play.

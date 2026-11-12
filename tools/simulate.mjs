@@ -27,7 +27,7 @@
 
 import { analyse, traitsOf, rollScroll, RARITY, TRAITS } from "../shared/sigil.js";
 import { SCRIBE, FAVOUR_PER_RARITY, CHESTS, XP, GAMBLE, FORGE, SHINY_VALUE_MUL } from "../shared/tuning.js";
-import { offerScroll, rollCoin, levelOf, xpForSeal, xpForOffer, xpForBrush, nextGift, forgeCost } from "../shared/economy.js";
+import { offerScroll, rollCoin, levelOf, xpForSeal, xpForOffer, xpForBrush, nextGift, forgeCost, plinkoOdds } from "../shared/economy.js";
 import { mkCoin, coinValue } from "../src/lib/coin.js";
 import { METALS } from "../src/lib/data.js";
 
@@ -246,19 +246,20 @@ for (let p = 0; p < N_PLAYERS; p++) {
   const R = rng(1000 + p * 7919);
   let pot = { favour: 0, tier: 0, cost: 0, best: 0, chests: 0 };
   let t = 0, xp = 0, marks = 0, since = 0, brush = 0;
-  const stats = { visits: 0, sealed: 0, offered: 0, chests: 0, brushed: 0, gambles: 0 }, given = [], reached = {};
+  const stats = { visits: 0, sealed: 0, offered: 0, chests: 0, brushed: 0, gambles: 0 }, given = [], reached = {}, journal = { c: {} };
   const open = tier => {
     const c = rollCoin(tier, brush, R);
     const coin = Object.assign(mkCoin(c.seed, 1, c.metalIdx), { shiny: c.shiny, rarity: c.rarity });
     const v = coinValue(coin);
     t += TIME.open + TIME.brush; xp += XP.open + xpForBrush(c); stats.brushed++;
+    journal.c[`${c.metalIdx}:${c.rarity}`] = (journal.c[`${c.metalIdx}:${c.rarity}`] || 0) + 1;
     marks += v; agg.value.push(v); agg.valueByTier[tier].push(v); agg.coins++; agg.metal[c.metalIdx]++; agg.coinRar[c.rarity]++; if (c.shiny) agg.shiny++;
     agg.chestTier[tier]++;
     const h = Math.min(HOURS - 1, Math.floor(t / 3600)); agg.marksByHour[h] += v; agg.chestsByHour[h]++;
   };
   const visit = () => {
     stats.visits++; t += TIME.walk;
-    const g = nextGift(stats, levelOf(xp), given);
+    const g = nextGift(stats, levelOf(xp), given, journal);
     if (!g) return;
     given.push(g.id);
     if (!(g.id in agg.gifts)) agg.gifts[g.id] = [];
@@ -318,6 +319,8 @@ head("6. The tavern, per coin staked (expected coins back, and expected tiers ga
   console.log(`toss      coins ×${GAMBLE.toss.win.toFixed(2)}   tiers +${GAMBLE.toss.win.toFixed(2)}`);
   console.log(`crucible  coins ×${(GAMBLE.crucible.win + (1 - GAMBLE.crucible.win) / 3).toFixed(2)}   tiers +${GAMBLE.crucible.win.toFixed(2)}`);
   console.log(`roulette  coins ×${GAMBLE.roulette.reduce((s, v) => s + v.weight * back[v.outcome], 0) / tot}   tiers +${(GAMBLE.roulette.reduce((s, v) => s + v.weight * tiers[v.outcome], 0) / tot).toFixed(2)} (jackpot counted as +4)`);
+  const po = plinkoOdds(), pc = GAMBLE.plinko.slots.reduce((t, o, k) => t + po[k] * back[o], 0), pt = GAMBLE.plinko.slots.reduce((t, o, k) => t + po[k] * tiers[o], 0);
+  console.log(`plinko    coins ×${pc.toFixed(2)}   tiers +${pt.toFixed(2)}`);
 }
 head("7. The forge: what a shine costs, and how long that takes to earn");
 {

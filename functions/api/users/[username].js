@@ -1,5 +1,7 @@
 import { json, bad, getAuth } from "../_utils.js";
 import { currentTitle } from "../../../src/lib/data.js";
+import { journalOut } from "../../../server/state.js";
+import { journalCounts } from "../../../shared/economy.js";
 
 /* GET /api/users/:username
    The public profile of a player — bio, title, level, frame and the
@@ -19,7 +21,7 @@ export async function onRequestGet({ request, env, params }) {
             COALESCE(player_state.frame, 'stone') AS frame,
             COALESCE(player_state.bio, '') AS bio,
             player_state.selected_title AS title,
-            player_state.pinned_ids
+            player_state.pinned_ids, player_state.journal
        FROM players
        LEFT JOIN player_state ON player_state.player_id = players.id
       WHERE players.username = ?1 COLLATE NOCASE`
@@ -45,9 +47,7 @@ export async function onRequestGet({ request, env, params }) {
       .slice(0, 6);
   }
 
-  const tierWeights = [1, 3, 8, 20, 45, 120, 300, 800, 2000];
-  const rarityScore = allCoins.reduce(
-    (s, c) => s + (tierWeights[c.metal_idx] || 1) * ((c.rarity ?? 0) + 1) * (c.shiny ? 3 : 1), 0);
+  const kinds = journalCounts(journalOut(player.journal, allCoins)).kinds;
 
   const friendRow = await env.DB.prepare(
     `SELECT 1 FROM friends WHERE player_id = ?1 AND friend_id = ?2`
@@ -65,7 +65,7 @@ export async function onRequestGet({ request, env, params }) {
     isFriend: !!friendRow,
     coinCount: allCoins.length,
     shinyCount: allCoins.filter(c => c.shiny).length,
-    rarityScore,
+    kinds,
     showcase: showcase.map(c => ({
       id: c.id, seed: c.seed >>> 0, metalIdx: c.metal_idx, shiny: !!c.shiny,
       ...(c.rarity != null ? { rarity: c.rarity } : {}),

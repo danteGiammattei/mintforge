@@ -1,12 +1,10 @@
-/* Friends, search, other players' profiles, and duels. None of this is
+/* Friends, search and other players' profiles. None of this is
  * part of the loop, so it loads only when the Friends view is opened. */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FEATURES } from "../../shared/tuning.js";
 
 export function useSocial(api, active) {
   const [friends, setFriends] = useState([]);
   const [followers, setFollowers] = useState([]);
-  const [duels, setDuels] = useState([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -18,12 +16,8 @@ export function useSocial(api, active) {
     api.listFriends().then(r => { setFriends(r.friends || []); setFollowers(r.followers || []); setError(null); })
       .catch(e => setError(e.message));
   }, [api]);
-  const refreshDuels = useCallback(() => {
-    if (!FEATURES.duels) return;
-    api.listDuels().then(r => setDuels(r.duels || [])).catch(() => {});
-  }, [api]);
 
-  useEffect(() => { if (active) { refresh(); refreshDuels(); } }, [active, refresh, refreshDuels]);
+  useEffect(() => { if (active) refresh(); }, [active, refresh]);
 
   // search as you type, a beat behind, newest answer wins
   useEffect(() => {
@@ -52,7 +46,7 @@ export function useSocial(api, active) {
   }, [api, refresh]);
 
   return {
-    friends, followers, duels, error, refresh, refreshDuels,
+    friends, followers, error, refresh,
     query, setQuery, results, searching,
     viewing, view, closeView: () => setViewing(null),
     setFriend,

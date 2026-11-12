@@ -106,31 +106,44 @@ export function analyse(strokes, sheet) {
  * page-filling sprawl is never sparse, patience costs time. Thresholds
  * are tuned (npm run sim) so each fires on a minority of drawings. */
 export function traitsOf(a) {
-  if (!a) return [];
-  const out = [], cells = GRID * GRID;
-  const filled = a.grid.reduce((s, v) => s + v, 0) / cells;
+  const m = measure(a);
+  if (!m) return [];
+  const out = [];
+  if (m.cells >= TH.symmetricMinCells && m.symmetry > TH.symmetric) out.push("symmetric");
+  if (m.enclosed > TH.closed) out.push("closed");                          // a real enclosure, not a scribble's pocket
+  if (m.strokes === 1 && m.ink >= TH.continuousInk) out.push("continuous"); // one unbroken stroke, and a long one
+  if (m.crossings >= TH.woven) out.push("woven");
+  if (m.span > TH.sparseSpan && m.filled < TH.sparse) out.push("sparse");  // a mark or two across a wide stretch
+  if (m.ink >= TH.deliberateInk && m.pace > 0 && m.pace < TH.deliberate) out.push("deliberate");
+  if (m.span > TH.vast) out.push("vast");
+  return out;
+}
 
-  // mirrored overlap, left against right — of a shape, not of a single line
-  let both = 0, either = 0;
+/* ─── the numbers the traits are read from ────────────────────────────
+ * Kept separate from the thresholds so the server can log them for each
+ * seal and tools/seal-report.mjs can re-judge real drawings against new
+ * thresholds without ever storing a drawing. */
+export function measure(a) {
+  if (!a) return null;
+  const cells = GRID * GRID;
+  let both = 0, either = 0, inked = 0;
   for (let y = 0; y < GRID; y++) for (let x = 0; x < GRID; x++) {
     const p = a.grid[y * GRID + x], q = a.grid[y * GRID + (GRID - 1 - x)];
+    if (p) inked++;
     if (p || q) either++;
     if (p && q) both++;
   }
-  if (either >= TH.symmetricMinCells && both / either > TH.symmetric) out.push("symmetric");
-
-  // a real enclosure, not a pocket left by a scribble
-  if (enclosedCells(a.grid) / cells > TH.closed) out.push("closed");
-  // one unbroken stroke, and a long one
-  if (a.strokes.length === 1 && a.ink >= TH.continuousInk) out.push("continuous");
-  if (crossings(a.strokes) >= TH.woven) out.push("woven");
-  // a mark or two across a wide stretch of page, and nothing else
-  if (a.sheetFrac > TH.sparseSpan && filled < TH.sparse) out.push("sparse");
-  // drawn slowly: enough ink to judge, and a patient hand
-  if (a.ink >= TH.deliberateInk && a.pace > 0 && a.pace < TH.deliberate) out.push("deliberate");
-  if (a.sheetFrac > TH.vast) out.push("vast");
-
-  return out;
+  return {
+    cells: either,
+    symmetry: either ? both / either : 0,
+    enclosed: enclosedCells(a.grid) / cells,
+    crossings: crossings(a.strokes),
+    filled: inked / cells,
+    span: a.sheetFrac,
+    pace: a.pace,
+    ink: a.ink,
+    strokes: a.strokes.length,
+  };
 }
 
 /* ─── the roll ────────────────────────────────────────────────────────

@@ -32,8 +32,9 @@ export default function Door() {
       visit: () => live.current.act("visit"),
       say: ui.say, feel,
       received: what => {
-        // a lasting reward gets its moment; a chest or the day's pouch is a line
-        const reward = !what.daily && giftToReward(what);
+        // a lasting reward gets its moment, and so does the day's gift; a chest is a line
+        if (what.daily) { cel.current({ kind: "daily", streak: what.streak, gift: what }); return; }
+        const reward = giftToReward(what);
         if (reward) { cel.current(reward); return; }
         const name = what.name || (CHESTS.names[what.tier] + " CHEST");
         const line = (GIFT_LINE[what.type] || GIFT_LINE.chest)({ ...what, name });
@@ -41,6 +42,10 @@ export default function Door() {
         if (what.type !== "chest") feel("gift");
       },
       toDesk: () => live.current.setTab("scribe"),
+      more: () => live.current.dailyReady,
+      coach: () => (live.current.stats.offered > 0 ? null
+        : live.current.scrolls.length ? "HE WANTS WHAT YOU MADE. SWIPE UP."
+        : "HE WANTS SCROLLS. THE DESK MAKES THEM."),
     });
     return scene.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps

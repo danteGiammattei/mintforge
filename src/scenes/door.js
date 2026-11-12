@@ -17,6 +17,8 @@
  *    bus.feel(name)       sound + haptics hook
  *    bus.received(what)   a chest or gift has landed in the satchel
  *    bus.toDesk()         the player asked to go and draw
+ *    bus.more()           true while he still has something waiting (the daily gift)
+ *    bus.coach()          a line for a player who has never offered, or null
  *
  *  There is no menu, no price and no tooltip in here, and there must not
  *  be. His posture is the only meter.
@@ -394,7 +396,11 @@ function stepArrive() {
   const a = S.arriving;
   if (S.hurry) a.k = Math.min(1, a.k + 0.02);
   a.k = Math.min(1, a.k + 0.0065);
-  if (a.k >= 1) { S.arriving = null; S.mode = "idle"; bus.received(a.what); }
+  if (a.k >= 1) {
+    S.arriving = null; S.mode = "idle"; bus.received(a.what);
+    // he had more than one thing for us (a gift and the day's pouch): ask again
+    if (a.visit && bus.more()) visitTimer = setTimeout(doVisit, 900);
+  }
 }
 
 function beginGive(ids) {
@@ -427,6 +433,12 @@ function frame() {
     S.hurry = false;
     if (S.say?.length && S.lineA < 1) speak(S.say.shift());           // anything else he had to say
     else if (S.queue.length && S.drawer < 0.01) arrive(S.queue.shift(), "HE PUSHES A CHEST THROUGH THE GAP");
+    // a new player is told, once a visit, what he wants — and nothing more
+    else if (!S.coached && S.t > 300 && S.lineA < 0.4 && S.drawer < 0.01 && !S.arriving) {
+      S.coached = true;
+      const line = bus.coach();
+      if (line) speak(line, 3.4);
+    }
   }
 
   // his posture follows the pot, slowly: he does not jump
@@ -541,19 +553,21 @@ cv.addEventListener("pointercancel", onCancel);
 
 /* ── arrival: he may have something for us ───────────────── */
 let alive = true;
-const visitTimer = setTimeout(() => {
+let visitTimer = 0;
+function doVisit() {
   bus.visit().then(r => {
     if (!alive || !r?.gift) return;
     const g = r.gift;
     const wait = () => {
       if (!alive) return;
-      if (S.mode !== "idle") { setTimeout(wait, 400); return; }
-      if (g.type === "chest") arrive({ kind: "chest", tier: g.tier, what: g }, "HE PUSHES A CHEST THROUGH THE GAP");
-      else arrive({ kind: "gift", what: g }, "HE PUSHES SOMETHING THROUGH THE GAP");
+      if (S.mode !== "idle") { visitTimer = setTimeout(wait, 400); return; }
+      if (g.type === "chest") arrive({ kind: "chest", tier: g.tier, what: g, visit: true }, "HE PUSHES A CHEST THROUGH THE GAP");
+      else arrive({ kind: "gift", what: g, visit: true }, "HE PUSHES SOMETHING THROUGH THE GAP");
     };
     wait();
   }, () => {});
-}, 900);
+}
+visitTimer = setTimeout(doVisit, 900);
 
 const teardown = () => {
   alive = false; clearTimeout(visitTimer); stop();

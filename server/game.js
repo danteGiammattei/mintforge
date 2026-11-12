@@ -20,13 +20,13 @@
  *  whose reply it never received.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { analyse, rollScroll, TRAITS } from "../shared/sigil.js";
+import { analyse, rollScroll, measure, TRAITS } from "../shared/sigil.js";
 import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
-  resolveToss, resolveCrucible, resolveRoulette, forgeCost,
-  inkFor, wellOf, dailyGift, cleanName,
+  resolveToss, resolveCrucible, resolveRoulette, resolvePlinko, forgeCost,
+  inkFor, wellOf, dailyGift, cleanName, nameAllowed,
 } from "../shared/economy.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
@@ -96,6 +96,10 @@ async function seal(db, pid, body, { now, rand }) {
   await db.batch([
     db.prepare(`INSERT INTO scrolls (id, player_id, rarity, seed, hint, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)`)
       .bind(id, pid, r.rarity, r.seed, hint, now),
+    db.prepare(
+      `INSERT INTO seal_log (player_id, created_at, rarity, traits, bumped, familiar, well_level, m) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
+    ).bind(pid, now, r.rarity, r.traits.join(","), r.bumped.join(","), r.familiar ? 1 : 0, ps.well_level || 0,
+           JSON.stringify(Object.fromEntries(Object.entries(measure(a)).map(([k, v]) => [k, Math.round(v * 10000) / 10000])))),
     db.prepare(
       `UPDATE player_state SET xp = xp + ?2, seal_nonce = ?3, seal_count = seal_count + 1, recent_sigs = ?4,
               stats = ${bump("sealed")} WHERE player_id = ?1`
@@ -181,7 +185,7 @@ function describeReward(reward) {
 
 async function visit(db, pid, _body, { now }) {
   let ps = await db.prepare(
-    `SELECT xp, stats, gifts, favour, chest_cost FROM player_state WHERE player_id = ?1`).bind(pid).first();
+    `SELECT xp, stats, gifts, favour, chest_cost, journal FROM player_state WHERE player_id = ?1`).bind(pid).first();
   let stats = parseObj(ps.stats);
   if (now - (stats.lastVisitAt || 0) >= VISIT_GAP_MS) {
     await db.prepare(
@@ -191,7 +195,7 @@ async function visit(db, pid, _body, { now }) {
   }
   const lean = leanOf({ favour: ps.favour, cost: ps.chest_cost });
   const given = parseList(ps.gifts);
-  const gift = nextGift(stats, levelOf(ps.xp), given);
+  const gift = nextGift(stats, levelOf(ps.xp), given, parseObj(ps.journal));
   if (!gift) return { gift: await daily(db, pid, stats, ps.stats, now), lean };
 
   // claim it: the list only grows from the value we read
@@ -361,11 +365,12 @@ async function forge(db, pid, body, { rand }) {
 }
 
 /* A name cut into the coin. Costs marks; clearing one is free. The name
- * goes wherever the coin goes — a duel winner inherits it. */
+ * goes wherever the coin goes. */
 async function engrave(db, pid, body) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const name = cleanName(body.name);
   if (name === null) throw new Refusal(`A name is up to ${ENGRAVE.maxLength} letters, digits or spaces`);
+  if (name && !nameAllowed(name)) throw new Refusal("The engraver will not cut that");
   const c = await db.prepare(
     `SELECT id, nickname FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`).bind(body.coinId, pid).first();
   if (!c) throw new Refusal("That coin is gone", 404);
@@ -401,6 +406,7 @@ const GAMES = {
   toss:     { coins: 1, resolve: resolveToss,     winXp: XP.gambleWin,   lossXp: XP.gambleLoss },
   crucible: { coins: 3, resolve: resolveCrucible, winXp: XP.gambleWin,   lossXp: XP.gambleLoss, sameMetal: true },
   roulette: { coins: 1, resolve: resolveRoulette, winXp: XP.rouletteWin, lossXp: XP.rouletteLoss },
+  plinko:   { coins: 1, resolve: resolvePlinko,   winXp: XP.rouletteWin, lossXp: XP.rouletteLoss },
 };
 
 async function gamble(db, pid, body, { now, rand }) {
@@ -438,7 +444,7 @@ async function gamble(db, pid, body, { now, rand }) {
     db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${bump("gambles")} WHERE player_id = ?1`).bind(pid, xp),
   ]);
   return {
-    game: body.game, won: res.won, outcome: res.outcome, sector: res.sector ?? null,
+    game: body.game, won: res.won, outcome: res.outcome, sector: res.sector ?? null, slot: res.slot ?? null, path: res.path ?? null,
     lost, kept: ids.filter(id => !lost.includes(id)), minted, xp,
   };
 }

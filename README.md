@@ -25,9 +25,9 @@ poor scroll and never states a rule.
 Around the loop: the **Forge** (reached from any coin in the vault — spend
 marks on a strike that may leave the coin shiny and never harms it, or have a
 name of your own engraved on it), deeper **inkwells** bought with marks at the
-desk, a **Journal** of every kind of coin found, a small gift on the first
-visit to the door each day, the
-**Tavern** (three coin wagers), and **Profile** (banner, title, a cabinet of
+desk, a **Journal** of every kind of coin found (milestones in it earn gifts from the goblin), a gift on the first visit to
+the door each day (a seven-day streak, with a chest on the seventh), the
+**Tavern** (four coin wagers: toss, crucible, roulette, plinko), and **Profile** (banner, title, a cabinet of
 six coins, friends).
 
 ## Three rules of the codebase
@@ -66,7 +66,7 @@ src/
   ui/            dialogs, toasts, aria-live, pixel icons
 tests/         node --test: coin golden, sigil traits, server actions, contrast
 tools/simulate.mjs   plays the loop thousands of times and prints what it pays
-migrations/    D1 migrations 001–011 · schema.sql is all of them applied
+migrations/    D1 migrations 001–012 · schema.sql is all of them applied
 ```
 
 ## Running it
@@ -83,39 +83,43 @@ behind it; use `npm run serve` (rebuild after changes) to play.
 
 ```sh
 npm run check        # lint + tests + build
-npm test             # 55 tests, no network, no browser
+npm test             # 61 tests, no network, no browser
 npm run sim          # the balance report (npm run sim -- --quick while iterating)
 ```
 
-To give a player a new PIN (it also signs them out everywhere and clears any
-lockout):
-
-```sh
-node tools/reset-pin.mjs <username> <new-pin> --remote
-```
-
-Leave off `--remote` to do it on the local database.
 
 ## Deploying
 
-The project is Cloudflare Pages + D1 (`wrangler.toml`).
-
-An existing database needs migration 009 before this branch is deployed, and
-010 at any point after:
+The project is Cloudflare Pages + D1 (`wrangler.toml`). Migrations go in
+**before** the code that needs them:
 
 ```sh
-npx wrangler d1 execute mintforge --remote --file=migrations/009_grassroots.sql
-npx wrangler d1 execute mintforge --remote --file=migrations/010_retheme_titles.sql
-npx wrangler d1 execute mintforge --remote --file=migrations/011_journal_names_wells.sql
+npx wrangler d1 export mintforge --remote --output=backup.sql      # always, first
+node tools/migrate.mjs migrations/012_tidy_and_seal_log.sql --remote
+npm run build
+npx wrangler pages deploy dist --project-name mintforge --branch main
 ```
 
-011 (names, journal, inkwells) must be applied **before** deploying code that
-reads those columns.
+`tools/migrate.mjs` runs a migration file as a `--command`, because
+`wrangler d1 execute --file` uses an import endpoint that can refuse an OAuth
+login. Either works when it works. Each migration runs once.
 
-009 only adds things. 010 rewrites stored titles from the old digging game to
-their new names; the app already shows the new names without it. Old columns and tables from removed systems (shovel,
-tarot, ore, artefacts) are left in place and no longer read. A fresh database
-takes `schema.sql` instead.
+| Migration | What it does |
+| --- | --- |
+| 009 | the grassroots loop: scrolls, chests, the pot, dusty coins, login throttle, session expiry |
+| 010 | renames the old digging-game titles in stored rows (safe to repeat) |
+| 011 | engraved names, the journal, inkwells |
+| 012 | **deletes** the duels, tarot and artefact tables and six dead columns; better indexes; the seal log |
+
+A fresh database takes `schema.sql` instead, which is all of them applied.
+
+## Tools
+
+```sh
+node tools/reset-pin.mjs <username> <new-pin> --remote   # new PIN, signs them out, clears any lockout
+node tools/seal-report.mjs --remote [--days 7]           # how real drawings score; suggests sigil thresholds
+node tools/simulate.mjs                                  # the balance report (npm run sim)
+```
 
 ## Art
 
