@@ -23,8 +23,8 @@ export default function RevealBanner({ coin, xp, onDone, doneLabel = "KEEP IT" }
         </div>
       )}
       <div className="t-big rise" style={{ color: r.color }}>{r.name}</div>
-      <div style={{ padding: 8, boxShadow: `0 0 0 2px #000, 0 0 0 4px ${r.color}` , background: "var(--stone-0)", animation: "coinEmerge .8s steps(6) both" }}>
-        <CoinCanvas coin={coin} size={192}/>
+      <div style={{ padding: 36, boxShadow: `0 0 0 2px #000, 0 0 0 4px ${r.color}` , background: "var(--stone-0)", animation: "coinEmerge .8s steps(6) both" }}>
+        <CoinCanvas coin={coin} size={192} auraMargin={12}/>
       </div>
       <div style={{ color: m.hl }}>{m.name} · {SHAPE_NAMES[coin.shape] || coin.shape}</div>
       <div>

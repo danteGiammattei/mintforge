@@ -106,11 +106,13 @@ export const SHINY_CHANCE_BY_BRUSH = [0.005, 0.015, 0.03, 0.05, 0.08];
 
 /* ─── what a coin sells for ───────────────────────────────────────────
  * value = metal base × rarity × condition × shiny.
- * Rarity used to contribute nothing (a bug); now that it does, the metal
- * bases are scaled down by the average rarity multiplier (≈1.57) so the
- * expected sale of each metal is what it was before. */
-export const METAL_BASE_VALUE = [2, 5, 13, 35, 90, 230, 575, 1500, 3800];
-export const RARITY_VALUE_MUL = [1.0, 1.6, 2.5, 4.0, 7.0, 14.0];
+ * Metal climbs about ×2.6 a step; rarity is meant to rival it, so a
+ * mythic is worth about three and a half metals up (a mythic copper
+ * outsells a common gold). The metal bases came down about a sixth when
+ * this spread went in (it was ×1 to ×14), so income rose by about a
+ * fifth rather than a half. */
+export const METAL_BASE_VALUE = [2, 4, 11, 29, 74, 190, 475, 1240, 3150];
+export const RARITY_VALUE_MUL = [1.0, 1.8, 3.2, 6.0, 12.0, 30.0];
 export const SHINY_VALUE_MUL  = 4;
 export const CONDITION_STEP   = 0.05;   // each grade below Pristine; Pristine is +15%
 

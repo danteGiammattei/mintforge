@@ -1,0 +1,195 @@
+/* ══════════════════════════════════════════════════════════════════════
+ *  aura — what a coin's rarity looks like
+ *  ────────────────────────────────────────────────────────────────────
+ *  Metal is what a coin is made of; rarity is how strange this one is.
+ *  The coin itself is frozen (lib/coin.js), so rarity is drawn as a layer
+ *  of its own around it, on the coin's 64-unit grid plus a margin, and
+ *  shown at the same whole-number scale as the coin.
+ *
+ *  It is the coin's own light, so it needs no light from the scene:
+ *    common     nothing
+ *    uncommon   a faint rim of its colour
+ *    rare       the rim, and a glint that walks round it
+ *    epic       a brighter rim, a dithered halo, three sparks in orbit
+ *    legendary  all that, and rays that turn and breathe
+ *    mythic     a burning rim, and embers that rise off it and die
+ *
+ *  Rare and above move, at 8 frames a second, all coins on one shared
+ *  clock, and only while on screen. With reduced motion they hold still.
+ * ══════════════════════════════════════════════════════════════════════ */
+
+import { drawCoin } from "./coin.js";
+import { RARITIES } from "./data.js";
+
+export const AURA_FPS = 8;
+const S = 64;
+
+/* The coin's outline: which pixels of the 64 grid the coin covers, and
+ * the rings of empty pixels around it, each in order round the centre. */
+const shapes = new Map();
+function rings(coin, M) {
+  const key = `${coin.shape}:${M}`;
+  if (shapes.has(key)) return shapes.get(key);
+  const cv = document.createElement("canvas");
+  drawCoin(cv, { ...coin, shiny: false }, S);
+  const a = cv.getContext("2d").getImageData(0, 0, S, S).data;
+  const G = S + 2 * M, inside = new Uint8Array(G * G);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (a[(y * S + x) * 4 + 3] > 96) inside[(y + M) * G + x + M] = 1;
+  // distance out from the coin, by 8-neighbour steps, up to 4
+  const dist = new Uint8Array(G * G).fill(255);
+  let front = [];
+  for (let i = 0; i < G * G; i++) if (inside[i]) { dist[i] = 0; front.push(i); }
+  for (let d = 1; d <= 4; d++) {
+    const next = [];
+    for (const i of front) {
+      const x = i % G, y = (i / G) | 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= G || ny >= G) continue;
+        const j = ny * G + nx;
+        if (dist[j] === 255) { dist[j] = d; next.push(j); }
+      }
+    }
+    front = next;
+  }
+  // and inward: the coin's own edge pixels (1) and the ones just inside (2)
+  const inner = new Uint8Array(G * G);
+  for (let pass = 1; pass <= 2; pass++) for (let i = 0; i < G * G; i++) {
+    if (dist[i] !== 0 || inner[i]) continue;
+    const x = i % G, y = (i / G) | 0;
+    let edge = false;
+    for (let dy = -1; dy <= 1 && !edge; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const j = (y + dy) * G + x + dx;
+      if (pass === 1 ? dist[j] >= 1 : inner[j] === 1) { edge = true; break; }
+    }
+    if (edge) inner[i] = pass;
+  }
+  const c = G / 2, out = [[], [], [], [], []], ins = [[], [], []];
+  for (let i = 0; i < G * G; i++) {
+    const x = i % G, y = (i / G) | 0, p = { x, y, a: Math.atan2(y - c, x - c) };
+    if (dist[i] >= 1 && dist[i] <= 4) out[dist[i]].push(p);
+    else if (inner[i]) ins[inner[i]].push(p);
+  }
+  out.forEach(r => r.sort((p, q) => p.a - q.a));
+  const res = { G, ring: out, inner: ins };
+  shapes.set(key, res);
+  return res;
+}
+
+const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const WHITE = [255, 250, 235];
+// tiny hash, so every coin's sparks and embers sit differently
+const h32 = (n) => { n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d); n = Math.imul(n ^ (n >>> 12), 0x297a2d39); return ((n ^ (n >>> 15)) >>> 0) / 4294967296; };
+
+/* Paint one frame of a coin's aura into ctx, at 1 unit = 1 pixel. The
+ * canvas is (64 + 2·margin) square, the coin sitting in the middle; the
+ * layer lies over the coin, but touches only its outermost two pixels. */
+export function paintAura(ctx, coin, rarity, frame, M = 8) {
+  const { G, ring, inner } = rings(coin, M);
+  ctx.clearRect(0, 0, G, G);
+  if (rarity <= 0) return;
+  const img = ctx.createImageData(G, G), d = img.data;
+  const put = (x, y, rgb, al) => {
+    x = Math.round(x); y = Math.round(y);
+    if (x < 0 || y < 0 || x >= G || y >= G || al <= 0) return;
+    const i = (y * G + x) * 4, a = Math.min(1, al);
+    if (a * 255 < d[i + 3]) return;                       // keep the brighter
+    d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = Math.round(a * 255);
+  };
+  const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
+  const hot = [255, 236, 170], warm = [255, 160, 70];
+  const burn = rarity === 5, beat = (frame >> 1) % 4;      // a slow 4-step pulse
+  const flick = i => h32(seed + i * 7 + (frame >> 1) * 131);
+  const fire = (i, base) => { const f = flick(i); return f > 0.75 ? hot : f > 0.4 ? warm : base; };
+
+  // the rim, and from epic up the band and haze beyond it
+  const L = {          //  rim   band  haze  far   inner
+    1: [0.5,  0,    0,    0,    0   ],
+    2: [0.8,  0.25, 0,    0,    0   ],
+    3: [1,    0.6,  0.3,  0,    0.3 ],
+    4: [1,    0.8,  0.45, 0.22, 0.45],
+    5: [1,    0.9,  0.55, 0.3,  0.55],
+  }[rarity];
+  ring[1].forEach((p, i) => put(p.x, p.y, burn ? fire(i, col) : col, L[0]));
+  ring[2].forEach((p, i) => put(p.x, p.y, burn ? fire(i + 999, col) : col, L[1] * (rarity >= 4 ? 0.85 + beat * 0.05 : 1)));
+  ring[3].forEach(p => { if ((p.x + p.y) % 2 === 0) put(p.x, p.y, col, L[2]); });
+  ring[4].forEach(p => { if (p.x % 2 === 0 && p.y % 2 === 0) put(p.x, p.y, col, L[3]); });
+  // light reaching in over the coin's own edge
+  if (L[4]) {
+    inner[1].forEach((p, i) => put(p.x, p.y, burn ? fire(i + 4242, col) : col, L[4] * (0.7 + beat * 0.1)));
+    if (rarity >= 4) inner[2].forEach(p => { if ((p.x + p.y) % 2 === 0) put(p.x, p.y, col, L[4] * 0.45); });
+  }
+
+  // a glint walking the rim, rare to legendary
+  if (rarity >= 2 && !burn) {
+    const r1 = ring[1], n = r1.length, at = (frame * (rarity >= 4 ? 3 : 2) + seed % n) % n;
+    for (let k = -3; k <= 3; k++) {
+      const p = r1[(at + k + n) % n];
+      put(p.x, p.y, mix(col, WHITE, 1 - Math.abs(k) * 0.22), 1);
+    }
+  }
+
+  // sparks in orbit, epic and legendary
+  if (rarity >= 3 && !burn) {
+    const count = rarity >= 4 ? 4 : 3;
+    for (let k = 0; k < count; k++) {
+      const R = S / 2 + 4 + (k % 2) * 2;
+      const ang = (k / count) * Math.PI * 2 + frame * 0.09 + h32(seed + k) * 0.6;
+      const x = c + Math.cos(ang) * R, y = c + Math.sin(ang) * R;
+      put(x, y, mix(col, WHITE, 0.85), 1);
+      if ((frame + k * 3) % 6 < 3) { put(x + 1, y, col, 0.8); put(x - 1, y, col, 0.8); put(x, y + 1, col, 0.8); put(x, y - 1, col, 0.8); }
+    }
+  }
+
+  // rays that turn and breathe, legendary
+  if (rarity === 4) {
+    const turn = frame * 0.035;
+    for (let k = 0; k < 8; k++) {
+      const ang = turn + (k / 8) * Math.PI * 2, len = (k % 2 ? 2 : 4) + beat;
+      for (let s = 0; s < len; s++) {
+        const R = S / 2 + 2 + s;
+        put(c + Math.cos(ang) * R, c + Math.sin(ang) * R, s < 2 ? mix(col, WHITE, 0.4) : col, 0.9 - s * 0.1);
+      }
+    }
+  }
+
+  // a mythic burns: tongues of flame lick up off its top, embers rise and die
+  if (burn) {
+    // flames stand tallest at the top and shrink down the sides
+    ring[1].forEach((p, i) => {
+      if (i % 2 || p.y > c + 4) return;
+      const up = (c + 4 - p.y) / (c + 4);                 // 0 at the sides … 1 at the top
+      const h = Math.round((1 + flick(i + 77) * 5) * (0.35 + up * 0.75));
+      const sway = Math.round(Math.sin(frame * 0.7 + i * 0.5));
+      for (let s = 1; s <= h; s++) {
+        const t = s / (h + 1);
+        put(p.x + (t > 0.5 ? sway : 0), p.y - s, t < 0.34 ? hot : t < 0.7 ? warm : col, 1 - t * 0.55);
+      }
+    });
+    const LIFE = 18, N = 30, edge = ring[1].filter(p => p.y < c + 12);
+    for (let k = 0; k < N; k++) {
+      const phase = Math.floor(h32(seed * 3 + k) * LIFE), age = (frame + phase) % LIFE;
+      const gen = Math.floor((frame + phase) / LIFE);
+      const p = edge[Math.floor(h32(seed + k * 977 + gen * 7919) * edge.length)];
+      if (!p) continue;
+      const x = p.x + Math.round(Math.sin((age + k) * 0.6) * 1.5), y = p.y - age;
+      const t = age / LIFE, rgb = t < 0.25 ? hot : t < 0.6 ? warm : col;
+      put(x, y, rgb, 1 - t * 0.8);
+      if (t < 0.5) { put(x, y + 1, t < 0.2 ? warm : col, 0.8 - t); if (k % 3 === 0) put(x + 1, y, rgb, 0.8 - t); }
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+}
+
+/* ─── the one clock ───────────────────────────────────────────────── */
+const subs = new Set();
+let timer = null, frame = 0;
+export function onAuraFrame(fn) {
+  subs.add(fn);
+  if (!timer) timer = setInterval(() => { frame++; subs.forEach(f => f(frame)); }, 1000 / AURA_FPS);
+  return () => { subs.delete(fn); if (!subs.size) { clearInterval(timer); timer = null; } };
+}
+export const auraFrame = () => frame;
+export const auraStill = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;

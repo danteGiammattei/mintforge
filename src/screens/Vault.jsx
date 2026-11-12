@@ -26,7 +26,7 @@ export function CoinTile({ coin, selected, pinned, disabled, onClick, label }) {
   const m = METALS[coin.metalIdx], r = RARITIES[coinRarity(coin)];
   return (
     <button className="tile" aria-pressed={selected ? true : undefined} disabled={disabled} onClick={onClick}
-            style={{ borderTopColor: r.color }}
+            style={{ borderTopColor: r.color, ...(r.id >= 4 && !selected ? { background: `radial-gradient(circle at 50% 38%, ${r.glow}, transparent 70%), var(--stone-1)` } : {}) }}
             aria-label={label || `${r.name} ${m.name} coin, ${coinName(coin)}${coin.shiny ? ", shiny" : ""}${coin.locked ? ", locked" : ""}`}>
       <CoinCanvas coin={coin} size={64}/>
       <span aria-hidden style={{ color: m.hl, maxWidth: "100%", overflowWrap: "anywhere", textAlign: "center", lineHeight: 1.25 }}>{coinName(coin)}</span>

@@ -1,10 +1,11 @@
 import { useRef, useEffect } from "react";
 import { drawCoin } from "../lib/coin.js";
+import Aura from "./Aura.jsx";
 
 /* A coin, painted by the one generator in lib/coin.js. Pass a `size`
  * that is a multiple of 64 (the generator's own canvas) wherever the
  * layout allows, so its pixels land whole. */
-export default function CoinCanvas({ coin, size, hideShine = false }) {
+export default function CoinCanvas({ coin, size, hideShine = false, aura = true, auraMargin = 8 }) {
   const canvasRef = useRef();
   const shiny = coin.shiny && !hideShine;
 
@@ -16,6 +17,7 @@ export default function CoinCanvas({ coin, size, hideShine = false }) {
   return (
     <div style={{ position: "relative", width: size, height: size, display: "inline-block", flexShrink: 0 }}>
       <canvas ref={canvasRef} aria-hidden style={{ imageRendering: "pixelated", display: "block", width: size, height: size }}/>
+      {aura && <Aura coin={coin} size={size} margin={auraMargin}/>}
       {shiny && (
         <div aria-hidden style={{
           position: "absolute", inset: 0, borderRadius: "50%",
