@@ -3,6 +3,7 @@ import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
 import { mount, SURROUND } from "../scenes/door.js";
+import { useCelebrate, giftToReward } from "../components/Reward.jsx";
 import { RARITY } from "../../shared/sigil.js";
 import { CHESTS } from "../../shared/tuning.js";
 
@@ -17,7 +18,9 @@ const GIFT_LINE = {
 };
 
 export default function Door() {
-  const g = useGame(), ui = useUi();
+  const g = useGame(), ui = useUi(), celebrate = useCelebrate();
+  const cel = useRef(celebrate);
+  cel.current = celebrate;
   const ref = useRef(null), scene = useRef(null), live = useRef(g);
   live.current = g;
 
@@ -29,6 +32,9 @@ export default function Door() {
       visit: () => live.current.act("visit"),
       say: ui.say, feel,
       received: what => {
+        // a lasting reward gets its moment; a chest or the day's pouch is a line
+        const reward = !what.daily && giftToReward(what);
+        if (reward) { cel.current(reward); return; }
         const name = what.name || (CHESTS.names[what.tier] + " CHEST");
         const line = (GIFT_LINE[what.type] || GIFT_LINE.chest)({ ...what, name });
         ui.toast(what.daily ? `DAY ${what.streak}. ${line}` : line, what.type === "chest" ? "" : "magic");

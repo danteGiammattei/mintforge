@@ -4,12 +4,13 @@ import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
 import { mount, SURROUND } from "../scenes/scribe.js";
 import { SCRIBE } from "../../shared/tuning.js";
+import { useCelebrate } from "../components/Reward.jsx";
 
 /* The scribe's desk. The scene owns its canvas and its loop; this hands
  * it a bus into game state and mirrors its three buttons as real ones
  * for anyone not using a pointer. */
 export default function Scribe() {
-  const g = useGame(), ui = useUi();
+  const g = useGame(), ui = useUi(), celebrate = useCelebrate();
   const ref = useRef(null), scene = useRef(null), live = useRef(g);
   live.current = g;
 
@@ -23,7 +24,7 @@ export default function Scribe() {
       return;
     }
     if (!(await ui.confirm({ title: next.name, body: `HOLDS ${next.ink} INK, UP FROM ${cur.inkMax}. ${next.cost.toLocaleString()} OF YOUR ${cur.marks.toLocaleString()} MARKS.`, yes: "BUY IT" }))) return;
-    try { const r = await cur.act("well"); feel("gift"); ui.toast(`${r.name}. A SHEET NOW TAKES ${r.ink} INK.`); }
+    try { const r = await cur.act("well"); celebrate({ kind: "well", level: r.level }); }
     catch (e) { ui.toast(e.message, "bad"); feel("error"); }
   };
   const buyRef = useRef(buyWell);

@@ -200,3 +200,5 @@ canvas { image-rendering: pixelated; }
 .grid-coins { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; }
 .row    { display: flex; align-items: center; gap: 8px; }
 .between { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+@keyframes burst { 0% { transform: translate(0, 0); opacity: 1; } 70% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }

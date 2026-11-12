@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameContext } from "./lib/GameContext.js";
 import { useGameState } from "./state/useGameState.js";
-import { OverlayProvider, useUi } from "./ui/Overlay.jsx";
-import { feel } from "./lib/feel.js";
+import { OverlayProvider } from "./ui/Overlay.jsx";
 import { TITLES, TITLE_LEVELS, FRAMES } from "./lib/data.js";
+import { RewardHost, useCelebrate } from "./components/Reward.jsx";
 import AuthScreen from "./components/AuthScreen.jsx";
 import BottomNav, { TABS } from "./components/BottomNav.jsx";
 import TopBar from "./components/TopBar.jsx";
@@ -38,6 +38,21 @@ function Splash({ children }) {
   );
 }
 
+/* A level gained gets its own moment, listing anything it unlocked. */
+function LevelWatch({ level }) {
+  const celebrate = useCelebrate(), seen = useRef(level);
+  useEffect(() => {
+    const was = seen.current; seen.current = level;
+    if (level <= was) return;
+    celebrate({
+      kind: "level", level,
+      titles: TITLES.filter((_, i) => TITLE_LEVELS[i] > was && TITLE_LEVELS[i] <= level),
+      frames: Object.entries(FRAMES).filter(([, f]) => !f.premium && f.minLvl > was && f.minLvl <= level).map(([id]) => id),
+    });
+  }, [level, celebrate]);
+  return null;
+}
+
 function Game({ game }) {
   // A new player starts at the door, where the first chest is waiting.
   const [tab, setTabRaw] = useState(() => {
@@ -52,16 +67,6 @@ function Game({ game }) {
   }, []);
   useEffect(() => { document.title = `${TABS.find(t => t[0] === tab)?.[2] || ""} · MintForge`; }, [tab]);
 
-  // A level gained is said out loud, along with anything it unlocked.
-  const ui = useUi(), seenLevel = useRef(game.level);
-  useEffect(() => {
-    const was = seenLevel.current; seenLevel.current = game.level;
-    if (game.level <= was) return;
-    feel("gift");
-    ui.toast(`LEVEL ${game.level}`, "magic");
-    TITLES.forEach((t, i) => { if (TITLE_LEVELS[i] > was && TITLE_LEVELS[i] <= game.level) ui.toast(`NEW TITLE: ${t}`); });
-    Object.values(FRAMES).forEach(f => { if (!f.premium && f.minLvl > was && f.minLvl <= game.level) ui.toast(`NEW BANNER: ${f.lbl}`); });
-  }, [game.level, ui]);
 
   const ctx = useMemo(() => ({ ...game, tab, setTab }), [game, tab, setTab]);
   const Screen = SCREENS[tab] || Scribe;
@@ -69,6 +74,8 @@ function Game({ game }) {
 
   return (
     <GameContext.Provider value={ctx}>
+      <RewardHost>
+      <LevelWatch level={game.level}/>
       <div className="app">
         <a className="sr-only" href="#main">Skip to the game</a>
         {!BARE.has(tab) && <TopBar marks={game.marks} level={game.level} xp={game.xp} onRetry={game.retrySaves}/>}
@@ -77,6 +84,7 @@ function Game({ game }) {
         </main>
         <BottomNav tab={tab} setTab={setTab} badges={{ satchel: waiting }}/>
       </div>
+      </RewardHost>
     </GameContext.Provider>
   );
 }
