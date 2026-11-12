@@ -1,7 +1,8 @@
 import { json, bad, getAuth } from "../_utils.js";
 import { currentTitle } from "../../../src/lib/data.js";
 import { journalOut } from "../../../server/state.js";
-import { journalCounts } from "../../../shared/economy.js";
+import { journalCounts, cabinetScore } from "../../../shared/economy.js";
+import { deriveRarity } from "../../../src/lib/coin.js";
 
 /* GET /api/users/:username
    The public profile of a player — bio, title, level, frame and the
@@ -66,6 +67,7 @@ export async function onRequestGet({ request, env, params }) {
     coinCount: allCoins.length,
     shinyCount: allCoins.filter(c => c.shiny).length,
     kinds,
+    cabinet: cabinetScore(showcase.map(c => ({ metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity ?? deriveRarity(c.seed >>> 0) }))),
     showcase: showcase.map(c => ({
       id: c.id, seed: c.seed >>> 0, metalIdx: c.metal_idx, shiny: !!c.shiny,
       ...(c.rarity != null ? { rarity: c.rarity } : {}),

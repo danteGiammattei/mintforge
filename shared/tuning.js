@@ -224,3 +224,24 @@ export const AUTH = {
   regLockMs: 12 * 3600e3,
 };
 
+
+/* ─── the cabinet's score ─────────────────────────────────────────────
+ * What the six coins on show are worth to a collector, which is mostly
+ * how rare they are: points by rarity, a little more for a finer metal
+ * (+25% a step, so an astral counts ×3), double for a shine. Six common
+ * astrals score 18; one mythic copper scores 150. The grades are for
+ * the profile; each is reached by a cabinet of roughly that rarity. */
+export const CABINET_SCORE = {
+  slots: 6,
+  rarity: [1, 3, 8, 20, 50, 150],
+  perMetal: 0.25,
+  shiny: 2,
+  grades: [
+    [0,    "AN EMPTY SHELF"],
+    [20,   "A FEW CURIOS"],
+    [80,   "A FINE CABINET"],
+    [250,  "A COLLECTOR'S CABINET"],
+    [700,  "A LEGENDARY HOARD"],
+    [1600, "A MYTHIC HOARD"],
+  ],
+};

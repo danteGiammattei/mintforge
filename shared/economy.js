@@ -11,7 +11,7 @@
 
 import {
   FAVOUR_PER_RARITY, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
-  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE,
+  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE,
 } from "./tuning.js";
 
 export const MAX_METAL = 8;
@@ -233,4 +233,22 @@ export function nameAllowed(name) {
   // single letters spaced out ("F U C K") are read as one word
   const spaced = words.every(w => w.length === 1) ? [joined] : [];
   return ![...words, ...spaced, joined].some(w => WORDS.includes(w));
+}
+
+/* ─── the cabinet's score ─────────────────────────────────────────── */
+
+/* One coin's points; `coin` is { metalIdx, rarity, shiny }. */
+export function cabinetPoints(coin) {
+  const S = CABINET_SCORE, r = Math.max(0, Math.min(MAX_RARITY, coin?.rarity ?? 0));
+  return Math.round(S.rarity[r] * (1 + S.perMetal * (coin?.metalIdx || 0)) * (coin?.shiny ? S.shiny : 1));
+}
+
+/* The cabinet's score (its first six coins; gaps count nothing), its
+ * grade, and the score the next grade needs (null at the top). */
+export function cabinetScore(coins) {
+  const S = CABINET_SCORE;
+  const score = (coins || []).slice(0, S.slots).reduce((s, c) => s + (c ? cabinetPoints(c) : 0), 0);
+  let g = 0;
+  while (g + 1 < S.grades.length && score >= S.grades[g + 1][0]) g++;
+  return { score, grade: S.grades[g][1], rank: g, from: S.grades[g][0], next: S.grades[g + 1]?.[0] ?? null };
 }

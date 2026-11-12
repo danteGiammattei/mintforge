@@ -2,14 +2,14 @@ import { useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel, isMuted, setMuted } from "../lib/feel.js";
-import { unlockedTitles, rune } from "../lib/coin.js";
-import { journalCounts } from "../../shared/economy.js";
+import { unlockedTitles, rune, coinRarity } from "../lib/coin.js";
+import { journalCounts, cabinetScore } from "../../shared/economy.js";
 import { FRAMES, METALS, PREMIUM_TITLE_BY_ID, TITLES, TITLE_LEVELS, BRUSH_UPS } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
 import CoinModal from "../components/CoinModal.jsx";
 import PixelBanner from "../components/PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
-import Friends, { TitleText } from "./Friends.jsx";
+import Friends, { TitleText, CabinetScore } from "./Friends.jsx";
 import { CoinTile } from "./Vault.jsx";
 
 /* ─── PROFILE ─────────────────────────────────────────────────────────────
@@ -23,6 +23,7 @@ function Cabinet({ g }) {
   const [slot, setSlot] = useState(null);         // picking a coin for this slot
   const [open, setOpen] = useState(null);         // { coin, slot }
   const slots = Array.from({ length: g.maxPins }, (_, i) => g.showcase[i] || null);
+  const cab = cabinetScore(slots.map(c => c && { metalIdx: c.metalIdx, rarity: coinRarity(c), shiny: c.shiny }));
   const reset = async () => {
     if (await ui.confirm({ title: "RESET THE CABINET?", body: "IT WILL SHOW YOUR SIX BEST COINS AGAIN.", yes: "RESET" })) g.setPinnedIds(null);
   };
@@ -32,6 +33,7 @@ function Cabinet({ g }) {
         <h2 className="t-title" style={{ margin: 0 }}>CABINET</h2>
         {g.pinnedIds != null ? <button className="btn btn-ghost" onClick={reset}>RESET</button> : <span className="t-label">YOUR BEST SIX</span>}
       </div>
+      <div style={{ marginBottom: 12 }}><CabinetScore cab={cab}/></div>
       <div className="grid-3">
         {slots.map((c, i) => c
           ? <CoinTile key={c.id} coin={c} onClick={() => setOpen({ coin: c, slot: i })}/>

@@ -608,3 +608,18 @@ test("player search uses the username index", () => {
   const plan = db.raw.prepare(`EXPLAIN QUERY PLAN SELECT id FROM players WHERE username LIKE ?1 COLLATE NOCASE`).all("ale%").map(r => r.detail).join(" ");
   assert.match(plan, /USING (COVERING )?INDEX/);
 });
+
+test("cabinet score: rarity counts most, six coins, grades in order", async () => {
+  const { cabinetScore, cabinetPoints } = await import("../shared/economy.js");
+  const commonAstral = { metalIdx: 8, rarity: 0, shiny: false };
+  const mythicCopper = { metalIdx: 0, rarity: 5, shiny: false };
+  assert.ok(cabinetPoints(mythicCopper) > 6 * cabinetPoints(commonAstral));
+  assert.equal(cabinetPoints({ ...mythicCopper, shiny: true }), 2 * cabinetPoints(mythicCopper));
+  assert.equal(cabinetScore([]).grade, "AN EMPTY SHELF");
+  const seven = Array(7).fill(mythicCopper);
+  assert.equal(cabinetScore(seven).score, 6 * 150);
+  assert.equal(cabinetScore([null, mythicCopper]).score, 150);
+  const top = cabinetScore(Array(6).fill({ metalIdx: 8, rarity: 5, shiny: true }));
+  assert.equal(top.next, null);
+  assert.equal(top.grade, "A MYTHIC HOARD");
+});
