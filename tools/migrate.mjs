@@ -21,11 +21,12 @@ const [file, ...flags] = process.argv.slice(2);
 if (!file) { console.error("usage: node tools/migrate.mjs <file.sql> [--remote]"); process.exit(1); }
 const remote = flags.includes("--remote");
 
+// \r?\n: on Windows git checks files out with CRLF line endings
 const sql = readFileSync(file, "utf8")
-  .split("\n").map(l => l.replace(/--.*$/, "").trimEnd()).filter(Boolean).join("\n").trim();
+  .split(/\r?\n/).map(l => l.replace(/--.*$/, "").trimEnd()).filter(Boolean).join("\n").trim();
 const count = sql.split(";").filter(s => s.trim()).length;
 
 console.log(`Running ${count} statement${count === 1 ? "" : "s"} from ${file} on the ${remote ? "PRODUCTION" : "local"} database…`);
 const wrangler = join(dirname(createRequire(import.meta.url).resolve("wrangler/package.json")), "bin", "wrangler.js");
-execFileSync(process.execPath, [wrangler, "d1", "execute", "mintforge", remote ? "--remote" : "--local", "--yes", "--command", sql], { stdio: "inherit" });
+execFileSync(process.execPath, [wrangler, "d1", "execute", "mintforge", remote ? "--remote" : "--local", "--yes", `--command=${sql}`], { stdio: "inherit" });
 console.log("Done.");

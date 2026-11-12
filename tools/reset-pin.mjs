@@ -41,7 +41,7 @@ console.log(`Resetting the PIN for ${username} on the ${remote ? "PRODUCTION" : 
 // Run the project's own wrangler with this same Node, and no shell between:
 // a shell (cmd.exe in particular) would split the SQL into words.
 const wrangler = join(dirname(createRequire(import.meta.url).resolve("wrangler/package.json")), "bin", "wrangler.js");
-const out = execFileSync(process.execPath, [wrangler, "d1", "execute", "mintforge", remote ? "--remote" : "--local", "--command", sql, "--json"],
+const out = execFileSync(process.execPath, [wrangler, "d1", "execute", "mintforge", remote ? "--remote" : "--local", `--command=${sql}`, "--json"],
   { encoding: "utf8", stdio: ["inherit", "pipe", "inherit"] });
 
 let found = false;

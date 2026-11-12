@@ -31,7 +31,7 @@ const TARGET = 0.15;
 const wrangler = join(dirname(createRequire(import.meta.url).resolve("wrangler/package.json")), "bin", "wrangler.js");
 const since = days ? Date.now() - days * 86400e3 : 0;
 const out = execFileSync(process.execPath, [wrangler, "d1", "execute", "mintforge", remote ? "--remote" : "--local", "--json",
-  "--command", `SELECT player_id, rarity, traits, bumped, familiar, well_level, m FROM seal_log WHERE created_at >= ${since}`],
+  `--command=SELECT player_id, rarity, traits, bumped, familiar, well_level, m FROM seal_log WHERE created_at >= ${since}`],
   { encoding: "utf8", stdio: ["inherit", "pipe", "inherit"], maxBuffer: 256 * 1024 * 1024 });
 const rows = JSON.parse(out)[0].results.map(r => ({ ...r, m: JSON.parse(r.m) }));
 if (!rows.length) { console.log("No seals logged yet."); process.exit(0); }
