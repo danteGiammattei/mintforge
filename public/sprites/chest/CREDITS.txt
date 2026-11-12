@@ -1,0 +1,11 @@
+Wooden chest by Frakassets — https://frakassets.itch.io/
+Licensed CC BY 4.0 (see LICENSE.txt). https://creativecommons.org/licenses/by/4.0/
+
+Used here: the 32px "scroller" sheets — flat colours (chest-albedo.png, was
+wooden-chest_32px_scroller_no-outline_unlit.png) and normal map
+(chest-normal.png, was wooden-chest_32px_scroller_normal.png).
+
+Changes made in MintForge, at run time (src/lib/chestArt.js): the four flat
+colours are replaced per chest tier (wooden, iron, gilded, obsidian, void),
+and each frame is lit with the game's own light rigs from the normal map,
+then quantised to six tones.

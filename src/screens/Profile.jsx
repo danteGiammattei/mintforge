@@ -172,6 +172,9 @@ function You({ g }) {
           <PixelIcon name={muted ? "mute" : "sound"} size={11}/>SOUND AND HAPTICS: {muted ? "OFF" : "ON"}
         </button>
         <button className="btn btn-ghost btn-block" onClick={signOut}>SIGN OUT</button>
+        <p className="t-label" style={{ margin: 0, textAlign: "center" }}>
+          CHEST ART: <span className="t-plain">“Wooden chest” by Frakassets</span>, CC BY 4.0
+        </p>
       </section>
     </>
   );

@@ -15,6 +15,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { chestParts, CHEST, dirtClod } from "../lib/forms.js";
+import { chestClosed, chestOpening, CHEST_FRAME, OPEN_FRAMES } from "../lib/chestArt.js";
 import { CHESTS } from "../../shared/tuning.js";
 import { stage, FONT, INK, lerp, ease, feather } from "./kit.js";
 
@@ -34,6 +35,10 @@ export function mount(cv, bus, { tier = 0 } = {}) {
   const plot = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, w | 0, h | 0); };
   const { body, lid } = chestParts(tier, "candle");
   const bx = Math.round((CW - CHEST.w * SC) / 2), by = 92;
+  // the drawn chest, when its sheets are loaded: 32px frames at a whole 4×,
+  // standing on the same table line as the procedural one
+  const drawn = !!chestClosed(tier, "candle"), DS = 4;
+  const dyBase = by + CHEST.h * SC - CHEST_FRAME * DS + 6;
   let alive = true;
 
   function frame() {
@@ -57,6 +62,7 @@ export function mount(cv, bus, { tier = 0 } = {}) {
 
     const shake = (S.phase === "hold" && S.held && !view.calm) ? Math.round(Math.sin(S.t * 1.3) * S.p * 2) : 0;
     const x = bx + shake;
+    const dx = Math.round((CW - CHEST_FRAME * DS) / 2) + shake, dy = dyBase;
 
     // what is inside shows first as light through the seam
     const strain = S.phase === "hold" ? S.p : Math.max(0, 1 - S.anim / 50);
@@ -67,14 +73,24 @@ export function mount(cv, bus, { tier = 0 } = {}) {
       ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
     }
 
-    ctx.drawImage(body, x, by, CHEST.w * SC, CHEST.h * SC);
-    let lidY = by, lidA = 1;
-    if (S.phase !== "hold" && !S.failed) { const k = ease(Math.min(1, S.anim / 34)); lidY = by - Math.round(k * 46); lidA = 1 - k; }
-    if (lidA > 0.02) { ctx.globalAlpha = lidA; ctx.drawImage(lid, x, lidY, CHEST.w * SC, CHEST.lidH * SC); ctx.globalAlpha = 1; }
-    if (S.phase === "hold" && S.p > 0.3) {                 // the seam, splitting
-      ctx.globalAlpha = Math.min(1, (S.p - 0.3) * 1.6);
-      plot(x + 12, by + CHEST.lidH * SC - 3, CHEST.w * SC - 24, 3, "#ecc46e");
-      ctx.globalAlpha = 1;
+    if (drawn) {
+      // held: the lid rattles harder as the seal strains (the first open
+      // frames are the rattle); broken: it flies up at 12 frames a second
+      let f = null;
+      if (S.phase === "hold") f = S.held && S.p > 0.35 && !view.calm ? chestOpening(tier, "candle", ((S.t >> 2) % 3) + (S.p > 0.75 ? 1 : 0)) : chestClosed(tier, "candle");
+      else if (S.failed) f = chestClosed(tier, "candle");
+      else f = chestOpening(tier, "candle", Math.min(OPEN_FRAMES - 1, Math.floor(S.anim / (view.calm ? 1 : 5))));
+      ctx.drawImage(f, dx, dy, CHEST_FRAME * DS, CHEST_FRAME * DS);
+    } else {
+      ctx.drawImage(body, x, by, CHEST.w * SC, CHEST.h * SC);
+      let lidY = by, lidA = 1;
+      if (S.phase !== "hold" && !S.failed) { const k = ease(Math.min(1, S.anim / 34)); lidY = by - Math.round(k * 46); lidA = 1 - k; }
+      if (lidA > 0.02) { ctx.globalAlpha = lidA; ctx.drawImage(lid, x, lidY, CHEST.w * SC, CHEST.lidH * SC); ctx.globalAlpha = 1; }
+      if (S.phase === "hold" && S.p > 0.3) {               // the seam, splitting
+        ctx.globalAlpha = Math.min(1, (S.p - 0.3) * 1.6);
+        plot(x + 12, by + CHEST.lidH * SC - 3, CHEST.w * SC - 24, 3, "#ecc46e");
+        ctx.globalAlpha = 1;
+      }
     }
 
     // dust thrown up when it gives
@@ -86,8 +102,9 @@ export function mount(cv, bus, { tier = 0 } = {}) {
 
     // and the coin, which is all dirt
     if (S.phase !== "hold" && S.coin) {
-      const k = ease(Math.min(1, Math.max(0, (S.anim - 30) / 50)));
-      if (S.anim > 30) {
+      const rise = drawn ? (view.calm ? 12 : 52) : 30;   // once the lid is up
+      const k = ease(Math.min(1, Math.max(0, (S.anim - rise) / 50)));
+      if (S.anim > rise) {
         const sp = dirtClod(S.coin.seed);
         ctx.drawImage(sp, Math.round(CW / 2 - sp.width * SC / 2), Math.round(lerp(by + 30, by - 56, k)), sp.width * SC, sp.height * SC);
       }

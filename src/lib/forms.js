@@ -25,6 +25,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { capsule, joint, box, digit, merge, place, raster, sprite, quantise, LIGHT, RAMP } from "./pixelform.js";
+import { chestClosed } from "./chestArt.js";
 
 /* ─── the goblin's hand ───────────────────────────────────────────────
  * Authored from a photograph: a forearm running in from the left and
@@ -339,8 +340,11 @@ export function chestParts(tier = 0, light = "candle") {
     return { body, lid };
   });
 }
-/* The chest shut, as one sprite. */
+/* The chest shut, as one sprite: the Frakassets chest (lib/chestArt.js)
+ * once its sheets have loaded, this procedural one if they never do. */
 export function chest(tier = 0, light = "candle") {
+  const drawn = chestClosed(tier, light);
+  if (drawn) return drawn;
   return sprite(`chest-shut:${tier}:${light}`, () => {
     const { body, lid } = chestParts(tier, light);
     const cv = document.createElement("canvas"); cv.width = CHEST.w; cv.height = CHEST.h;

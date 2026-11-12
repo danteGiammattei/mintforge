@@ -137,6 +137,13 @@ Each scene names its light at the top of its file and shades to it:
 | Scribe, Satchel, chest | One candle, low and left, **in front**. Warm, falls off hard. |
 | Forge | A bed of coals, low and right, **in front**. Orange, and the only light. |
 
+The one exception is the chest: "Wooden chest" by
+[Frakassets](https://frakassets.itch.io/), CC BY 4.0 (credited in Profile;
+terms in `public/sprites/chest/`). It ships as flat colours plus a normal map,
+so `src/lib/chestArt.js` relights every frame with the scenes' own rigs and
+swaps its four colours to make the five tiers. It obeys the same rule as
+everything else.
+
 HTML screens follow the scenes: one dark palette, Silkscreen for every word,
 hard square edges, pixel icons (`src/ui/icons.js`), no emoji.
 

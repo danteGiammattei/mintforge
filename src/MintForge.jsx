@@ -4,6 +4,7 @@ import { useGameState } from "./state/useGameState.js";
 import { OverlayProvider, useUi } from "./ui/Overlay.jsx";
 import { TITLES, TITLE_LEVELS, FRAMES } from "./lib/data.js";
 import { RewardHost, useCelebrate } from "./components/Reward.jsx";
+import { loadChestArt } from "./lib/chestArt.js";
 import AuthScreen from "./components/AuthScreen.jsx";
 import BottomNav, { TABS } from "./components/BottomNav.jsx";
 import TopBar from "./components/TopBar.jsx";
@@ -106,6 +107,10 @@ function Game({ game }) {
 export default function MintForge() {
   const game = useGameState();
   const { boot } = game;
+  // the chest's sheets are small; wait for them (or for them to fail) so
+  // every chest drawn is the same one
+  const [art, setArt] = useState(false);
+  useEffect(() => { loadChestArt().finally(() => setArt(true)); }, []);
 
   let body;
   if (boot.status === "anon") body = <AuthScreen onAuthed={game.onAuthed}/>;
@@ -117,7 +122,7 @@ export default function MintForge() {
       <button className="btn btn-ghost" style={{ minWidth: 200 }} onClick={game.signOut}>SIGN OUT</button>
     </Splash>
   );
-  else if (boot.status !== "ready" || !game.snap) body = <Splash><p className="t-dim blink" role="status" style={{ margin: 0 }}>OPENING THE VAULT</p></Splash>;
+  else if (boot.status !== "ready" || !game.snap || !art) body = <Splash><p className="t-dim blink" role="status" style={{ margin: 0 }}>OPENING THE VAULT</p></Splash>;
   else body = <Game game={game}/>;
 
   return <OverlayProvider>{body}</OverlayProvider>;
