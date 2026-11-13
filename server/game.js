@@ -21,13 +21,14 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { analyse, rollScroll, measure, TRAITS, cravingOn } from "../shared/sigil.js";
-import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL } from "../shared/tuning.js";
+import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
   resolveToss, resolveCrucible, resolveRoulette, resolvePlinko, forgeCost,
-  inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz,
+  inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz, placeAstral,
 } from "../shared/economy.js";
+import { heldSigns } from "./signs.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
@@ -289,15 +290,24 @@ async function open(db, pid, body, { now, rand }) {
     `DELETE FROM chests WHERE id = ?1 AND player_id = ?2 RETURNING tier`).bind(body.chestId, pid).first();
   if (!ch) throw new Refusal("That chest is gone", 404);
   const ps = await db.prepare(`SELECT brush_level FROM player_state WHERE player_id = ?1`).bind(pid).first();
-  const c = rollCoin(ch.tier, ps.brush_level || 0, rand);
+  const rolled = rollCoin(ch.tier, ps.brush_level || 0, rand);
   const id = "c_" + randomHex(8);
-  await db.batch([
-    db.prepare(
-      `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material)
-       VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, 1, ?8)`
-    ).bind(id, pid, c.seed, c.metalIdx, c.shiny ? 1 : 0, c.rarity, now, c.material || null),
-    db.prepare(`UPDATE player_state SET xp = xp + ?2 WHERE player_id = ?1`).bind(pid, XP.open),
-  ]);
+  // an astral coin takes a sign its owner lacks (and if two chests race
+  // for the last free one, the index refuses the second: pick again)
+  let c;
+  for (let tries = 0; ; tries++) {
+    c = placeAstral(rolled, await heldSigns(db, pid), rand);
+    try {
+      await db.batch([
+        db.prepare(
+          `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material, sign)
+           VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, 1, ?8, ?9)`
+        ).bind(id, pid, c.seed, c.metalIdx, c.shiny ? 1 : 0, c.rarity, now, c.material || null, c.sign ?? null),
+        db.prepare(`UPDATE player_state SET xp = xp + ?2 WHERE player_id = ?1`).bind(pid, XP.open),
+      ]);
+      break;
+    } catch (e) { if (tries >= 2 || !/UNIQUE/i.test(String(e?.message))) throw e; }
+  }
   return { tier: ch.tier, coin: { id, seed: c.seed, metalIdx: c.metalIdx, shiny: c.shiny, locked: false, rarity: c.rarity }, xp: XP.open };
 }
 
@@ -305,7 +315,7 @@ async function brush(db, pid, body, { now }) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const c = await db.prepare(
     `UPDATE coins SET dusty = 0, acquired_at = ?3 WHERE id = ?1 AND player_id = ?2 AND dusty = 1
-     RETURNING id, seed, metal_idx, shiny, locked, rarity, material`
+     RETURNING id, seed, metal_idx, shiny, locked, rarity, material, sign`
   ).bind(body.coinId, pid, now).first();
   if (!c) throw new Refusal("That coin is already clean", 404);
   const xp = xpForBrush({ rarity: c.rarity, metalIdx: c.metal_idx, shiny: !!c.shiny });
@@ -444,16 +454,19 @@ async function gamble(db, pid, body, { now, rand }) {
   // if someone else got to a staked coin first, nothing is minted
   if (del.meta.changes !== lost.length) throw new Refusal("A staked coin is locked or gone", 409);
 
+  const held = res.make.includes(ASTRAL.metal) ? await heldSigns(db, pid) : new Set();
   const minted = res.make.map(m => {
     const seed = u32(rand);
-    return { id: "c_" + randomHex(8), seed, metalIdx: m, shiny: false, locked: false, rarity: deriveRarity(seed) };
+    const c = placeAstral({ id: "c_" + randomHex(8), seed, metalIdx: m, shiny: false, locked: false, rarity: deriveRarity(seed) }, held, rand);
+    if (c.sign != null) held.add(c.sign);
+    return c;
   });
   const xp = res.won ? g.winXp : g.lossXp;
   await db.batch([
     ...minted.map(c => journalStmt(db, pid, c)),
     ...minted.map(c => db.prepare(
-      `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty)
-       VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, ?6, 0)`).bind(c.id, pid, c.seed, c.metalIdx, c.rarity, now)),
+      `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign)
+       VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, ?6, 0, ?7)`).bind(c.id, pid, c.seed, c.metalIdx, c.rarity, now, c.sign ?? null)),
     db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${bump("gambles")} WHERE player_id = ?1`).bind(pid, xp),
   ]);
   return {

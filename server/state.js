@@ -12,7 +12,8 @@
 
 import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay } from "../shared/economy.js";
 import { cravingOn } from "../shared/sigil.js";
-import { SCRIBE } from "../shared/tuning.js";
+import { SCRIBE, ASTRAL } from "../shared/tuning.js";
+import { heldSigns } from "./signs.js";
 import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
 
@@ -24,6 +25,7 @@ export const coinOut = r => ({
   ...(r.rarity != null ? { rarity: r.rarity } : {}),
   ...(r.nickname ? { nick: r.nickname } : {}),
   ...(r.material ? { material: r.material } : {}),
+  ...(r.sign != null ? { sign: r.sign } : {}),
 });
 
 /* The journal as stored, topped up with what the player holds right now —
@@ -43,6 +45,25 @@ export function journalOut(stored, coins) {
   return { c, m, shiny: Math.max(j.shiny || 0, shinyHeld), best: j.best || 0 };
 }
 
+/* Astral coins from before the signs (migration 016) get one each, the
+ * oldest first, from the signs the player does not hold; any beyond
+ * twelve stay unsigned. Done once, the first time their owner loads. */
+async function signOldAstrals(db, pid, rows) {
+  const bare = rows.filter(r => r.metal_idx === ASTRAL.metal && r.sign == null);
+  if (!bare.length) return;
+  const held = await heldSigns(db, pid);
+  const free = ASTRAL.signs.map((_, i) => i).filter(i => !held.has(i));
+  const stmts = [];
+  for (const r of [...bare].reverse()) {                      // rows are newest first
+    if (!free.length) break;
+    const s = free.splice((r.seed >>> 0) % free.length, 1)[0];
+    r.sign = s;
+    stmts.push(db.prepare(`UPDATE coins SET sign = ?3 WHERE player_id = ?1 AND id = ?2 AND sign IS NULL`).bind(pid, r.id, s));
+  }
+  try { if (stmts.length) await db.batch(stmts); }
+  catch { for (const r of bare) r.sign = null; }               // a race: try again next load
+}
+
 export async function loadState(db, pid, now = Date.now(), tz = 0) {
   const ps = await db.prepare(
     `SELECT players.username, s.xp, s.marks, s.brush_level, s.frame, s.bio, s.selected_title, s.pinned_ids,
@@ -54,11 +75,12 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   if (!ps) throw new Refusal("State missing — your account may need recreating", 500);
 
   const [coins, scrolls, chests] = await Promise.all([
-    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
+    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material, sign FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
     db.prepare(`SELECT id, rarity, seed FROM scrolls WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
     db.prepare(`SELECT id, tier FROM chests WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
   ]);
   const all = coins.results || [];
+  await signOldAstrals(db, pid, all);
   const stats = parseObj(ps.stats);
   delete stats.lastVisitAt;
   const daily = stats.daily || {};

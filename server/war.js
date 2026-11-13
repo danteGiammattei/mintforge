@@ -19,7 +19,8 @@
  *  both have picked, so walking away can never dodge a decided loss.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { WAR } from "../shared/tuning.js";
+import { WAR, ASTRAL } from "../shared/tuning.js";
+import { heldSigns } from "./signs.js";
 import { MAX_RARITY } from "../shared/economy.js";
 import { deriveRarity } from "../src/lib/coin.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
@@ -55,21 +56,22 @@ export function dealRound(deck, hp, gp, war) {
 const pickOk = v => Number.isInteger(v) && v >= 0 && v < WAR.fan;
 
 const coinJson = `json_object('id', id, 'seed', seed, 'metal_idx', metal_idx, 'shiny', shiny,
-  'rarity', COALESCE(rarity, ?R), 'nickname', nickname, 'acquired_at', acquired_at, 'material', material)`;
+  'rarity', COALESCE(rarity, ?R), 'nickname', nickname, 'acquired_at', acquired_at, 'material', material, 'sign', sign)`;
 const parse = s => { try { return JSON.parse(s); } catch { return null; } };
 const coinOut = c => c && ({
   id: c.id, seed: c.seed >>> 0, metalIdx: c.metal_idx, shiny: !!c.shiny, locked: false, rarity: c.rarity,
   ...(c.nickname ? { nick: c.nickname } : {}),
   ...(c.material ? { material: c.material } : {}),
+  ...(c.sign != null ? { sign: c.sign } : {}),
 });
 const rarityOf = row => row.rarity ?? deriveRarity(row.seed >>> 0);
 
 /* A coin coming out of escrow into `owner`'s vault. */
 const release = (db, t, side, owner, nonce, now) => db.prepare(
-  `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, nickname, material)
+  `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, nickname, material, sign)
    SELECT json_extract(${side}_coin, '$.id'), ?3, json_extract(${side}_coin, '$.seed'), json_extract(${side}_coin, '$.metal_idx'),
           json_extract(${side}_coin, '$.shiny'), 0, json_extract(${side}_coin, '$.rarity'), ?4, 0, json_extract(${side}_coin, '$.nickname'),
-          json_extract(${side}_coin, '$.material')
+          json_extract(${side}_coin, '$.material'), json_extract(${side}_coin, '$.sign')
      FROM war_tables WHERE id = ?1 AND settle = ?2 AND ${side}_coin IS NOT NULL`
 ).bind(t.id, nonce, owner, now);
 
@@ -116,9 +118,10 @@ async function invite(db, pid, body, now) {
   if (!g) throw new Refusal("You can only challenge a friend", 403);
   if (g.id === pid) throw new Refusal("You cannot play yourself");
   if (await busy(db, pid)) throw new Refusal("You are already at a table", 409);
-  const c = await db.prepare(`SELECT id, seed, rarity, locked, dusty FROM coins WHERE id = ?1 AND player_id = ?2`).bind(body.coinId, pid).first();
+  const c = await db.prepare(`SELECT id, seed, rarity, locked, dusty, sign FROM coins WHERE id = ?1 AND player_id = ?2`).bind(body.coinId, pid).first();
   if (!c || c.dusty) throw new Refusal("That coin is not yours to stake", 404);
   if (c.locked) throw new Refusal("That coin is locked", 409);
+  if (c.sign != null && (await heldSigns(db, g.id)).has(c.sign)) throw new Refusal(`${friend} already holds ${ASTRAL.signs[c.sign]}`, 409);
 
   const id = "w_" + randomHex(8);
   const [put] = await db.batch([
@@ -139,9 +142,13 @@ async function join(db, pid, body, now, rand) {
   if (t.guest_id !== pid || t.status !== "invited" || t.expires_at <= now) throw new Refusal("That challenge has lapsed", 409);
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   if (await busy(db, pid, t.id)) throw new Refusal("You are already at a table", 409);
-  const c = await db.prepare(`SELECT id, seed, rarity, locked, dusty FROM coins WHERE id = ?1 AND player_id = ?2`).bind(body.coinId, pid).first();
+  const c = await db.prepare(`SELECT id, seed, rarity, locked, dusty, sign FROM coins WHERE id = ?1 AND player_id = ?2`).bind(body.coinId, pid).first();
   if (!c || c.dusty) throw new Refusal("That coin is not yours to stake", 404);
   if (c.locked) throw new Refusal("That coin is locked", 409);
+  // nobody may win a star sign they already hold
+  const hostSign = parse(t.host_coin)?.sign;
+  if (c.sign != null && (await heldSigns(db, t.host_id)).has(c.sign)) throw new Refusal(`They already hold ${ASTRAL.signs[c.sign]}`, 409);
+  if (hostSign != null && (await heldSigns(db, pid)).has(hostSign)) throw new Refusal(`You already hold ${ASTRAL.signs[hostSign]}`, 409);
   const need = parse(t.host_coin)?.rarity ?? 0;
   if (rarityOf(c) < need) throw new Refusal("Your coin must be at least as rare as theirs", 409);
 

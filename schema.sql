@@ -55,10 +55,12 @@ CREATE TABLE IF NOT EXISTS coins (
   dusty           INTEGER NOT NULL DEFAULT 0,         -- fresh from a chest, not yet brushed
   nickname        TEXT,                               -- engraved at the forge
   material        TEXT,                               -- a twin in another material (migration 015)
+  sign            INTEGER,                            -- an astral coin's star sign, 0-11 (migration 016)
   PRIMARY KEY (player_id, id),
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS coins_player_time_idx ON coins(player_id, acquired_at);
+CREATE UNIQUE INDEX IF NOT EXISTS coins_one_sign_idx ON coins(player_id, sign) WHERE sign IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS sessions (
   token           TEXT    PRIMARY KEY,

@@ -20,8 +20,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 015 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql"]);
+test("migrations 009 and 011 to 016 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -652,4 +652,43 @@ test("materials: about one coin in fifteen is its tier's twin, worth more, and c
   assert.equal(r.result.coin.material, "lava");
   assert.equal(r.state.journal.m.lava, 1);
   assert.equal(r.state.coins.find(c => c.id === "c_m").material, "lava");
+});
+
+test("astral signs: never two of one, all twelve closes the sky, old coins get signs", async () => {
+  const { placeAstral } = await import("../shared/economy.js");
+  const { ASTRAL } = await import("../shared/tuning.js");
+  const R = seeded(8);
+  const held = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.equal(placeAstral({ metalIdx: 8 }, held, R).sign, 11, "the one sign left");
+  held.add(11);
+  const full = placeAstral({ metalIdx: 8 }, held, R);
+  assert.equal(full.metalIdx, ASTRAL.instead); assert.equal(full.sign, null);
+  assert.equal(placeAstral({ metalIdx: 3 }, new Set(), R).sign, null, "only astral coins carry signs");
+
+  // fourteen astral coins from before the signs: twelve get distinct signs, two stay bare
+  const { db, pid } = await world();
+  for (let i = 0; i < 14; i++)
+    await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?1, ?2, ?3, 8, 0, 0, 0, ?4, 0)`)
+      .bind(`c_a${i}`, pid, 500 + i * 37, i).run();
+  const st = await driver(db, pid, seeded(1))("visit", {}).then(r => r.state).catch(async () => (await import("../server/state.js")).loadState(db, pid));
+  const signs = st.coins.filter(c => c.metalIdx === 8).map(c => c.sign).filter(s => s != null);
+  assert.equal(signs.length, 12); assert.equal(new Set(signs).size, 12);
+  // and the database itself refuses a second Cancer
+  const cancer = st.coins.find(c => c.sign === 3);
+  await assert.rejects(db.prepare(`UPDATE coins SET sign = 3 WHERE player_id = ?1 AND sign IS NULL AND metal_idx = 8`).bind(pid).run());
+  assert.ok(cancer);
+});
+
+test("war: nobody can win a star sign they already hold", async () => {
+  const { warMove } = await import("../server/war.js");
+  const db = makeDb();
+  const { register } = await import("../server/auth.js");
+  const a = (await register(db, { username: "stargazer", pin: "4821", ip: "1.1.1.1", now: 1e9 })).body.player.id;
+  const b = (await register(db, { username: "astronomer", pin: "4821", ip: "1.1.1.2", now: 1e9 })).body.player.id;
+  await db.prepare(`INSERT INTO friends (player_id, friend_id, created_at) VALUES (?1, ?2, 0)`).bind(a, b).run();
+  const put = (pid, id, sign) => db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES (?1, ?2, 77, 8, 0, 0, 2, 0, 0, ?3)`).bind(id, pid, sign).run();
+  await put(a, "c_cancer", 3); await put(b, "c_cancer2", 3); await put(a, "c_leo", 4);
+  await assert.rejects(warMove(db, a, { op: "invite", friend: "astronomer", coinId: "c_cancer" }, { now: 1e9 + 1 }), /already holds Cancer/);
+  const { result: { tableId } } = await warMove(db, a, { op: "invite", friend: "astronomer", coinId: "c_leo" }, { now: 1e9 + 1 });
+  await assert.rejects(warMove(db, b, { op: "join", tableId, coinId: "c_cancer2" }, { now: 1e9 + 2, rand: seeded(1) }), /already hold Cancer/);
 });

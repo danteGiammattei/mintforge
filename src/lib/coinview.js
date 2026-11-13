@@ -3,6 +3,7 @@
  * decided or was told: shine, lock, rarity, and an engraved name. */
 import { mkCoin } from "./coin.js";
 import { METALS, MATERIALS } from "./data.js";
+import { ASTRAL } from "../../shared/tuning.js";
 
 export function hydrate(row) {
   const c = mkCoin(row.seed, 1, row.metalIdx);
@@ -10,6 +11,7 @@ export function hydrate(row) {
   if (typeof row.rarity === "number") c.rarity = row.rarity;
   if (row.nick) c.nick = row.nick;
   if (row.material && MATERIALS[row.material]) c.material = row.material;
+  if (row.sign != null && ASTRAL.signs[row.sign]) c.sign = row.sign;
   return c;
 }
 
@@ -17,6 +19,7 @@ export function hydrate(row) {
  * a colour to write that in. */
 export function matterOf(c) {
   const mat = c.material && MATERIALS[c.material];
+  if (c.metalIdx === ASTRAL.metal && c.sign != null) return { name: `${METALS[c.metalIdx].name} ${ASTRAL.signs[c.sign]}`, hl: METALS[c.metalIdx].hl, material: false, sign: c.sign };
   return mat ? { name: mat.name, hl: mat.glows?.[0] || mat.ramp[6], material: true } : { name: METALS[c.metalIdx].name, hl: METALS[c.metalIdx].hl, material: false };
 }
 

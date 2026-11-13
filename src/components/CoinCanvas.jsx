@@ -34,7 +34,7 @@ export default function CoinCanvas({ coin, size, hideShine = false, aura = true,
     io.observe(cv);
     return () => { io.disconnect(); off?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coin.seed, coin.metalIdx, coin.material, coin.shape, shiny, size, turns, drifts]);
+  }, [coin.seed, coin.metalIdx, coin.material, coin.sign, coin.shape, shiny, size, turns, drifts]);
 
   return (
     <div style={{ position: "relative", width: size, height: size, display: "inline-block", flexShrink: 0 }}>

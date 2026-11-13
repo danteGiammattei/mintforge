@@ -15,7 +15,7 @@
  * ════════════════════════════════════════════════════════════════════════ */
 
 import {
-  METALS, MATERIALS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
+  METALS, MATERIALS, CONSTELLATIONS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
   RARITIES,   TITLES, TITLE_LEVELS,
 } from "./data.js";
 import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP, MATERIAL } from "../../shared/tuning.js";
@@ -289,7 +289,7 @@ const GRAIN = {
 const painted = new Map();
 export const SPACE_LOOP = 16;                 // frames in the void's loop
 function paintCoin(coin, back = false, phase = 0) {
-  const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.shiny ? 1 : 0}:${back ? 1 : 0}:${phase}`;
+  const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.sign ?? ""}:${coin.shiny ? 1 : 0}:${back ? 1 : 0}:${phase}`;
   if (painted.has(key)) return painted.get(key);
   const out = paintFresh(coin, back, phase);
   if (painted.size > 900) painted.delete(painted.keys().next().value);
@@ -358,6 +358,29 @@ function paintFresh(coin, back, phase) {
     }
     if (t >= 7 && glows[t - 7]) { set(x, y, glows[t - 7]); continue; }
     set(x, y, R[Math.max(0, Math.min(6, t))]);
+  }
+  // an astral coin's star sign: its constellation, laid over the field
+  const con = coin.metalIdx === 8 && coin.sign != null && !back ? CONSTELLATIONS[coin.sign] : null;
+  if (con) {
+    // star-chart ink: deep blue lines, stars white with blue points
+    const INK = [44, 58, 128], POINT = [80, 120, 220], STAR = [255, 255, 255];
+    const at = ([u, v]) => [Math.round(13 + u * 38), Math.round(13 + v * 38)];
+    // the lines cross the face too (a shade lighter where they do), so the
+    // sign reads whole
+    const onField = (x, y) => inside(x, y, r - 6);
+    for (const [a, b] of con.lines) {
+      const [x0, y0] = at(con.stars[a]), [x1, y1] = at(con.stars[b]);
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 1; i < n; i++) {
+        const x = Math.round(x0 + ((x1 - x0) * i) / n), y = Math.round(y0 + ((y1 - y0) * i) / n);
+        if (onField(x, y)) set(x, y, faceAt(x, y) === 1 ? POINT : INK);
+      }
+    }
+    for (const st of con.stars) {
+      const [x, y] = at(st);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inside(x + dx, y + dy, r - 5)) set(x + dx, y + dy, POINT);
+      set(x, y, STAR);
+    }
   }
   g.putImageData(img, 0, 0);
   if (coin.shiny) shine(g, coin);

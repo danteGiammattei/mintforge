@@ -282,3 +282,15 @@ export const MATERIAL = {
   valueMul: 1.6,
   byTier: [null, null, "ice", null, null, "lava", null, null, null],
 };
+
+/* ─── astral: the twelve signs ────────────────────────────────────────
+ * Every astral coin carries one of the twelve signs, its constellation on
+ * its face. A player never holds two of one sign: a new astral coin
+ * takes a sign they lack, and once they hold all twelve, no more astral
+ * coins come (that roll is eldritch instead). Selling or losing one frees
+ * its sign. Enforced by a unique index (migration 016). */
+export const ASTRAL = {
+  metal: 8,
+  instead: 7,
+  signs: ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"],
+};

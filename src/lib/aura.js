@@ -17,6 +17,9 @@
  *  An Eldritch coin is never quite still: tentacles curl off its rim
  *  and sway, dark as the deep, edged with its own sick green light.
  *
+ *  An astral coin has a small moon in orbit, on a tilted path: in front
+ *  of the coin for half its round, hidden behind it for the other half.
+ *
  *  A shiny coin also catches the light: a glint sweeps across its face
  *  every few seconds and small stars twinkle on it, held to the coin's
  *  own pixels, whatever its shape.
@@ -94,10 +97,10 @@ const h32 = (n) => { n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d); n = Math.imul(n 
 /* Paint one frame of a coin's aura into ctx, at 1 unit = 1 pixel. The
  * canvas is (64 + 2·margin) square, the coin sitting in the middle; the
  * layer lies over the coin, but touches only its outermost two pixels. */
-export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendrils = false) {
+export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendrils = false, moon = false) {
   const { G, ring, inner, face, inside } = rings(coin, M);
   ctx.clearRect(0, 0, G, G);
-  if (rarity <= 0 && !shine && !tendrils) return;
+  if (rarity <= 0 && !shine && !tendrils && !moon) return;
   if (rarity === 5 && !auraStill() && turnAt(coin, frame)) return;
   const img = ctx.createImageData(G, G), d = img.data;
   const put = (x, y, rgb, al) => {
@@ -109,7 +112,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
-  if (rarity <= 0) { if (tendrils) paintTendrils(put, G, M, seed, frame); ctx.putImageData(img, 0, 0); return; }
+  if (rarity <= 0) { if (tendrils) paintTendrils(put, G, M, seed, frame); if (moon) paintMoon(put, G, M, inside, seed, frame); ctx.putImageData(img, 0, 0); return; }
   const hot = [255, 236, 170], warm = [255, 160, 70];
   const burn = rarity === 5, beat = (frame >> 1) % 4;      // a slow 4-step pulse
   const flick = i => h32(seed + i * 7 + (frame >> 1) * 131);
@@ -193,6 +196,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   }
 
   if (tendrils) paintTendrils(put, G, M, seed, frame);
+  if (moon) paintMoon(put, G, M, inside, seed, frame);
   ctx.putImageData(img, 0, 0);
 }
 
@@ -231,6 +235,32 @@ function paintTendrils(put, G, M, seed, frame) {
     if (w >= 1) put(x - 1, y - 1, T_LIT, 1);
     if (w >= 1 && i % 4 === 1) put(x - 1, y - w, T_GLINT, 1);
   });
+}
+
+/* The astral moon: a round of 64 frames (8 s), on an ellipse tipped a
+ * little off level. The near half of its path crosses in front of the
+ * coin; on the far half, wherever the coin is, the moon is hidden. Lit
+ * from the left, with a short fading trail behind it. */
+const MOON = { lit: [236, 244, 255], mid: [168, 186, 222], dark: [90, 106, 150], rim: [24, 32, 64] };
+function paintMoon(put, G, M, inside, seed, frame) {
+  const c = G / 2, rx = 31 + M / 2, ry = 13, tilt = -0.32, ROUND = 64;
+  const at = f => {
+    const th = (f / ROUND) * Math.PI * 2 + (seed % 628) / 100;
+    const ex = Math.cos(th) * rx, ey = Math.sin(th) * ry;
+    return { x: c + ex * Math.cos(tilt) - ey * Math.sin(tilt), y: c + ex * Math.sin(tilt) + ey * Math.cos(tilt), near: Math.sin(th) > 0 };
+  };
+  const hidden = (x, y, near) => !near && x >= 0 && y >= 0 && x < G && y < G && inside[y * G + x] === 0;
+  for (let k = 4; k >= 1; k--) {                                 // the trail
+    const p = at(frame - k * 0.6), x = Math.round(p.x), y = Math.round(p.y);
+    if (!hidden(x, y, p.near)) put(x, y, MOON.mid, 0.5 - k * 0.1);
+  }
+  const p = at(frame), mx = Math.round(p.x), my = Math.round(p.y);
+  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+    const d2 = dx * dx + dy * dy, x = mx + dx, y = my + dy;
+    if (d2 > 17 || hidden(x, y, p.near)) continue;
+    const col = d2 > 11 ? MOON.rim : dx <= -1 ? MOON.lit : dx <= 1 ? MOON.mid : MOON.dark;
+    put(x, y, col, 1);
+  }
 }
 
 /* A shiny's light: a glint band sweeping corner to corner across the

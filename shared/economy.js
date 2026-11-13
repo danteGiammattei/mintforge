@@ -11,7 +11,7 @@
 
 import {
   FAVOUR_PER_RARITY, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
-  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL,
+  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL, ASTRAL,
 } from "./tuning.js";
 
 export const MAX_METAL = 8;
@@ -253,4 +253,16 @@ export function cabinetScore(coins) {
   let g = 0;
   while (g + 1 < S.grades.length && score >= S.grades[g + 1][0]) g++;
   return { score, grade: S.grades[g][1], rank: g, from: S.grades[g][0], next: S.grades[g + 1]?.[0] ?? null };
+}
+
+/* ─── astral signs ────────────────────────────────────────────────── */
+
+/* A coin about to be made, given the signs its owner already holds: an
+ * astral coin takes a sign they lack, or, if they hold all twelve, it
+ * comes as the tier below. Anything else passes untouched. */
+export function placeAstral(coin, held, rand) {
+  if (coin.metalIdx !== ASTRAL.metal) return { ...coin, sign: null };
+  const free = ASTRAL.signs.map((_, i) => i).filter(i => !held.has(i));
+  if (!free.length) return { ...coin, metalIdx: ASTRAL.instead, sign: null, material: MATERIAL.byTier[ASTRAL.instead] && coin.material ? coin.material : null };
+  return { ...coin, sign: free[Math.floor(rand() * free.length)] };
 }

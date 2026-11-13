@@ -1,5 +1,6 @@
 import { useGame } from "../lib/GameContext.js";
 import { METALS, RARITIES, MATERIALS } from "../lib/data.js";
+import { ASTRAL } from "../../shared/tuning.js";
 import CoinCanvas from "./CoinCanvas.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { LEDGER_MARKS } from "../../shared/economy.js";
@@ -92,6 +93,34 @@ export default function Journal() {
         </div>
         <p className="t-label" style={{ margin: 0 }}>NOW AND THEN A SILVER COIN COMES OUT OF ICE, OR AN OBSIDIAN ONE OUT OF LAVA. EACH IS WORTH A LITTLE MORE.</p>
       </section>
+
+      {/* the twelve signs: which this player holds right now */}
+      {(() => {
+        const held = new Map([...g.coins, ...(g.dusty || [])].filter(c => c.metalIdx === ASTRAL.metal && c.sign != null).map(c => [c.sign, c]));
+        return (
+          <section className="panel" style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }} aria-label="The twelve signs">
+            <div className="between"><span className="t-label">THE TWELVE</span><span className="t-label">{held.size} / 12</span></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+              {ASTRAL.signs.map((name, i) => {
+                const c = held.get(i);
+                return (
+                  <div key={name} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: 4,
+                                           border: `2px solid ${c ? METALS[ASTRAL.metal].hl : "var(--line)"}`, background: c ? "var(--stone-3)" : "var(--stone-0)" }}
+                       aria-label={c ? `${name}: held` : `${name}: not held`}>
+                    {c ? <CoinCanvas coin={c} size={64} aura={false} still/>
+                       : <div style={{ width: 64, height: 64, display: "grid", placeItems: "center" }} className="t-label" aria-hidden>?</div>}
+                    <span className="t-label" style={{ color: c ? METALS[ASTRAL.metal].hl : "var(--mute)" }}>{name.toUpperCase()}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="t-label" style={{ margin: 0 }}>
+              {held.size >= 12 ? "ALL TWELVE ARE YOURS. NO MORE ASTRAL COINS WILL COME, UNLESS ONE LEAVES YOU."
+                               : "EVERY ASTRAL COIN BEARS A SIGN YOU DO NOT HOLD. HOLD ALL TWELVE AND THE SKY CLOSES."}
+            </p>
+          </section>
+        );
+      })()}
 
       <p className="t-label" style={{ margin: 0, textAlign: "center" }}>
         {everything ? <>{everything.toLocaleString()} COINS CLEANED OR WON, ALL TOLD.</> : <>NOTHING YET. BRUSH A COIN CLEAN AND IT IS WRITTEN HERE.</>}
