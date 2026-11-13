@@ -14,7 +14,7 @@ import {
   SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL, ASTRAL,
 } from "./tuning.js";
 
-export const MAX_METAL = 8;
+export const MAX_METAL = 10;
 export const MAX_RARITY = 5;
 export const MAX_CHEST = CHESTS.cost.length - 1;
 

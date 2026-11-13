@@ -14,24 +14,24 @@ export const METALS = [
   { name:"Bronze",  base:"#9a7240", mid:"#7a5428", dark:"#3a2010", hl:"#d4a060", eng:"#6a4218", accent:"#9a7240", flash:"rgba(154,114,64,.18)", rarity:"Uncommon" },
   { name:"Silver",  base:"#aabccc", mid:"#7890a2", dark:"#38506a", hl:"#d8eaf8", eng:"#304858", accent:"#aabccc", flash:"rgba(150,185,215,.18)",rarity:"Rare" },
   { name:"Gold",    base:"#d4a017", mid:"#a87800", dark:"#503800", hl:"#ffe878", eng:"#6a5000", accent:"#d4a017", flash:"rgba(212,160,23,.22)", rarity:"Epic" },
-  { name:"Platinum",base:"#c0d8e8", mid:"#8ab0c8", dark:"#304860", hl:"#e8f4ff", eng:"#283848", accent:"#90c0e0", flash:"rgba(160,200,230,.22)",rarity:"Legendary" },
+  { name:"Ice",     base:"#7ccaf4", mid:"#2f94d4", dark:"#0a2c48", hl:"#e8f8ff", eng:"#0c4a78", accent:"#52b6ec", flash:"rgba(124,202,244,.22)",rarity:"Legendary" },
   { name:"Obsidian",base:"#5a1890", mid:"#380a60", dark:"#0e0020", hl:"#c060ff", eng:"#e090ff", accent:"#7a28b0", flash:"rgba(120,20,220,.2)",  rarity:"Mythic" },
+  { name:"Lava",    base:"#7e2c16", mid:"#55180c", dark:"#1a0604", hl:"#ffb030", eng:"#ff8a1a", accent:"#d8301a", flash:"rgba(255,120,30,.22)", rarity:"Molten" },
+  { name:"Fire",    base:"#e86a1c", mid:"#a82c0c", dark:"#2a0802", hl:"#ffe070", eng:"#6a1404", accent:"#ff8a1a", flash:"rgba(255,170,40,.26)", rarity:"Blazing" },
   { name:"Void",    base:"#0e1040", mid:"#090920", dark:"#020208", hl:"#7070f8", eng:"#a0a0ff", accent:"#3030c0", flash:"rgba(50,50,220,.22)", rarity:"Transcendent" },
   { name:"Eldritch",base:"#2a5a3a", mid:"#0e3a1a", dark:"#021a08", hl:"#80ffb0", eng:"#5af090", accent:"#1aa050", flash:"rgba(80,255,160,.24)",rarity:"Eldritch" },
   { name:"Astral",  base:"#f0e8d0", mid:"#a89060", dark:"#605030", hl:"#fff8a0", eng:"#806010", accent:"#f0c840", flash:"rgba(255,240,160,.28)",rarity:"Celestial" },
 ];
-export const MAX_TIER = 8;
+export const MAX_TIER = 10;
+/* the metals by name, for the places that treat one specially */
+export const METAL = { copper: 0, bronze: 1, silver: 2, gold: 3, ice: 4, obsidian: 5, lava: 6, fire: 7, void: 8, eldritch: 9, astral: 10 };
 /* ─── MATERIALS ───────────────────────────────────────────────────────────
- * Two metal tiers have a rare twin made of something else: silver's in
- * ice, obsidian's in lava. The same tier and value band, a different
- * look. Ramps run outline → glint (seven steps), `eng` colours the cut-in
- * parts of the face, `tex` is its grain (lib/coin.js GRAIN), `glows` the
- * colours of anything that burns, hottest first. */
-export const MATERIALS = {
-  ice:  { tier: 2, name: "Ice",  tex: "ice",  eng: "#0c4a78", ramp: ["#0a2c48", "#1a6aa4", "#2f94d4", "#52b6ec", "#7ccaf4", "#b4e6fc", "#ffffff"] },
-  lava: { tier: 5, name: "Lava", tex: "lava", eng: "#ff8a1a", ramp: ["#1a0604", "#3a0e08", "#55180c", "#6a2210", "#7e2c16", "#96401e", "#b8582c"],
-          glows: ["#ffd84a", "#ff8a1a", "#d8301a"] },
-};
+ * Rare twins of a metal in another material. There are none just now:
+ * ice and lava, the two there were, became metals of their own in the
+ * ladder of November 2026 (migration 017). The plumbing stays for the
+ * next ones. Shape: { tier, name, tex, eng, ramp[7], glows? }. */
+export const MATERIALS = {};
+
 /* ─── THE TWELVE ──────────────────────────────────────────────────────────
  * Each astral coin carries a star sign (shared/tuning.js ASTRAL), drawn on
  * its face as its constellation: stars at these points (0…1 across the

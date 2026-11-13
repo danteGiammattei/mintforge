@@ -99,6 +99,7 @@ node tools/migrate.mjs migrations/013_war.sql --remote
 node tools/migrate.mjs migrations/014_war_picks.sql --remote
 node tools/migrate.mjs migrations/015_materials.sql --remote
 node tools/migrate.mjs migrations/016_astral_signs.sql --remote
+node tools/migrate.mjs migrations/017_new_ladder.sql --remote
 node tools/cards.mjs path/to/Jorels_Card_Pack.zip                  # once per machine
 npm run build
 npx wrangler pages deploy dist --project-name mintforge --branch main
@@ -118,6 +119,7 @@ login. Either works when it works. Each migration runs once.
 | 014 | war: which card of the fan each player picked |
 | 015 | materials: silver's twin in ice, obsidian's in lava |
 | 016 | astral signs: each astral coin a star sign, never two of one per player |
+| 017 | the new ladder: Ice for Platinum, Lava and Fire added (marks itself; safe to run twice) |
 
 The playing cards for war are Jorel's Card Pack, whose licence allows them
 in the game but not in this public repo, so `public/sprites/cards/` is

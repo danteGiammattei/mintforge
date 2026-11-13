@@ -20,8 +20,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 016 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql"]);
+test("migrations 009 and 011 to 017 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -321,11 +321,11 @@ test("crucible wants three of one metal; losing keeps exactly one", async () => 
 
 test("roulette: locked coins cannot be staked, the top metal does not overflow", async () => {
   const { db, pid } = await world();
-  coin(db, pid, "locked", 3, 1); coin(db, pid, "top", 8);
+  coin(db, pid, "locked", 3, 1); coin(db, pid, "top", 10);
   await refuses(driver(db, pid, seeded(1))("gamble", { game: "roulette", coinIds: ["locked"] }), 409);
   const r = await driver(db, pid, scripted(0.95))("gamble", { game: "roulette", coinIds: ["top"] });   // up2
   assert.equal(r.result.outcome, "up2");
-  assert.equal(r.result.minted[0].metalIdx, 8);
+  assert.equal(r.result.minted[0].metalIdx, 10);
 });
 
 /* ─── retries ─────────────────────────────────────────────────────── */
@@ -350,7 +350,7 @@ test("a retried request with the same op id is answered once", async () => {
 test("the vault endpoint refuses fabricated coins and balances", async () => {
   const { db, token, pid } = await world();
   const env = { DB: db };
-  const fake = { id: "c_fake", seed: 1, metalIdx: 8, rarity: 5, shiny: true };
+  const fake = { id: "c_fake", seed: 1, metalIdx: 10, rarity: 5, shiny: true };
   for (const body of [{ add: [fake] }, { state: { marks: 999999 } }, { state: { xp: 1e9 } }, { state: { brushLevel: 4 } },
                       { state: { ownedFrames: ["astrarium"] } }, { remove: ["x"] }]) {
     const r = await vaultPost({ request: post(token, body), env });
@@ -565,7 +565,7 @@ test("plinko follows the path it reports, and its odds are the board's", async (
   // every bounce right: the far edge, a jackpot
   const jp = await driver(db, pid, () => 0.9)("gamble", { game: "plinko", coinIds: ["a"] });
   assert.deepEqual([jp.result.path.join(""), jp.result.slot, jp.result.outcome], ["11111111", 8, "jackpot"]);
-  assert.equal(jp.result.minted[0].metalIdx, 8);
+  assert.equal(jp.result.minted[0].metalIdx, 10);
   const mid = await driver(db, pid, scripted(0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9))("gamble", { game: "plinko", coinIds: ["b"] });
   assert.deepEqual([mid.result.slot, mid.result.outcome, mid.result.minted.length], [4, "same", 1]);
   const odds = plinkoOdds();
@@ -611,7 +611,7 @@ test("player search uses the username index", () => {
 
 test("cabinet score: rarity counts most, six coins, grades in order", async () => {
   const { cabinetScore, cabinetPoints } = await import("../shared/economy.js");
-  const commonAstral = { metalIdx: 8, rarity: 0, shiny: false };
+  const commonAstral = { metalIdx: 10, rarity: 0, shiny: false };
   const mythicCopper = { metalIdx: 0, rarity: 5, shiny: false };
   assert.ok(cabinetPoints(mythicCopper) > 6 * cabinetPoints(commonAstral));
   assert.equal(cabinetPoints({ ...mythicCopper, shiny: true }), 2 * cabinetPoints(mythicCopper));
@@ -619,39 +619,27 @@ test("cabinet score: rarity counts most, six coins, grades in order", async () =
   const seven = Array(7).fill(mythicCopper);
   assert.equal(cabinetScore(seven).score, 6 * 3750);
   assert.equal(cabinetScore([null, mythicCopper]).score, 3750);
-  const top = cabinetScore(Array(6).fill({ metalIdx: 8, rarity: 5, shiny: true }));
+  const top = cabinetScore(Array(6).fill({ metalIdx: 10, rarity: 5, shiny: true }));
   assert.equal(top.next, null);
   assert.equal(top.grade, "A MYTHIC HOARD");
 });
 
-test("materials: about one coin in fifteen is its tier's twin, worth more, and counted in the journal", async () => {
-  const { rollCoin } = await import("../shared/economy.js");
-  const { MATERIAL } = await import("../shared/tuning.js");
-  const { MATERIALS } = await import("../src/lib/data.js");
-  const { coinValue, mkCoin } = await import("../src/lib/coin.js");
-  // the rule's list and the drawings agree, one twin per tier
-  assert.deepEqual(MATERIAL.byTier.filter(Boolean), Object.keys(MATERIALS));
-  MATERIAL.byTier.forEach((id, tier) => id && assert.equal(MATERIALS[id].tier, tier));
-
-  const R = seeded(21);
-  let mat = 0, N = 0;
-  for (let i = 0; i < 30000; i++) {
-    const c = rollCoin(i % 5, 0, R);
-    if (c.material) assert.equal(c.material, MATERIAL.byTier[c.metalIdx]);
-    if (MATERIAL.byTier[c.metalIdx]) { N++; if (c.material) mat++; }
-  }
-  assert.ok(Math.abs(mat / N - MATERIAL.chance) < 0.015, `twins ${mat / N}`);
-
-  const plain = Object.assign(mkCoin(4242, 1, 3), { rarity: 2 });
-  assert.ok(Math.abs(coinValue({ ...plain, material: "ice" }) - coinValue(plain) * MATERIAL.valueMul) <= 1);
-
-  const { db, pid } = await world();
-  await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material)
-                    VALUES ('c_m', ?1, 99, 5, 0, 0, 1, 0, 1, 'lava')`).bind(pid).run();
-  const r = await driver(db, pid, seeded(4))("brush", { coinId: "c_m" });
-  assert.equal(r.result.coin.material, "lava");
-  assert.equal(r.state.journal.m.lava, 1);
-  assert.equal(r.state.coins.find(c => c.id === "c_m").material, "lava");
+test("migration 017 moves the ladder once, twins and journals and war coins with it", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { db: d, pid } = await world();
+  d.raw.exec(`DELETE FROM migration_marks`);                     // as if 017 never ran
+  const put = (id, m, mat) => d.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material) VALUES (?, ?, 1, ?, 0, 0, 1, 0, 0, ?)`).run(id, pid, m, mat);
+  put("c_void", 6, null); put("c_eld", 7, null); put("c_ast", 8, null); put("c_plat", 4, null); put("c_ice", 2, "ice"); put("c_lava", 5, "lava");
+  d.raw.prepare(`UPDATE player_state SET journal = ? WHERE player_id = ?`).run(JSON.stringify({ c: { "6:1": 2, "8:5": 1, "3:0": 4 }, m: { ice: 1 }, shiny: 0, best: 9 }), pid);
+  const sql = readFileSync("migrations/017_new_ladder.sql", "utf8");
+  d.raw.exec(sql); d.raw.exec(sql);                                // twice, on purpose
+  const m = id => ({ ...d.raw.prepare(`SELECT metal_idx, material FROM coins WHERE id = ?`).get(id) });
+  assert.deepEqual([m("c_void").metal_idx, m("c_eld").metal_idx, m("c_ast").metal_idx, m("c_plat").metal_idx], [8, 9, 10, 4]);
+  assert.deepEqual(m("c_ice"), { metal_idx: 4, material: null });
+  assert.deepEqual(m("c_lava"), { metal_idx: 6, material: null });
+  const j = JSON.parse(d.raw.prepare(`SELECT journal FROM player_state WHERE player_id = ?`).get(pid).journal);
+  assert.deepEqual(j.c, { "8:1": 2, "10:5": 1, "3:0": 4 });
+  assert.equal(j.m, undefined); assert.equal(j.best, 9);
 });
 
 test("astral signs: never two of one, all twelve closes the sky, old coins get signs", async () => {
@@ -659,23 +647,23 @@ test("astral signs: never two of one, all twelve closes the sky, old coins get s
   const { ASTRAL } = await import("../shared/tuning.js");
   const R = seeded(8);
   const held = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-  assert.equal(placeAstral({ metalIdx: 8 }, held, R).sign, 11, "the one sign left");
+  assert.equal(placeAstral({ metalIdx: 10 }, held, R).sign, 11, "the one sign left");
   held.add(11);
-  const full = placeAstral({ metalIdx: 8 }, held, R);
+  const full = placeAstral({ metalIdx: 10 }, held, R);
   assert.equal(full.metalIdx, ASTRAL.instead); assert.equal(full.sign, null);
   assert.equal(placeAstral({ metalIdx: 3 }, new Set(), R).sign, null, "only astral coins carry signs");
 
   // fourteen astral coins from before the signs: twelve get distinct signs, two stay bare
   const { db, pid } = await world();
   for (let i = 0; i < 14; i++)
-    await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?1, ?2, ?3, 8, 0, 0, 0, ?4, 0)`)
+    await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?1, ?2, ?3, 10, 0, 0, 0, ?4, 0)`)
       .bind(`c_a${i}`, pid, 500 + i * 37, i).run();
   const st = await driver(db, pid, seeded(1))("visit", {}).then(r => r.state).catch(async () => (await import("../server/state.js")).loadState(db, pid));
-  const signs = st.coins.filter(c => c.metalIdx === 8).map(c => c.sign).filter(s => s != null);
+  const signs = st.coins.filter(c => c.metalIdx === 10).map(c => c.sign).filter(s => s != null);
   assert.equal(signs.length, 12); assert.equal(new Set(signs).size, 12);
   // and the database itself refuses a second Cancer
   const cancer = st.coins.find(c => c.sign === 3);
-  await assert.rejects(db.prepare(`UPDATE coins SET sign = 3 WHERE player_id = ?1 AND sign IS NULL AND metal_idx = 8`).bind(pid).run());
+  await assert.rejects(db.prepare(`UPDATE coins SET sign = 3 WHERE player_id = ?1 AND sign IS NULL AND metal_idx = 10`).bind(pid).run());
   assert.ok(cancer);
 });
 
@@ -686,7 +674,7 @@ test("war: nobody can win a star sign they already hold", async () => {
   const a = (await register(db, { username: "stargazer", pin: "4821", ip: "1.1.1.1", now: 1e9 })).body.player.id;
   const b = (await register(db, { username: "astronomer", pin: "4821", ip: "1.1.1.2", now: 1e9 })).body.player.id;
   await db.prepare(`INSERT INTO friends (player_id, friend_id, created_at) VALUES (?1, ?2, 0)`).bind(a, b).run();
-  const put = (pid, id, sign) => db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES (?1, ?2, 77, 8, 0, 0, 2, 0, 0, ?3)`).bind(id, pid, sign).run();
+  const put = (pid, id, sign) => db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES (?1, ?2, 77, 10, 0, 0, 2, 0, 0, ?3)`).bind(id, pid, sign).run();
   await put(a, "c_cancer", 3); await put(b, "c_cancer2", 3); await put(a, "c_leo", 4);
   await assert.rejects(warMove(db, a, { op: "invite", friend: "astronomer", coinId: "c_cancer" }, { now: 1e9 + 1 }), /already holds Cancer/);
   const { result: { tableId } } = await warMove(db, a, { op: "invite", friend: "astronomer", coinId: "c_leo" }, { now: 1e9 + 1 });

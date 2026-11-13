@@ -15,7 +15,7 @@
  * ════════════════════════════════════════════════════════════════════════ */
 
 import {
-  METALS, MATERIALS, CONSTELLATIONS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
+  METALS, METAL, MATERIALS, CONSTELLATIONS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
   RARITIES,   TITLES, TITLE_LEVELS,
 } from "./data.js";
 import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP, MATERIAL, ASTRAL } from "../../shared/tuning.js";
@@ -189,13 +189,24 @@ const rgbCss = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 /* metals with a texture of their own: void is a piece of night sky,
  * dithered nebula and stars (glows: white star, blue star, nebula) */
 const METAL_LOOK = {
-  6: { tex: "space", glows: ["#eef4ff", "#3a86f0", "#2c1a50"] },
+  [METAL.ice]:  { tex: "ice",  ramp: ["#0a2c48", "#1a6aa4", "#2f94d4", "#52b6ec", "#7ccaf4", "#b4e6fc", "#ffffff"] },
+  [METAL.lava]: { tex: "lava", ramp: ["#1a0604", "#3a0e08", "#55180c", "#6a2210", "#7e2c16", "#96401e", "#b8582c"],
+                  glows: ["#ffd84a", "#ff8a1a", "#d8301a"] },
+  // fire: a coin of living flame, white-gold at the bottom through orange
+  // and red to ember at the top, the bands licking upward as it burns
+  [METAL.fire]: { tex: "fire", ramp: ["#1a0402", "#3a0c04", "#6a1808", "#a02a0c", "#d04a14", "#f07a24", "#ffd060"],
+                  glows: ["#fff2b0", "#ffb030", "#e8501a"] },
+  [METAL.void]: { tex: "space", glows: ["#eef4ff", "#3a86f0", "#2c1a50"] },
+  // eldritch: cracked through, something green showing in the crack
+  [METAL.eldritch]: { crack: true },
 };
 
 /* outline, deep, dark, mid, base, light, glint */
 export function coinRamp(coin) {
   const mat = coin.material && MATERIALS[coin.material];
   if (mat) return { ramp: mat.ramp.map(hexRgb), eng: hexRgb(mat.eng), tex: mat.tex, glows: (mat.glows || []).map(hexRgb) };
+  const look = METAL_LOOK[coin.metalIdx];
+  if (look?.ramp) return { ramp: look.ramp.map(hexRgb), eng: hexRgb(METALS[coin.metalIdx].eng), tex: look.tex, glows: (look.glows || []).map(hexRgb) };
   const m = METALS[coin.metalIdx], dark = hexRgb(m.dark), mid = hexRgb(m.mid), base = hexRgb(m.base), hl = hexRgb(m.hl);
   return {
     ramp: [mixRgb(dark, [0, 0, 0], 0.55), dark, mixRgb(dark, mid, 0.55), mid, base, hl, mixRgb(hl, [255, 255, 255], 0.5)],
@@ -281,6 +292,18 @@ const GRAIN = {
       return t - 1;
     };
   },
+  // fire: bands of flame, hottest at the bottom, their edges licking up;
+  // `phase` moves the licks, looping like the void's sky
+  fire: (s, phase = 0) => {
+    const turn = (phase / SPACE_LOOP) * Math.PI * 2;
+    return (x, y, t) => {
+      const h = (SZ - y) + 3.5 * Math.sin(x * 0.42 + s - turn * 2) + 2 * Math.sin(x * 0.95 - s + turn * 3);
+      if (h < 16) return 7;
+      if (h < 27) return 8;
+      if (h < 39) return 9;
+      return t - 1;
+    };
+  },
   plain: () => (x, y, t) => t,
 };
 
@@ -288,7 +311,7 @@ const GRAIN = {
  * is drawn many times a second). */
 /* The shape a coin is drawn in: an astral coin with a sign is always a
  * pointed hexagon, a badge of the sky; anything else, its own shape. */
-export const shapeOf = coin => (coin.metalIdx === 8 && coin.sign != null ? "hexagonal" : coin.shape);
+export const shapeOf = coin => (coin.metalIdx === METAL.astral && coin.sign != null ? "hexagonal" : coin.shape);
 
 /* ─── the astral series ────────────────────────────────────────────────
  * A badge of the sky: a pointed hexagon, a cream frame studded with
@@ -400,8 +423,8 @@ export const SPACE_LOOP = 16;                 // frames in the void's loop
 function paintCoin(coin, back = false, phase = 0) {
   const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.sign ?? ""}:${coin.shiny ? 1 : 0}:${back ? 1 : 0}:${phase}`;
   if (painted.has(key)) return painted.get(key);
-  const out = coin.metalIdx === 8 && coin.sign != null ? paintAstral(coin, back) : paintFresh(coin, back, phase);
-  if (coin.shiny && coin.metalIdx === 8 && coin.sign != null) shine(out.getContext("2d"), coin);
+  const out = coin.metalIdx === METAL.astral && coin.sign != null ? paintAstral(coin, back) : paintFresh(coin, back, phase);
+  if (coin.shiny && coin.metalIdx === METAL.astral && coin.sign != null) shine(out.getContext("2d"), coin);
   if (painted.size > 900) painted.delete(painted.keys().next().value);
   painted.set(key, out);
   return out;
@@ -470,8 +493,29 @@ function paintFresh(coin, back, phase) {
     set(x, y, R[Math.max(0, Math.min(6, t))]);
   }
   g.putImageData(img, 0, 0);
+  if (METAL_LOOK[coin.metalIdx]?.crack && !back) crack(g, coin);
   if (coin.shiny) shine(g, coin);
   return off;
+}
+
+/* Eldritch: a jagged crack down through the coin, face and all: black
+ * at its heart, a sick green light along one lip. Placed by the seed. */
+function crack(g, coin) {
+  const s = (coin.seed >>> 0) % 997, img = g.getImageData(0, 0, SZ, SZ), d = img.data;
+  const set = (x, y, c) => { if (x < 0 || y < 0 || x >= SZ || y >= SZ || !d[(y * SZ + x) * 4 + 3]) return; const i = (y * SZ + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; };
+  const pts = [];
+  for (let y = 9, i = 0; y <= 55; y += 6, i++) pts.push([Math.round(30 + (hashPx(i, 3, s) - 0.5) * 9), y]);
+  for (let k = 1; k < pts.length; k++) {
+    const [x0, y0] = pts[k - 1], [x1, y1] = pts[k], n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    const w = k === 1 || k === pts.length - 1 ? 1 : 2;                 // narrow at the ends
+    for (let i = 0; i <= n; i++) {
+      const x = Math.round(x0 + ((x1 - x0) * i) / n), y = Math.round(y0 + ((y1 - y0) * i) / n);
+      for (let j = 0; j < w; j++) set(x + j, y, [4, 14, 8]);
+      set(x + w, y, [128, 255, 176]);
+      set(x - 1, y, [10, 40, 22]);
+    }
+  }
+  g.putImageData(img, 0, 0);
 }
 
 function shine(c, coin) {

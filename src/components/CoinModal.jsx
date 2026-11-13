@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { drawCoin, coinRarity, coinValue, shapeOf } from "../lib/coin.js";
 import Aura from "./Aura.jsx";
-import { RARITIES, SHAPE_NAMES } from "../lib/data.js";
+import { RARITIES, SHAPE_NAMES, METAL } from "../lib/data.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { coinName, matterOf } from "../lib/coinview.js";
 
@@ -78,7 +78,8 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
              onPointerDown={onStart} onPointerMove={onMove} onPointerUp={onEnd} onPointerCancel={onEnd}>
           <div style={{ transform: `perspective(560px) rotateY(${rot.y}deg) rotateX(${-rot.x}deg)` }}>
             <div style={{ position: "relative", width: SIZE, height: SIZE }}>
-              <canvas ref={cvRef} aria-hidden style={{ imageRendering: "pixelated", display: "block", width: SIZE, height: SIZE }}/>
+              {coin.metalIdx === METAL.eldritch && <Aura coin={coin} size={SIZE} margin={12} layer="behind" shine={false}/>}
+              <canvas ref={cvRef} aria-hidden style={{ position: "relative", imageRendering: "pixelated", display: "block", width: SIZE, height: SIZE }}/>
               <Aura coin={coin} size={SIZE} margin={12}/>
             </div>
           </div>

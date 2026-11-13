@@ -162,3 +162,7 @@ CREATE TABLE IF NOT EXISTS war_tables (
 );
 CREATE INDEX IF NOT EXISTS war_host_idx  ON war_tables(host_id, status);
 CREATE INDEX IF NOT EXISTS war_guest_idx ON war_tables(guest_id, status);
+
+-- ── migrations that must only ever run once mark themselves here (017) ──
+CREATE TABLE IF NOT EXISTS migration_marks (id TEXT PRIMARY KEY, at INTEGER);
+INSERT OR IGNORE INTO migration_marks (id, at) VALUES ('017', 0);

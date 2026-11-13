@@ -97,10 +97,19 @@ const h32 = (n) => { n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d); n = Math.imul(n 
 /* Paint one frame of a coin's aura into ctx, at 1 unit = 1 pixel. The
  * canvas is (64 + 2·margin) square, the coin sitting in the middle; the
  * layer lies over the coin, but touches only its outermost two pixels. */
-export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendrils = false, moon = false) {
+export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendrils = false, moon = false, layer = "front", flames = false) {
   const { G, ring, inner, face, inside } = rings(coin, M);
   ctx.clearRect(0, 0, G, G);
-  if (rarity <= 0 && !shine && !tendrils && !moon) return;
+  if (layer === "behind") {
+    // only what stands behind the coin: an eldritch coin's far tentacles
+    if (!tendrils || (rarity === 5 && !auraStill() && turnAt(coin, frame))) return;
+    const img = ctx.createImageData(G, G), d = img.data;
+    const put = (x, y, rgb) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= G || y >= G) return; const i = (y * G + x) * 4; d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = 255; };
+    paintTentacles(put, G, M, coin.seed >>> 0, frame, "behind");
+    ctx.putImageData(img, 0, 0);
+    return;
+  }
+  if (rarity <= 0 && !shine && !tendrils && !moon && !flames) return;
   if (rarity === 5 && !auraStill() && turnAt(coin, frame)) return;
   const img = ctx.createImageData(G, G), d = img.data;
   const put = (x, y, rgb, al) => {
@@ -112,7 +121,12 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
-  if (rarity <= 0) { if (tendrils) paintTendrils(put, G, M, seed, frame); if (moon) paintMoon(put, G, M, inside, seed, frame); ctx.putImageData(img, 0, 0); return; }
+  if (rarity <= 0) {
+    if (flames) paintFlames(put, G, M, ring[1], seed, frame);
+    if (tendrils) paintTentacles(put, G, M, seed, frame, "front");
+    if (moon) paintMoon(put, G, M, inside, seed, frame);
+    ctx.putImageData(img, 0, 0); return;
+  }
   const hot = [255, 236, 170], warm = [255, 160, 70];
   const burn = rarity === 5, beat = (frame >> 1) % 4;      // a slow 4-step pulse
   const flick = i => h32(seed + i * 7 + (frame >> 1) * 131);
@@ -195,46 +209,95 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
     }
   }
 
-  if (tendrils) paintTendrils(put, G, M, seed, frame);
+  if (flames) paintFlames(put, G, M, ring[1], seed, frame);
+  if (tendrils) paintTentacles(put, G, M, seed, frame, "front");
   if (moon) paintMoon(put, G, M, inside, seed, frame);
   ctx.putImageData(img, 0, 0);
 }
 
-/* Tentacles off an Eldritch coin: four, rooted on the rim (at places
- * the coin's seed picks), reaching out and curling tight at the tip, each
- * swaying on its own beat. Outline, body, and a lit edge toward the
- * top-left; a sick green glint along the top of each. */
-const T_OUT = [6, 16, 14], T_BODY = [22, 54, 44], T_LIT = [52, 112, 90], T_GLINT = [128, 255, 176];
-function paintTendrils(put, G, M, seed, frame) {
-  const c = G / 2, r = 31;
-  const blot = (x, y, rad, col) => {
-    const R2 = rad * rad + 0.3;
-    for (let dy = -Math.ceil(rad); dy <= Math.ceil(rad); dy++) for (let dx = -Math.ceil(rad); dx <= Math.ceil(rad); dx++)
-      if (dx * dx + dy * dy <= R2) put(x + dx, y + dy, col, 1);
-  };
-  const paths = [];
-  for (let k = 0; k < 4; k++) {
-    const a0 = (k / 4) * Math.PI * 2 + 0.4 + h32(seed + k * 13) * 0.9;
-    const curl = (k % 2 ? 1 : -1) * (0.9 + h32(seed + k * 29) * 0.5);
-    const sway = Math.sin(frame * 0.35 + k * 1.7) * 0.18;
-    // out from under the rim, straight at first, then curling tight
-    const L = M + 10 + Math.floor(h32(seed + k * 41) * 5);
-    let x = c + Math.cos(a0) * (r - 5), y = c + Math.sin(a0) * (r - 5), h = a0 + sway;
-    const pts = [];
-    for (let i = 0; i < L; i++) {
-      const u = i / L;
-      pts.push([Math.round(x), Math.round(y), Math.max(0, Math.round(2.8 * (1 - u)))]);
-      h += curl * (0.01 + 0.75 * u * u * u) + sway * 0.06;
-      x += Math.cos(h); y += Math.sin(h);
-    }
-    paths.push(pts);
+/* Eldritch tentacles, thick and round: some sweep out from behind the
+ * coin (dark, drawn on a layer under it), some come in from outside and
+ * curl over its face (lit, drawn over it). Each is a run of discs that
+ * thins to a curled tip, shaded as a cylinder lit from the top-left, no
+ * outline, swaying on its own beat. Placed by the coin's seed. */
+const TENT = {
+  behind: { lit: [40, 96, 66], body: [24, 62, 42], shade: [12, 34, 24] },
+  front:  { lit: [170, 250, 196], body: [84, 184, 120], shade: [34, 108, 66], edge: [4, 18, 10] },
+};
+function tentacle(put, pts, pal) {
+  // the front ones lie on a green coin: a dark edge keeps them apart from it
+  if (pal.edge) for (const [x, y, w] of pts) {
+    const n = Math.ceil(w + 1);
+    for (let dy = -n; dy <= n; dy++) for (let dx = -n; dx <= n; dx++) if (dx * dx + dy * dy <= (w + 1) * (w + 1) + 0.35) put(x + dx, y + dy, pal.edge, 1);
   }
-  for (const pts of paths) for (const [x, y, w] of pts) blot(x, y, w + 1, T_OUT);
-  for (const pts of paths) for (const [x, y, w] of pts) blot(x, y, w, T_BODY);
-  for (const pts of paths) pts.forEach(([x, y, w], i) => {
-    if (w >= 1) put(x - 1, y - 1, T_LIT, 1);
-    if (w >= 1 && i % 4 === 1) put(x - 1, y - w, T_GLINT, 1);
-  });
+  for (const [x, y, w] of pts) {
+    const n = Math.ceil(w);
+    for (let dy = -n; dy <= n; dy++) for (let dx = -n; dx <= n; dx++) {
+      const d2 = dx * dx + dy * dy;
+      if (d2 > w * w + 0.35) continue;
+      const lean = -(dx + dy) / Math.SQRT2;                       // toward the light
+      put(x + dx, y + dy, lean > w * 0.38 ? pal.lit : lean < -w * 0.38 ? pal.shade : pal.body, 1);
+    }
+  }
+}
+function tentaclePath(x, y, h, len, w0, dir, wave, frame, k) {
+  const pts = [];
+  for (let i = 0; i < len; i++) {
+    const u = i / len;
+    pts.push([Math.round(x), Math.round(y), Math.max(0.6, w0 * (1 - u) ** 0.9)]);
+    h += wave * Math.sin(i * 0.22 + frame * 0.32 + k * 1.9) * 0.1 + dir * (0.015 + 0.75 * u ** 4);
+    x += Math.cos(h); y += Math.sin(h);
+  }
+  return pts;
+}
+function paintTentacles(put, G, M, seed, frame, layer) {
+  const c = G / 2, r = 31;
+  if (layer === "behind") {
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI * 2 + 0.3 + h32(seed + k * 13) * 1.0, dir = k % 2 ? 1 : -1;
+      const pts = tentaclePath(c + Math.cos(a) * (r - 10), c + Math.sin(a) * (r - 10), a + dir * 0.35, r - 6 + M + Math.floor(h32(seed + k * 7) * 6), 4.2, dir, 1, frame, k);
+      tentacle(put, pts, TENT.behind);
+    }
+    return;
+  }
+  for (let k = 0; k < 2; k++) {
+    const a = k * Math.PI + 0.7 + h32(seed + k * 31) * 1.2, dir = k % 2 ? -1 : 1;
+    // rising from behind the rim and lying across the coin's face, the
+    // tip curling over: rooted just outside the edge, heading round and in
+    const sx = c + Math.cos(a) * (r + 2), sy = c + Math.sin(a) * (r + 2);
+    const pts = tentaclePath(sx, sy, a + dir * 2.3, 38 + Math.floor(h32(seed + k * 11) * 8), 2.8, dir, 1.6, frame, k + 5);
+    tentacle(put, pts, TENT.front);
+  }
+}
+
+/* Fire: flames standing up off the top of a fire coin, each a rounded
+ * tongue (white-gold heart, orange, red edge) that flickers in height
+ * and leans, with sparks that rise off it. */
+const FLAME = { core: [255, 242, 176], mid: [255, 176, 48], edge: [232, 80, 26], spark: [255, 214, 120] };
+function paintFlames(put, G, M, edge, seed, frame) {
+  const c = G / 2;
+  const top = edge.filter(p => p.y < c - 6);
+  const N = 6;
+  for (let k = 0; k < N; k++) {
+    const p = top[Math.floor(((k + 0.5) / N) * top.length)];
+    if (!p) continue;
+    const flick = h32(seed + k * 97 + (frame >> 1) * 31);
+    const H = Math.round(5 + M * 0.55 + flick * 5), W = 2.4 + h32(seed + k * 13) * 1.4;
+    const lean = Math.sin(frame * 0.5 + k) * 0.8;
+    for (let row = 0; row < H; row++) {
+      const u = row / H, hw = W * (1 - u ** 1.6) * (row < 2 ? 0.8 + row * 0.1 : 1);
+      const cx = p.x + lean * u * u * 3, y = p.y + 1 - row;
+      for (let dx = -Math.ceil(hw); dx <= Math.ceil(hw); dx++) {
+        const off = Math.abs(dx + (cx - Math.round(cx)));
+        if (off > hw) continue;
+        const col = off < hw * 0.45 && u < 0.55 ? FLAME.core : off < hw * 0.8 && u < 0.8 ? FLAME.mid : FLAME.edge;
+        put(Math.round(cx) + dx, y, col, 1);
+      }
+    }
+    // a spark or two above it
+    const age = (frame + k * 5) % 10;
+    if (age < 6) put(p.x + Math.round(Math.sin(k + age) * 2), p.y - H - 1 - age, FLAME.spark, 1 - age * 0.15);
+  }
 }
 
 /* The astral moon: a round of 64 frames (8 s), on an ellipse tipped a

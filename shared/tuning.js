@@ -104,12 +104,14 @@ export const CHESTS = {
 
 /* ─── what a chest holds ──────────────────────────────────────────── */
 export const COIN_METAL_BY_CHEST = [
-  //  Cu   Br   Ag   Au   Pt   Ob   Vo   El   As
-  [  50,  30,  14,   5,   1,   0,   0,   0,   0   ],   // wooden
-  [  22,  30,  26,  14,   6, 1.6, 0.4,   0,   0   ],   // iron
-  [   6,  14,  26,  28,  16,   7, 2.5, 0.4, 0.1  ],   // gilded
-  [   0,   4,  12,  24,  28,  20,   9, 2.5, 0.5  ],   // obsidian
-  [   0,   0,   3,  10,  22,  30,  24,   8,   3   ],   // void
+  // Lava and Fire came in between Obsidian and Void (November 2026),
+  // their share taken from those two, so the tiers above come as before.
+  //  Cu   Br   Ag   Au   Ice  Ob   Lava Fire Vo   El   As
+  [  50,  30,  14,   5,   1,   0,   0,   0,   0,   0,   0   ],   // wooden
+  [  22,  30,  26,  14,   6, 1.2, 0.4, 0.2, 0.2,   0,   0   ],   // iron
+  [   6,  14,  26,  28,  16,   5,   2, 1.2, 1.3, 0.4, 0.1  ],   // gilded
+  [   0,   4,  12,  24,  28,  14,   7,   4,   4, 2.5, 0.5  ],   // obsidian
+  [   0,   0,   3,  10,  22,  20,  12,  10,  12,   8,   3   ],   // void
 ];
 /* Coin rarity starts from the standard weights and each chest tier leans
  * them toward the top: weight × (1 + tier × lean) ^ rarity. */
@@ -124,7 +126,7 @@ export const SHINY_CHANCE_BY_BRUSH = [0.005, 0.015, 0.03, 0.05, 0.08];
  * outsells a common gold). The metal bases came down about a sixth when
  * this spread went in (it was ×1 to ×14), so income rose by about a
  * fifth rather than a half. */
-export const METAL_BASE_VALUE = [2, 4, 11, 29, 74, 190, 475, 1240, 3150];
+export const METAL_BASE_VALUE = [2, 4, 11, 29, 74, 190, 270, 370, 475, 1240, 3150];   // Lava and Fire between Obsidian and Void
 export const RARITY_VALUE_MUL = [1.0, 1.8, 3.2, 6.0, 12.0, 30.0];
 export const SHINY_VALUE_MUL  = 4;
 export const CONDITION_STEP   = 0.05;   // each grade below Pristine; Pristine is +15%
@@ -280,7 +282,7 @@ export const WAR = {
 export const MATERIAL = {
   chance: 1 / 15,
   valueMul: 1.6,
-  byTier: [null, null, "ice", null, null, "lava", null, null, null],
+  byTier: [null, null, null, null, null, null, null, null, null, null, null],
 };
 
 /* ─── astral: the twelve signs ────────────────────────────────────────
@@ -290,7 +292,7 @@ export const MATERIAL = {
  * coins come (that roll is eldritch instead). Selling or losing one frees
  * its sign. Enforced by a unique index (migration 016). */
 export const ASTRAL = {
-  metal: 8,
-  instead: 7,
+  metal: 10,
+  instead: 9,
   signs: ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"],
 };
