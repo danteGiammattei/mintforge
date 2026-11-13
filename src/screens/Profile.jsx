@@ -51,7 +51,7 @@ function Cabinet({ g }) {
         <div className="veil appear" style={{ zIndex: 430 }} onClick={() => setSlot(null)}>
           <div className="panel panel-hi sheet rise" role="dialog" aria-modal="true" aria-label="Choose a coin for the cabinet" style={{ padding: 12 }} onClick={e => e.stopPropagation()}>
             <h2 className="t-title" style={{ margin: "0 0 12px" }}>CHOOSE A COIN</h2>
-            <div className="grid-coins" style={{ maxHeight: 360, overflowY: "auto", padding: 2 }}>
+            <div className="grid-coins coin-scroll" style={{ maxHeight: 360, padding: 2 }}>
               {g.coins.map(c => <CoinTile key={c.id} coin={c} pinned={g.pinnedIds?.includes(c.id)} onClick={() => { g.pinToSlot(slot, c.id); setSlot(null); feel("tap"); }}/>)}
             </div>
             <button className="btn btn-ghost btn-block" style={{ marginTop: 12 }} onClick={() => setSlot(null)}>CANCEL</button>

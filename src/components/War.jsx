@@ -242,7 +242,7 @@ function Invite({ inv }) {
       {eligible.length ? (
         <>
           <p className="t-label" style={{ margin: 0 }}>STAKE A COIN AT LEAST AS RARE ({RARITIES[need].name.toUpperCase()} OR BETTER)</p>
-          <div className="grid-coins" style={{ maxHeight: 260, overflowY: "auto" }}>
+          <div className="grid-coins coin-scroll" style={{ maxHeight: 260 }}>
             {eligible.map(c => <CoinTile key={c.id} coin={c} selected={pick === c.id} onClick={() => { feel("tap"); setPick(p => (p === c.id ? null : c.id)); }}/>)}
           </div>
         </>
@@ -284,7 +284,7 @@ function Challenge() {
       <div>
         <div className="t-label" style={{ marginBottom: 8 }}>YOUR STAKE</div>
         {free.length ? (
-          <div className="grid-coins" style={{ maxHeight: 260, overflowY: "auto" }}>
+          <div className="grid-coins coin-scroll" style={{ maxHeight: 260 }}>
             {free.map(c => <CoinTile key={c.id} coin={c} selected={pick === c.id} onClick={() => { feel("tap"); setPick(p => (p === c.id ? null : c.id)); }}/>)}
           </div>
         ) : <span className="t-dim">NO UNLOCKED COINS TO STAKE.</span>}

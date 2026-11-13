@@ -179,7 +179,7 @@ export default function Tavern() {
                   {game === "crucible" && first && <span style={{ color: METALS[first.metalIdx].hl }}>{METALS[first.metalIdx].name} ONLY</span>}
                   {first && first.metalIdx >= MAX_TIER && game !== "roulette" && <span className="t-blood">ALREADY THE HIGHEST METAL</span>}
                 </div>
-                <div className="grid-coins" style={{ maxHeight: 300, overflowY: "auto", padding: 2 }}>
+                <div className="grid-coins coin-scroll" style={{ maxHeight: 300, padding: 2 }}>
                   {eligible.slice(0, 120).map(c => (
                     <CoinTile key={c.id} coin={c} selected={ids.includes(c.id)} onClick={() => pick(c.id)}/>
                   ))}

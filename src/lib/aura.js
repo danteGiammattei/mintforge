@@ -256,16 +256,18 @@ function tentaclePath(x, y, h, len, w0, dir, wave, frame, k) {
  * the root under the coin, the rest over it. */
 const ROOT = 7;
 function frontPaths(G, seed, frame) {
-  const c = G / 2, r = 31, out = [];
-  for (let k = 0; k < 2; k++) {
-    const a = k * Math.PI + 0.7 + h32(seed + k * 31) * 1.2, dir = k % 2 ? -1 : 1;
+  const c = G / 2, r = 31, out = [], N = 5;
+  for (let k = 0; k < N; k++) {
+    const a = (k / N) * Math.PI * 2 + 0.5 + h32(seed + k * 31) * 0.9, dir = k % 2 ? -1 : 1;
     let x = c + Math.cos(a) * (r - 6), y = c + Math.sin(a) * (r - 6), h = a;
-    const len = 40 + Math.floor(h32(seed + k * 11) * 8), pts = [];
+    const len = 44 + Math.floor(h32(seed + k * 11) * 14), pts = [];
+    const bend = 0.2 + h32(seed + k * 23) * 0.05;                    // how hard it turns back over the coin
     for (let i = 0; i < len; i++) {
       const u = i / len;
-      pts.push([Math.round(x), Math.round(y), Math.max(0.6, 3.0 * (1 - u) ** 0.85)]);
-      const turn = i < 5 ? 0 : i < 26 ? 0.13 : 0.04 + 0.8 * u ** 4;
-      h += dir * turn + 1.4 * Math.sin(i * 0.22 + frame * 0.32 + k * 1.9) * 0.08;
+      pts.push([Math.round(x), Math.round(y), Math.max(0.6, 2.2 * (1 - u) ** 0.8)]);
+      // out past the rim, a hard turn back, a long run across the face, a curl
+      const turn = i < 4 ? 0 : i < 18 ? bend : u < 0.8 ? 0.01 : 0.45;
+      h += dir * turn + Math.sin(i * 0.3 + frame * 0.32 + k * 1.9) * 0.16;   // wavier
       x += Math.cos(h); y += Math.sin(h);
     }
     out.push(pts);
@@ -275,9 +277,9 @@ function frontPaths(G, seed, frame) {
 function paintTentacles(put, G, M, seed, frame, layer) {
   const c = G / 2, r = 31;
   if (layer === "behind") {
-    for (let k = 0; k < 4; k++) {
-      const a = (k / 4) * Math.PI * 2 + 0.3 + h32(seed + k * 13) * 1.0, dir = k % 2 ? 1 : -1;
-      const pts = tentaclePath(c + Math.cos(a) * (r - 10), c + Math.sin(a) * (r - 10), a + dir * 0.35, r - 6 + M + Math.floor(h32(seed + k * 7) * 6), 4.2, dir, 1, frame, k);
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2 + 0.9 + h32(seed + k * 13) * 0.8, dir = k % 2 ? 1 : -1;
+      const pts = tentaclePath(c + Math.cos(a) * (r - 10), c + Math.sin(a) * (r - 10), a + dir * 0.35, r - 4 + M + Math.floor(h32(seed + k * 7) * 8), 3.0, dir, 1.9, frame, k);
       tentacle(put, pts, TENT.behind);
     }
     // the front tentacles' roots, under the coin
@@ -291,37 +293,39 @@ function paintTentacles(put, G, M, seed, frame, layer) {
   }
 }
 
-/* Fire: tall pointed flames standing up off the upper two-thirds of a
- * fire coin, rooted a pixel inside its edge: a gold heart, orange, then a
- * red edge that frays, and sparks scattered round each tip. Every frame
- * they are drawn afresh, so they flicker and lean and spit. */
+/* Fire: the coin is engulfed. Licks of flame stand up from all round its
+ * edge but the bottom, rooted a little inside it: the top ones tallest,
+ * the side ones climbing up along the coin. Each lick is narrow and
+ * wavy, swaying as it rises: a gold heart low down, orange, a red edge
+ * that frays, and sparks thrown off the tips. Drawn afresh every frame,
+ * so it never holds still. */
 const FLAME = { core: [255, 228, 138], mid: [246, 174, 83], hot: [232, 116, 44], edge: [197, 78, 61], ash: [155, 48, 54] };
 function paintFlames(put, G, M, edge, seed, frame) {
   const c = G / 2;
-  const root = edge.filter(p => p.y < c + 8);
-  const N = 6;
+  const root = edge.filter(p => !(p.y > c + 10 && Math.abs(p.x - c) < 18));      // all but the bottom
+  const N = 11;
   for (let k = 0; k < N; k++) {
     const p = root[Math.floor(((k + 0.5) / N) * root.length)];
     if (!p) continue;
     const a = Math.atan2(p.y - c, p.x - c);
-    const bx = p.x - Math.cos(a) * 2, by = p.y - Math.sin(a) * 2;     // a little inside the edge
-    const rnd = i => h32(seed + k * 97 + frame * 131 + i * 7);
-    const H = Math.round(M + 4 + rnd(1) * 6 - (Math.abs(p.x - c) / c) * 4), W = 4.6 + h32(seed + k * 13) * 1.8;
-    const lean = Math.sin(frame * 0.6 + k * 1.3) * 1.2;
+    const bx = p.x - Math.cos(a) * 2, by = p.y - Math.sin(a) * 2;
+    const rnd = i => h32(seed + k * 97 + (frame >> 1) * 131 + i * 7);
+    const high = (c - by) / c;                                          // 1 at the top … -1 at the bottom
+    const H = Math.round(M + 6 + high * 6 + rnd(1) * 7), W = 2.4 + h32(seed + k * 13) * 1.4;
     for (let row = 0; row < H; row++) {
-      const u = row / H, hw = W * (1 - u ** 1.15) * (1 - u * 0.35);   // broad at the root, to a point
-      const cx = bx + lean * u * u * 2.5, y = Math.round(by) - row;
+      const u = row / H;
+      const hw = W * (1 - u ** 1.3);
+      const cx = bx + Math.sin(row * 0.38 + frame * 0.75 + k * 1.7) * (0.6 + u * 2.4), y = Math.round(by) - row;
       for (let dx = -Math.ceil(hw) - 1; dx <= Math.ceil(hw) + 1; dx++) {
         const q = Math.abs(dx + (cx - Math.round(cx))) / Math.max(0.6, hw);
         if (q > 1.15) continue;
-        if (q > 0.9 && rnd(row * 17 + dx + 50) < 0.5) continue;        // frayed edge
-        const col = q < 0.5 && u < 0.6 ? FLAME.core : q < 0.72 && u < 0.8 ? FLAME.mid : q < 0.92 ? FLAME.hot : FLAME.edge;
+        if (q > 0.85 && rnd(row * 17 + dx + 50) < 0.5) continue;        // frayed edge
+        const col = q < 0.45 && u < 0.5 ? FLAME.core : q < 0.7 && u < 0.75 ? FLAME.mid : q < 0.92 ? FLAME.hot : FLAME.edge;
         put(Math.round(cx) + dx, y, col, 1);
       }
     }
-    // sparks scattered round the tip
-    for (let sp = 0; sp < 4; sp++) {
-      const sx = Math.round(bx + lean * 2 + (rnd(200 + sp) - 0.5) * W * 3), sy = Math.round(by) - Math.round(H * (0.6 + rnd(300 + sp) * 0.7));
+    for (let sp = 0; sp < 3; sp++) {
+      const sx = Math.round(bx + (rnd(200 + sp) - 0.5) * W * 4), sy = Math.round(by) - Math.round(H * (0.7 + rnd(300 + sp) * 0.6));
       put(sx, sy, rnd(400 + sp) < 0.5 ? FLAME.hot : FLAME.ash, 1);
     }
   }

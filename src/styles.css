@@ -199,6 +199,11 @@ canvas { image-rendering: pixelated; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .grid-coins { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; }
+/* a coin grid that scrolls: down only. A coin's glow reaches past its
+ * tile, and left to itself would summon a sideways scrollbar that comes
+ * and goes as the glows move, jolting the page. The gutter is kept so the
+ * grid never shifts when the scrollbar appears. */
+.coin-scroll { overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; }
 .row    { display: flex; align-items: center; gap: 8px; }
 .between { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
