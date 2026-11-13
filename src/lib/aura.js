@@ -109,7 +109,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
-  if (rarity <= 0) { if (tendrils) paintTendrils(put, G, M, seed, frame); ctx.putImageData(img, 0, 0); return; }
+  if (rarity <= 0) { if (tendrils) paintTendrils(put, G, M, seed, frame, ring[1]); ctx.putImageData(img, 0, 0); return; }
   const hot = [255, 236, 170], warm = [255, 160, 70];
   const burn = rarity === 5, beat = (frame >> 1) % 4;      // a slow 4-step pulse
   const flick = i => h32(seed + i * 7 + (frame >> 1) * 131);
@@ -192,44 +192,65 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
     }
   }
 
-  if (tendrils) paintTendrils(put, G, M, seed, frame);
+  if (tendrils) paintTendrils(put, G, M, seed, frame, ring[1]);
   ctx.putImageData(img, 0, 0);
 }
 
-/* Tentacles off an Eldritch coin: four, rooted on the rim (at places
- * the coin's seed picks), reaching out and curling tight at the tip, each
- * swaying on its own beat. Outline, body, and a lit edge toward the
- * top-left; a sick green glint along the top of each. */
+/* Tentacles off an Eldritch coin. Two long ones wrap along the coin's
+ * own edge, whatever its shape, lying over the rim, then lift away and
+ * curl tight; three short ones reach straight out and curl. Each sways on
+ * its own beat. Outline, body, a lit edge toward the top-left, and a sick
+ * green glint along each. Rooted where the coin's seed says. */
 const T_OUT = [6, 16, 14], T_BODY = [22, 54, 44], T_LIT = [52, 112, 90], T_GLINT = [128, 255, 176];
-function paintTendrils(put, G, M, seed, frame) {
+function paintTendrils(put, G, M, seed, frame, edge) {
   const c = G / 2, r = 31;
   const blot = (x, y, rad, col) => {
-    const R2 = rad * rad + 0.3;
-    for (let dy = -Math.ceil(rad); dy <= Math.ceil(rad); dy++) for (let dx = -Math.ceil(rad); dx <= Math.ceil(rad); dx++)
-      if (dx * dx + dy * dy <= R2) put(x + dx, y + dy, col, 1);
+    const R2 = rad * rad + 0.3, n = Math.ceil(rad);
+    for (let dy = -n; dy <= n; dy++) for (let dx = -n; dx <= n; dx++) if (dx * dx + dy * dy <= R2) put(x + dx, y + dy, col, 1);
   };
-  const paths = [];
-  for (let k = 0; k < 4; k++) {
-    const a0 = (k / 4) * Math.PI * 2 + 0.4 + h32(seed + k * 13) * 0.9;
-    const curl = (k % 2 ? 1 : -1) * (0.9 + h32(seed + k * 29) * 0.5);
-    const sway = Math.sin(frame * 0.35 + k * 1.7) * 0.18;
-    // out from under the rim, straight at first, then curling tight
-    const L = M + 10 + Math.floor(h32(seed + k * 41) * 5);
-    let x = c + Math.cos(a0) * (r - 5), y = c + Math.sin(a0) * (r - 5), h = a0 + sway;
-    const pts = [];
-    for (let i = 0; i < L; i++) {
-      const u = i / L;
-      pts.push([Math.round(x), Math.round(y), Math.max(0, Math.round(2.8 * (1 - u)))]);
-      h += curl * (0.01 + 0.75 * u * u * u) + sway * 0.06;
+  // the tip: from (x, y) heading h, curling one way, tighter and thinner
+  const curlFrom = (pts, x, y, h, dir, len, w0) => {
+    for (let i = 0; i < len; i++) {
+      const u = i / len;
+      h += dir * (0.08 + 0.55 * u * u);
       x += Math.cos(h); y += Math.sin(h);
+      pts.push([Math.round(x), Math.round(y), Math.max(0, Math.round(w0 * (1 - u)))]);
     }
+  };
+  const paths = [], n = edge.length;
+  // two wrappers, on opposite sides, wrapping opposite ways
+  for (let k = 0; k < 2; k++) {
+    const dir = k ? 1 : -1, sway = Math.sin(frame * 0.3 + k * 2.1);
+    const start = Math.floor((h32(seed + 7) * 0.5 + k * 0.5) * n);
+    const span = Math.floor(n * (0.28 + h32(seed + k * 17) * 0.12));     // about a third of the way round
+    const pts = [];
+    for (let i = 0; i <= span; i++) {
+      const p = edge[(start + dir * i + n * 4) % n];
+      const into = 1.6 + Math.sin(i * 0.25 + frame * 0.3 + k) * 0.6;    // ripples as it lies over the rim
+      const a = Math.atan2(p.y - c, p.x - c);
+      const w = i < 4 ? 3 : 2.4 - (i / span) * 0.6;
+      pts.push([Math.round(p.x - Math.cos(a) * into), Math.round(p.y - Math.sin(a) * into), Math.round(w)]);
+    }
+    const last = edge[(start + dir * span + n * 4) % n];
+    const a = Math.atan2(last.y - c, last.x - c);
+    curlFrom(pts, last.x, last.y, a + dir * 0.9 + sway * 0.15, dir, M + 6, 2);
+    paths.push(pts);
+  }
+  // three that reach out
+  for (let k = 0; k < 3; k++) {
+    const a0 = (k / 3) * Math.PI * 2 + 1.1 + h32(seed + k * 13) * 0.8;
+    const dir = k % 2 ? 1 : -1, sway = Math.sin(frame * 0.35 + k * 1.7) * 0.18;
+    const pts = [];
+    let x = c + Math.cos(a0) * (r - 5), y = c + Math.sin(a0) * (r - 5);
+    for (let i = 0; i < 4; i++) { pts.push([Math.round(x), Math.round(y), 2]); x += Math.cos(a0); y += Math.sin(a0); }
+    curlFrom(pts, x, y, a0 + sway, dir, M + 4 + Math.floor(h32(seed + k * 41) * 4), 2.2);
     paths.push(pts);
   }
   for (const pts of paths) for (const [x, y, w] of pts) blot(x, y, w + 1, T_OUT);
   for (const pts of paths) for (const [x, y, w] of pts) blot(x, y, w, T_BODY);
   for (const pts of paths) pts.forEach(([x, y, w], i) => {
     if (w >= 1) put(x - 1, y - 1, T_LIT, 1);
-    if (w >= 1 && i % 4 === 1) put(x - 1, y - w, T_GLINT, 1);
+    if (w >= 1 && i % 5 === 2) put(x - 1, y - w, T_GLINT, 1);
   });
 }
 

@@ -173,7 +173,8 @@ export const newSeed = () => (Date.now() ^ (Math.random() * 0xffffffff | 0)) >>>
  * symmetric too. Only the light (and the gloss) is one-sided, on purpose.
  *
  * opts.turn  how wide the coin shows as it spins (64 = face on, ~4 = edge)
- * opts.back  draw the reverse: a plain field and the mint's mark */
+ * opts.back  draw the reverse: a plain field and the mint's mark
+ * opts.phase where a moving texture (void) is in its loop, 0 … SPACE_LOOP-1 */
 const SZ = 64;
 const CELLS = [4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4];
 const CELL_AT = (() => { const at = new Int8Array(SZ).fill(-1); let p = (SZ - 46) / 2; CELLS.forEach((w, i) => { for (let k = 0; k < w; k++) at[p + k] = i; p += w; }); return at; })();
@@ -260,17 +261,21 @@ const GRAIN = {
   },
   // void: night sky. Nebula in checker-dithered diagonal drifts, single
   // stars white and blue, and a few that shine in a cross
-  space: s => {
+  // `phase` (0 … SPACE_LOOP-1) moves it: the nebula drifts along its
+  // diagonal and the stars twinkle, looping without a seam
+  space: (s, phase = 0) => {
     const crosses = Array.from({ length: 3 }, (_, i) => [8 + Math.floor(hashPx(i, 5, s) * 48), 8 + Math.floor(hashPx(i, 6, s) * 48)]);
+    const turn = (phase / SPACE_LOOP) * Math.PI * 2;
     return (x, y, t) => {
-      for (const [cx, cy] of crosses) {
-        if (x === cx && y === cy) return 7;
-        if (Math.abs(x - cx) + Math.abs(y - cy) === 1) return 8;
+      for (const [i, [cx, cy]] of crosses.entries()) {
+        const lit = (phase + i * 5) % SPACE_LOOP < SPACE_LOOP / 2;
+        if (x === cx && y === cy) return lit ? 7 : 8;
+        if (lit && Math.abs(x - cx) + Math.abs(y - cy) === 1) return 8;
       }
       const h = hashPx(x, y, s);
-      if (h > 0.988) return 7;
-      if (h > 0.976) return 8;
-      const n = Math.sin((x + y) * 0.17 + s) + 0.8 * Math.sin((x - y) * 0.07 - s * 0.5);
+      if (h > 0.988) return (Math.floor(h * 1e5) + phase) % 6 === 0 ? 8 : 7;   // now and then a star dims
+      if (h > 0.976) return (Math.floor(h * 1e5) + phase) % 7 === 0 ? t - 1 : 8;
+      const n = Math.sin((x + y) * 0.17 + s - turn) + 0.8 * Math.sin((x - y) * 0.07 - s * 0.5 + turn);
       if (n > 0.95) return (x + y) % 2 ? 9 : t;
       if (n > 0.45) return (x % 2 === 0 && y % 2 === 0) ? 9 : t - 1;
       return t - 1;
@@ -282,19 +287,20 @@ const GRAIN = {
 /* Paint a coin, face on, into a 64 × 64 canvas (kept: a coin that turns
  * is drawn many times a second). */
 const painted = new Map();
-function paintCoin(coin, back = false) {
-  const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.shiny ? 1 : 0}:${back ? 1 : 0}`;
+export const SPACE_LOOP = 16;                 // frames in the void's loop
+function paintCoin(coin, back = false, phase = 0) {
+  const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.shiny ? 1 : 0}:${back ? 1 : 0}:${phase}`;
   if (painted.has(key)) return painted.get(key);
-  const out = paintFresh(coin, back);
-  if (painted.size > 400) painted.delete(painted.keys().next().value);
+  const out = paintFresh(coin, back, phase);
+  if (painted.size > 900) painted.delete(painted.keys().next().value);
   painted.set(key, out);
   return out;
 }
-function paintFresh(coin, back) {
+function paintFresh(coin, back, phase) {
   const off = document.createElement("canvas"); off.width = SZ; off.height = SZ;
   const g = off.getContext("2d"), img = g.createImageData(SZ, SZ), d = img.data;
   const { ramp: R, eng, tex, glows } = coinRamp(coin);
-  const grain = GRAIN[tex || "metal"]((coin.seed >>> 0) % 997);
+  const grain = GRAIN[tex || "metal"]((coin.seed >>> 0) % 997, phase);
   const r = SZ / 2 - 1, mid = SZ / 2;
   const holed = coin.shape === "holed";
   const ring = (x, y) => Math.hypot(x + 0.5 - mid, y + 0.5 - mid);
@@ -380,7 +386,7 @@ function shine(c, coin) {
 }
 
 export function drawCoin(canvas, coin, px, opts = {}) {
-  const off = paintCoin(coin, !!opts.back);
+  const off = paintCoin(coin, !!opts.back, opts.phase || 0);
   if (canvas.width !== px) canvas.width = px;
   if (canvas.height !== px) canvas.height = px;
   const ctx = canvas.getContext("2d");
