@@ -286,12 +286,112 @@ const GRAIN = {
 
 /* Paint a coin, face on, into a 64 × 64 canvas (kept: a coin that turns
  * is drawn many times a second). */
+/* The shape a coin is drawn in: an astral coin with a sign is always a
+ * pointed hexagon, a badge of the sky; anything else, its own shape. */
+export const shapeOf = coin => (coin.metalIdx === 8 && coin.sign != null ? "hexagonal" : coin.shape);
+
+/* ─── the astral series ────────────────────────────────────────────────
+ * A badge of the sky: a pointed hexagon, a cream frame studded with
+ * stars, a deep teal field that darkens toward the middle in stepped
+ * bands, the sign's glyph above, the coin's own face small in the middle
+ * in rose, and the constellation in cream across it all. The back is
+ * the field and the glyph, large. */
+const ZODIAC = [
+  [".##.##.", "#..#..#", "#..#..#", "...#...", "...#...", "...#...", "...#..."],   // Aries
+  ["#.....#", ".#...#.", "..###..", ".#...#.", ".#...#.", ".#...#.", "..###.."],   // Taurus
+  ["#######", ".#...#.", ".#...#.", ".#...#.", ".#...#.", ".#...#.", "#######"],   // Gemini
+  ["..####.", ".#.....", "#.##...", ".......", "...##.#", ".....#.", ".####.."],   // Cancer
+  ["..##...", ".#..#..", ".#..#..", "..#.#..", "....#..", "....#.#", ".....#."],   // Leo
+  ["#.#.#..", "##.#.#.", "#..#.#.", "#..#.##", "#..#.##", "#..#.#.", "....#.."],   // Virgo
+  ["..###..", ".#...#.", ".#...#.", "##...##", ".......", "#######", "......."],   // Libra
+  ["#.#.#..", "##.#.#.", "#..#.#.", "#..#.#.", "#..#.#.", ".....##", "....###"],   // Scorpio
+  ["...####", ".....##", "....#.#", "...#...", "#.#....", ".#.....", "#.#...."],   // Sagittarius
+  ["#...#..", ".#.#.#.", "..#..#.", ".....#.", "....##.", "...#.#.", "....#.."],   // Capricorn
+  [".......", ".#.#.#.", "#.#.#.#", ".......", ".#.#.#.", "#.#.#.#", "......."],   // Aquarius
+  ["#.....#", ".#...#.", ".#...#.", "#######", ".#...#.", ".#...#.", "#.....#"],   // Pisces
+];
+const SKY = {
+  out: [11, 28, 38], frame: [251, 246, 210], frameMid: [226, 216, 160], frameDark: [176, 160, 108],
+  bands: [[7, 30, 40], [12, 46, 60], [19, 66, 80], [29, 90, 106], [43, 117, 134], [69, 147, 166], [106, 178, 196]],
+  rose: [[255, 216, 230], [244, 160, 192], [212, 120, 152], [138, 68, 98]], roseCut: [90, 42, 64],
+  ink: [251, 243, 200], star: [255, 255, 255],
+};
+const FACE2 = 26, FACE2_AT = (SZ - FACE2) / 2;                 // the face at 2 px a cell: 26 px, centred
+function paintAstral(coin, back) {
+  const off = document.createElement("canvas"); off.width = SZ; off.height = SZ;
+  const g = off.getContext("2d"), img = g.createImageData(SZ, SZ), d = img.data;
+  const r = SZ / 2 - 1, mid = SZ / 2, k = r * Math.cos(Math.PI / 6);
+  const set = (x, y, c) => { if (x < 0 || y < 0 || x >= SZ || y >= SZ) return; const i = (y * SZ + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
+  // how far out, 0 at the middle to 1 at the hexagon's edge
+  const hexD = (x, y) => {
+    const dx = x + 0.5 - mid, dy = y + 0.5 - mid;
+    return Math.max(Math.abs(dx), Math.abs(dx * 0.5 + dy * 0.866), Math.abs(dx * -0.5 + dy * 0.866)) / k;
+  };
+  const inHex = (x, y) => inShape("hexagonal", x, y, r);
+  for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
+    if (!inHex(x, y)) continue;
+    const t = hexD(x, y), lit = x - mid + (y - mid);
+    if (!inShape("hexagonal", x, y, r - 1)) set(x, y, SKY.out);
+    else if (!inShape("hexagonal", x, y, r - 3)) set(x, y, lit < 0 ? SKY.frame : SKY.frameMid);
+    else if (!inShape("hexagonal", x, y, r - 4)) set(x, y, SKY.frameDark);
+    else {
+      // stepped bands, dark at the heart, dithered where they meet
+      const q = Math.min(6.999, Math.max(0, (t - 0.05) / 0.82) * 7);
+      let b = Math.floor(q);
+      if (q - b > 0.7 && (x + y) % 2 && b < 6) b++;
+      set(x, y, SKY.bands[b]);
+      // an inner line of the frame, dotted
+      if (Math.abs(t - 0.79) < 0.02 && (x + y) % 3 === 0) set(x, y, SKY.frameMid);
+    }
+  }
+  // stars set into the frame at the side corners and below
+  const stud = (cx, cy, arm) => { set(cx, cy, SKY.star); for (let s = 1; s <= arm; s++) for (const [ax, ay] of [[s, 0], [-s, 0], [0, s], [0, -s]]) set(cx + ax, cy + ay, s === arm ? SKY.frameMid : SKY.frame); };
+  stud(Math.round(mid - k + 6) - 1, mid - 9, 2); stud(Math.round(mid + k - 6), mid - 9, 2);
+  stud(Math.round(mid - k + 6) - 1, mid + 9, 1); stud(Math.round(mid + k - 6), mid + 9, 1);
+  stud(mid - 1, SZ - 9, 1); stud(mid, SZ - 9, 1);
+
+  const glyph = ZODIAC[coin.sign];
+  if (back) {
+    // the back: the sign's glyph, large
+    for (let gy = 0; gy < 7; gy++) for (let gx = 0; gx < 7; gx++) if (glyph[gy][gx] === "#")
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) set(mid - 11 + gx * 3 + a + 1, mid - 11 + gy * 3 + b + 1, SKY.frame);
+  } else {
+    // the glyph above, in the frame's cream
+    for (let gy = 0; gy < 7; gy++) for (let gx = 0; gx < 7; gx++) if (glyph[gy][gx] === "#") set(mid - 4 + gx + 1, 9 + gy, SKY.frame);
+    // the coin's own face, small, in rose, carved cell by cell
+    const face = genFace(coin.seed);
+    const at = (x, y) => { const fx = Math.floor((x - FACE2_AT) / 2), fy = Math.floor((y - FACE2_AT) / 2); return fx >= 0 && fy >= 0 && fx < 13 && fy < 13 ? face[fy][fx] : 0; };
+    for (let y = FACE2_AT; y < FACE2_AT + FACE2; y++) for (let x = FACE2_AT; x < FACE2_AT + FACE2; x++) {
+      const v = at(x, y);
+      if (v === 1) set(x, y, at(x - 1, y) !== 1 || at(x, y - 1) !== 1 ? SKY.rose[0] : (y - FACE2_AT) % 2 ? SKY.rose[2] : SKY.rose[1]);
+      else if (v === 2) set(x, y, SKY.roseCut);
+      else if (at(x - 1, y - 1) === 1) set(x, y, SKY.rose[3]);
+    }
+    // the constellation across it all
+    const con = CONSTELLATIONS[coin.sign];
+    const pt = ([u, v]) => [Math.round(15 + u * 34), Math.round(18 + v * 30)];
+    for (const [a, b] of con.lines) {
+      const [x0, y0] = pt(con.stars[a]), [x1, y1] = pt(con.stars[b]);
+      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      for (let i = 1; i < n; i++) set(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), SKY.ink);
+    }
+    for (const st of con.stars) {
+      const [x, y] = pt(st);
+      for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) set(x + ax, y + ay, SKY.ink);
+      set(x, y, SKY.bands[0]);
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return off;
+}
+
 const painted = new Map();
 export const SPACE_LOOP = 16;                 // frames in the void's loop
 function paintCoin(coin, back = false, phase = 0) {
   const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.sign ?? ""}:${coin.shiny ? 1 : 0}:${back ? 1 : 0}:${phase}`;
   if (painted.has(key)) return painted.get(key);
-  const out = paintFresh(coin, back, phase);
+  const out = coin.metalIdx === 8 && coin.sign != null ? paintAstral(coin, back) : paintFresh(coin, back, phase);
+  if (coin.shiny && coin.metalIdx === 8 && coin.sign != null) shine(out.getContext("2d"), coin);
   if (painted.size > 900) painted.delete(painted.keys().next().value);
   painted.set(key, out);
   return out;
@@ -359,29 +459,6 @@ function paintFresh(coin, back, phase) {
     if (t >= 7 && glows[t - 7]) { set(x, y, glows[t - 7]); continue; }
     set(x, y, R[Math.max(0, Math.min(6, t))]);
   }
-  // an astral coin's star sign: its constellation, laid over the field
-  const con = coin.metalIdx === 8 && coin.sign != null && !back ? CONSTELLATIONS[coin.sign] : null;
-  if (con) {
-    // star-chart ink: deep blue lines, stars white with blue points
-    const INK = [44, 58, 128], POINT = [80, 120, 220], STAR = [255, 255, 255];
-    const at = ([u, v]) => [Math.round(13 + u * 38), Math.round(13 + v * 38)];
-    // the lines cross the face too (a shade lighter where they do), so the
-    // sign reads whole
-    const onField = (x, y) => inside(x, y, r - 6);
-    for (const [a, b] of con.lines) {
-      const [x0, y0] = at(con.stars[a]), [x1, y1] = at(con.stars[b]);
-      const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-      for (let i = 1; i < n; i++) {
-        const x = Math.round(x0 + ((x1 - x0) * i) / n), y = Math.round(y0 + ((y1 - y0) * i) / n);
-        if (onField(x, y)) set(x, y, faceAt(x, y) === 1 ? POINT : INK);
-      }
-    }
-    for (const st of con.stars) {
-      const [x, y] = at(st);
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inside(x + dx, y + dy, r - 5)) set(x + dx, y + dy, POINT);
-      set(x, y, STAR);
-    }
-  }
   g.putImageData(img, 0, 0);
   if (coin.shiny) shine(g, coin);
   return off;
@@ -390,7 +467,7 @@ function paintFresh(coin, back, phase) {
 function shine(c, coin) {
   const clipShape = () => {
     c.beginPath();
-    for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) if (inShape(coin.shape, x, y, SZ / 2 - 1)) c.rect(x, y, 1, 1);
+    for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) if (inShape(shapeOf(coin), x, y, SZ / 2 - 1)) c.rect(x, y, 1, 1);
   };
 
   // Shiny: an iridescent film in hard diagonal pixel bands, faint enough

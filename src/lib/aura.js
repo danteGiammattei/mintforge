@@ -29,7 +29,7 @@
  *  hold still.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { drawCoin } from "./coin.js";
+import { drawCoin, shapeOf } from "./coin.js";
 import { RARITIES } from "./data.js";
 
 export const AURA_FPS = 8;
@@ -39,7 +39,7 @@ const S = 64;
  * the rings of empty pixels around it, each in order round the centre. */
 const shapes = new Map();
 function rings(coin, M) {
-  const key = `${coin.shape}:${M}`;
+  const key = `${shapeOf(coin)}:${M}`;
   if (shapes.has(key)) return shapes.get(key);
   const cv = document.createElement("canvas");
   drawCoin(cv, { ...coin, shiny: false }, S);

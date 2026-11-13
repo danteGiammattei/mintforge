@@ -2,7 +2,7 @@ import { matterOf } from "../lib/coinview.js";
 import { useEffect } from "react";
 import CoinCanvas from "./CoinCanvas.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
-import { coinRarity, coinValue } from "../lib/coin.js";
+import { coinRarity, coinValue, shapeOf } from "../lib/coin.js";
 import { RARITIES, SHAPE_NAMES } from "../lib/data.js";
 
 /* What you found, once the dirt is off. Stays until dismissed: nothing
@@ -27,7 +27,7 @@ export default function RevealBanner({ coin, xp, onDone, doneLabel = "KEEP IT" }
       <div style={{ padding: 36, boxShadow: `0 0 0 2px #000, 0 0 0 4px ${r.color}` , background: "var(--stone-0)", animation: "coinEmerge .8s steps(6) both" }}>
         <CoinCanvas coin={coin} size={192} auraMargin={12}/>
       </div>
-      <div style={{ color: m.hl }}>{m.name} · {SHAPE_NAMES[coin.shape] || coin.shape}</div>
+      <div style={{ color: m.hl }}>{m.name} · {SHAPE_NAMES[shapeOf(coin)] || shapeOf(coin)}</div>
       <div>
         <div className="t-rune" style={{ fontSize: 24, color: m.hl }}>{coin.runes}</div>
         <div className="t-title">{coin.raw}</div>

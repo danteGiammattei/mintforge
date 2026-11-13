@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { drawCoin, coinRarity, coinValue } from "../lib/coin.js";
+import { drawCoin, coinRarity, coinValue, shapeOf } from "../lib/coin.js";
 import Aura from "./Aura.jsx";
 import { RARITIES, SHAPE_NAMES } from "../lib/data.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
@@ -66,7 +66,7 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
 
   const rows = [
     ["RARITY", r.name, r.color], ["METAL", m.name, m.hl],
-    ["SHAPE", SHAPE_NAMES[coin.shape] || coin.shape], ["CONDITION", coin.cond],
+    ["SHAPE", SHAPE_NAMES[shapeOf(coin)] || shapeOf(coin)], ["CONDITION", coin.cond],
     ["WEIGHT", `${coin.wt}G`], ["VALUE", coinValue(coin).toLocaleString(), "var(--candle)"],
   ];
 
