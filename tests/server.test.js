@@ -630,19 +630,20 @@ test("materials: about one coin in fifteen is its tier's twin, worth more, and c
   const { MATERIALS } = await import("../src/lib/data.js");
   const { coinValue, mkCoin } = await import("../src/lib/coin.js");
   // the rule's list and the drawings agree, one twin per tier
-  assert.deepEqual(MATERIAL.byTier, Object.keys(MATERIALS));
-  MATERIAL.byTier.forEach((id, tier) => assert.equal(MATERIALS[id].tier, tier));
+  assert.deepEqual(MATERIAL.byTier.filter(Boolean), Object.keys(MATERIALS));
+  MATERIAL.byTier.forEach((id, tier) => id && assert.equal(MATERIALS[id].tier, tier));
 
   const R = seeded(21);
-  let mat = 0, N = 6000;
-  for (let i = 0; i < N; i++) {
+  let mat = 0, N = 0;
+  for (let i = 0; i < 30000; i++) {
     const c = rollCoin(i % 5, 0, R);
-    if (c.material) { mat++; assert.equal(c.material, MATERIAL.byTier[c.metalIdx]); }
+    if (c.material) assert.equal(c.material, MATERIAL.byTier[c.metalIdx]);
+    if (MATERIAL.byTier[c.metalIdx]) { N++; if (c.material) mat++; }
   }
   assert.ok(Math.abs(mat / N - MATERIAL.chance) < 0.015, `twins ${mat / N}`);
 
   const plain = Object.assign(mkCoin(4242, 1, 3), { rarity: 2 });
-  assert.ok(Math.abs(coinValue({ ...plain, material: "amber" }) - coinValue(plain) * MATERIAL.valueMul) <= 1);
+  assert.ok(Math.abs(coinValue({ ...plain, material: "ice" }) - coinValue(plain) * MATERIAL.valueMul) <= 1);
 
   const { db, pid } = await world();
   await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material)

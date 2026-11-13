@@ -273,11 +273,12 @@ export const WAR = {
 };
 
 /* ─── materials ───────────────────────────────────────────────────────
- * A coin from a chest is, now and then, its metal tier's twin in another
- * material (src/lib/data.js MATERIALS): same tier, a different look,
- * worth a little more for being rarer. byTier must match MATERIALS. */
+ * A silver or obsidian coin from a chest is, now and then, its twin in
+ * another material (src/lib/data.js MATERIALS): ice, or lava. The same
+ * tier, a different look, worth a little more for being rarer. byTier
+ * (null where a tier has none) must match MATERIALS. */
 export const MATERIAL = {
   chance: 1 / 15,
   valueMul: 1.6,
-  byTier: ["wood", "stone", "ice", "amber", "pearl", "lava", "meteorite", "jade", "crystal"],
+  byTier: [null, null, "ice", null, null, "lava", null, null, null],
 };

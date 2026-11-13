@@ -17,7 +17,7 @@ export function hydrate(row) {
  * a colour to write that in. */
 export function matterOf(c) {
   const mat = c.material && MATERIALS[c.material];
-  return mat ? { name: mat.name, hl: mat.glow || mat.ramp[6], material: true } : { name: METALS[c.metalIdx].name, hl: METALS[c.metalIdx].hl, material: false };
+  return mat ? { name: mat.name, hl: mat.glows?.[0] || mat.ramp[6], material: true } : { name: METALS[c.metalIdx].name, hl: METALS[c.metalIdx].hl, material: false };
 }
 
 /* What to call it: the name its owner had cut into it, or the one it was struck with. */

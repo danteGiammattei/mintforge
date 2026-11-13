@@ -76,7 +76,7 @@ export default function Journal() {
       <section className="panel" style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }} aria-label="Materials found">
         <div className="between"><span className="t-label">MATERIALS</span>
           <span className="t-label">{Object.keys(MATERIALS).filter(id => (j.m || {})[id] > 0).length} / {Object.keys(MATERIALS).length}</span></div>
-        <div className="grid-3" style={{ gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
           {Object.entries(MATERIALS).map(([id, mat]) => {
             const n = (j.m || {})[id] || 0;
             return (
@@ -85,12 +85,12 @@ export default function Journal() {
                    aria-label={n ? `${mat.name}: ${n} found` : `A ${METALS[mat.tier].name.toLowerCase()} twin, not found`}>
                 {n ? <CoinCanvas coin={{ seed: 777 + mat.tier, metalIdx: mat.tier, shape: "round", material: id, rarity: 0 }} size={64} aura={false} still/>
                    : <div style={{ width: 64, height: 64, display: "grid", placeItems: "center" }} className="t-label" aria-hidden>?</div>}
-                <span className="t-label" style={{ color: n ? mat.glow || mat.ramp[6] : "var(--mute)" }}>{n ? mat.name : `${METALS[mat.tier].name} twin`}</span>
+                <span className="t-label" style={{ color: n ? mat.glows?.[0] || mat.ramp[6] : "var(--mute)" }}>{n ? mat.name : `${METALS[mat.tier].name} twin`}</span>
               </div>
             );
           })}
         </div>
-        <p className="t-label" style={{ margin: 0 }}>NOW AND THEN A CHEST HOLDS A METAL'S TWIN IN SOMETHING ELSE. EACH IS WORTH A LITTLE MORE.</p>
+        <p className="t-label" style={{ margin: 0 }}>NOW AND THEN A SILVER COIN COMES OUT OF ICE, OR AN OBSIDIAN ONE OUT OF LAVA. EACH IS WORTH A LITTLE MORE.</p>
       </section>
 
       <p className="t-label" style={{ margin: 0, textAlign: "center" }}>

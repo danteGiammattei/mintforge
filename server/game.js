@@ -322,7 +322,7 @@ const hydrate = r => {
   const c = mkCoin(r.seed >>> 0, 1, r.metal_idx);
   c.shiny = !!r.shiny;
   if (r.rarity != null) c.rarity = r.rarity;
-  if (r.material) c.material = r.material;
+  if (MATERIAL.byTier.includes(r.material) && r.material) c.material = r.material;
   return c;
 };
 const placeholders = (n, from) => Array.from({ length: n }, (_, i) => `?${i + from}`).join(",");

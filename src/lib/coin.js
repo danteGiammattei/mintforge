@@ -186,11 +186,11 @@ const rgbCss = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 /* outline, deep, dark, mid, base, light, glint */
 export function coinRamp(coin) {
   const mat = coin.material && MATERIALS[coin.material];
-  if (mat) return { ramp: mat.ramp.map(hexRgb), eng: hexRgb(mat.eng), tex: mat.tex, glow: mat.glow ? hexRgb(mat.glow) : null };
+  if (mat) return { ramp: mat.ramp.map(hexRgb), eng: hexRgb(mat.eng), tex: mat.tex, glows: (mat.glows || []).map(hexRgb) };
   const m = METALS[coin.metalIdx], dark = hexRgb(m.dark), mid = hexRgb(m.mid), base = hexRgb(m.base), hl = hexRgb(m.hl);
   return {
     ramp: [mixRgb(dark, [0, 0, 0], 0.55), dark, mixRgb(dark, mid, 0.55), mid, base, hl, mixRgb(hl, [255, 255, 255], 0.5)],
-    eng: hexRgb(m.eng), tex: "metal", glow: null,
+    eng: hexRgb(m.eng), tex: "metal", glows: [],
   };
 }
 
@@ -217,15 +217,39 @@ export function inShape(shape, x, y, r) {
 }
 
 const hashPx = (x, y, s) => ((Math.imul((x * 73856093) ^ (y * 19349663) ^ s, 2654435761) >>> 0) % 1000) / 1000;
-/* a material's grain: (x, y, tone) → tone; 7 means its glow colour */
+/* a material's grain: (x, y, tone) → tone; 7, 8, 9 mean its glows */
 const GRAIN = {
   metal: s => (x, y, t) => t + (hashPx(x, y, s) < 0.025 ? -1 : hashPx(x, y, s) > 0.985 ? 1 : 0),
-  wood:  s => (x, y, t) => t + (Math.sin((y + Math.sin(x * 0.35 + s) * 2.2) * 0.9) > 0.75 ? -1 : 0),
-  stone: s => (x, y, t) => t + (hashPx(x >> 1, y >> 1, s) < 0.12 ? -1 : hashPx(x, y, s) > 0.94 ? 1 : 0),
-  speck: s => (x, y, t) => (hashPx(x, y, s) > 0.965 ? 6 : hashPx(x >> 1, y >> 1, s) < 0.1 ? t - 1 : t),
-  lava:  s => (x, y, t) => (Math.abs(Math.sin(x * 0.45 + s) + Math.sin(y * 0.5 - s * 0.7) + Math.sin((x + y) * 0.3)) < 0.28 ? 7 : t),
-  ice:   s => (x, y, t) => ((x * 3 + y * 5 + s) % 23 === 0 || (x - y + 64 + s) % 29 === 0 ? 6 : t),
-  facet: () => (x, y, t) => t + ((Math.floor((x + 2 * y) / 9) + Math.floor((2 * x - y + 64) / 11)) % 3 === 0 ? 1 : 0),
+  // ice: a mosaic of blues in 2-pixel tiles, light catching on the
+  // diagonals, and frost across the top
+  ice: s => (x, y, t) => {
+    const h = hashPx(x >> 1, y >> 1, s), h2 = hashPx(x, y, s + 7);
+    const frost = y < 11 + Math.round(hashPx(x >> 1, 0, s + 3) * 4);
+    if (frost) return h < 0.45 ? 6 : 5;
+    let v = t + (h < 0.22 ? -1 : h > 0.8 ? 1 : 0);
+    if ((x - y + 64) % 9 === 0 && h2 > 0.45) v = 6;
+    return v;
+  },
+  // lava: plates of dark rock (cells round scattered points), each lit on
+  // its top-left, split by cracks that glow yellow at the heart, then
+  // orange, then red
+  lava: s => {
+    // one point in each cell of a 3 × 3 grid, jittered, so plates stay even
+    const pts = Array.from({ length: 9 }, (_, i) => [((i % 3) + 0.2 + 0.6 * hashPx(i, 1, s)) * 64 / 3, (Math.floor(i / 3) + 0.2 + 0.6 * hashPx(i, 2, s)) * 64 / 3]);
+    return (x, y) => {
+      let d1 = 1e9, d2 = 1e9, near = null;
+      for (const [px, py] of pts) for (const ox of [-64, 0, 64]) for (const oy of [-64, 0, 64]) {
+        const d = Math.hypot(x + 0.5 - px - ox, y + 0.5 - py - oy);
+        if (d < d1) { d2 = d1; d1 = d; near = [px + ox, py + oy]; } else if (d < d2) d2 = d;
+      }
+      const gap = d2 - d1;
+      if (gap < 1.3) return 7;
+      if (gap < 2.7) return 8;
+      if (gap < 4.0) return 9;
+      const lit = (x - near[0]) + (y - near[1]);
+      return lit < -4 ? 5 : lit < 3 ? 4 : 3;
+    };
+  },
   plain: () => (x, y, t) => t,
 };
 
@@ -243,7 +267,7 @@ function paintCoin(coin, back = false) {
 function paintFresh(coin, back) {
   const off = document.createElement("canvas"); off.width = SZ; off.height = SZ;
   const g = off.getContext("2d"), img = g.createImageData(SZ, SZ), d = img.data;
-  const { ramp: R, eng, tex, glow } = coinRamp(coin);
+  const { ramp: R, eng, tex, glows } = coinRamp(coin);
   const grain = GRAIN[tex || "metal"]((coin.seed >>> 0) % 997);
   const r = SZ / 2 - 1, mid = SZ / 2;
   const holed = coin.shape === "holed";
@@ -285,7 +309,7 @@ function paintFresh(coin, back) {
       const u = x + y;
       if ((u === 24 || u === 25 || u === 29) && x > 10 && y > 10 && v !== 1) t = Math.min(6, t + 1);
     }
-    if (t === 7 && glow) { set(x, y, glow); continue; }
+    if (t >= 7 && glows[t - 7]) { set(x, y, glows[t - 7]); continue; }
     set(x, y, R[Math.max(0, Math.min(6, t))]);
   }
   g.putImageData(img, 0, 0);
