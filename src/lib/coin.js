@@ -189,9 +189,10 @@ const rgbCss = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 /* metals with a texture of their own: void is a piece of night sky,
  * dithered nebula and stars (glows: white star, blue star, nebula) */
 const METAL_LOOK = {
-  [METAL.ice]:  { tex: "ice",  ramp: ["#0a2c48", "#1a6aa4", "#2f94d4", "#52b6ec", "#7ccaf4", "#b4e6fc", "#ffffff"] },
-  [METAL.lava]: { tex: "lava", ramp: ["#1a0604", "#3a0e08", "#55180c", "#6a2210", "#7e2c16", "#96401e", "#b8582c"],
-                  glows: ["#ffd84a", "#ff8a1a", "#d8301a"] },
+  // ice and lava take their colours from the reference textures
+  [METAL.ice]:  { tex: "ice",  ramp: ["#1a5a8a", "#2a86c8", "#46a8e8", "#5cbef6", "#6acefc", "#aaebfb", "#f4fdff"] },
+  [METAL.lava]: { tex: "lava", ramp: ["#1e0802", "#3c1204", "#501703", "#5b1e05", "#6a2206", "#782007", "#94320c"],
+                  glows: ["#ffd23a", "#f78f0d", "#f65111", "#cd1605"] },
   // fire: a coin of living flame, white-gold at the bottom through orange
   // and red to ember at the top, the bands licking upward as it burns
   [METAL.fire]: { tex: "fire", ramp: ["#1a0402", "#3a0c04", "#6a1808", "#a02a0c", "#d04a14", "#f07a24", "#ffd060"],
@@ -240,21 +241,21 @@ const hashPx = (x, y, s) => ((Math.imul((x * 73856093) ^ (y * 19349663) ^ s, 265
 /* a material's grain: (x, y, tone) → tone; 7, 8, 9 mean its glows */
 const GRAIN = {
   metal: s => (x, y, t) => t + (hashPx(x, y, s) < 0.025 ? -1 : hashPx(x, y, s) > 0.985 ? 1 : 0),
-  // ice: a mosaic of blues in 2-pixel tiles, light catching on the
-  // diagonals, and frost across the top
+  // ice: a pale mosaic in 2-pixel tiles, mostly the base blue, flecked
+  // lighter and deeper, light catching on the diagonals, frost on top
   ice: s => (x, y, t) => {
     const h = hashPx(x >> 1, y >> 1, s), h2 = hashPx(x, y, s + 7);
     const frost = y < 11 + Math.round(hashPx(x >> 1, 0, s + 3) * 4);
-    if (frost) return h < 0.45 ? 6 : 5;
-    let v = t + (h < 0.22 ? -1 : h > 0.8 ? 1 : 0);
-    if ((x - y + 64) % 9 === 0 && h2 > 0.45) v = 6;
+    if (frost) return h < 0.5 ? 6 : 5;
+    let v = 4 + (h < 0.16 ? -1 : h > 0.84 ? 1 : 0);
+    if (t < 4 && h < 0.4) v--;                                  // the side away from the light
+    if ((x - y + 64) % 7 === 0 && h2 > 0.55) v = 6;
     return v;
   },
-  // lava: plates of dark rock (cells round scattered points), each lit on
-  // its top-left, split by cracks that glow yellow at the heart, then
-  // orange, then red
+  // lava: plates of dark mottled rock round scattered points (a jittered
+  // 3 × 3 grid, so they stay even), each lit on its top-left, split by
+  // thick cracks: yellow at the heart, then amber, orange, red
   lava: s => {
-    // one point in each cell of a 3 × 3 grid, jittered, so plates stay even
     const pts = Array.from({ length: 9 }, (_, i) => [((i % 3) + 0.2 + 0.6 * hashPx(i, 1, s)) * 64 / 3, (Math.floor(i / 3) + 0.2 + 0.6 * hashPx(i, 2, s)) * 64 / 3]);
     return (x, y) => {
       let d1 = 1e9, d2 = 1e9, near = null;
@@ -263,33 +264,13 @@ const GRAIN = {
         if (d < d1) { d2 = d1; d1 = d; near = [px + ox, py + oy]; } else if (d < d2) d2 = d;
       }
       const gap = d2 - d1;
-      if (gap < 1.3) return 7;
-      if (gap < 2.7) return 8;
-      if (gap < 4.0) return 9;
+      if (gap < 1.2) return 7;
+      if (gap < 2.3) return 8;
+      if (gap < 3.3) return 9;
+      if (gap < 4.4) return 10;
       const lit = (x - near[0]) + (y - near[1]);
-      return lit < -4 ? 5 : lit < 3 ? 4 : 3;
-    };
-  },
-  // void: night sky. Nebula in checker-dithered diagonal drifts, single
-  // stars white and blue, and a few that shine in a cross
-  // `phase` (0 … SPACE_LOOP-1) moves it: the nebula drifts along its
-  // diagonal and the stars twinkle, looping without a seam
-  space: (s, phase = 0) => {
-    const crosses = Array.from({ length: 3 }, (_, i) => [8 + Math.floor(hashPx(i, 5, s) * 48), 8 + Math.floor(hashPx(i, 6, s) * 48)]);
-    const turn = (phase / SPACE_LOOP) * Math.PI * 2;
-    return (x, y, t) => {
-      for (const [i, [cx, cy]] of crosses.entries()) {
-        const lit = (phase + i * 5) % SPACE_LOOP < SPACE_LOOP / 2;
-        if (x === cx && y === cy) return lit ? 7 : 8;
-        if (lit && Math.abs(x - cx) + Math.abs(y - cy) === 1) return 8;
-      }
-      const h = hashPx(x, y, s);
-      if (h > 0.988) return (Math.floor(h * 1e5) + phase) % 6 === 0 ? 8 : 7;   // now and then a star dims
-      if (h > 0.976) return (Math.floor(h * 1e5) + phase) % 7 === 0 ? t - 1 : 8;
-      const n = Math.sin((x + y) * 0.17 + s - turn) + 0.8 * Math.sin((x - y) * 0.07 - s * 0.5 + turn);
-      if (n > 0.95) return (x + y) % 2 ? 9 : t;
-      if (n > 0.45) return (x % 2 === 0 && y % 2 === 0) ? 9 : t - 1;
-      return t - 1;
+      const mottle = hashPx(x >> 1, y >> 1, s) < 0.3 ? -1 : 0;
+      return (lit < -5 ? 5 : lit < 3 ? 4 : 3) + mottle;
     };
   },
   // fire: bands of flame, hottest at the bottom, their edges licking up;
