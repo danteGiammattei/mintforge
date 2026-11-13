@@ -23,21 +23,24 @@ export const coinOut = r => ({
   id: r.id, seed: r.seed >>> 0, metalIdx: r.metal_idx, shiny: !!r.shiny, locked: !!r.locked,
   ...(r.rarity != null ? { rarity: r.rarity } : {}),
   ...(r.nickname ? { nick: r.nickname } : {}),
+  ...(r.material ? { material: r.material } : {}),
 });
 
 /* The journal as stored, topped up with what the player holds right now —
  * so coins from before the journal existed count without a backfill. */
 export function journalOut(stored, coins) {
-  const j = parseObj(stored), c = { ...(j.c || {}) }, held = {};
+  const j = parseObj(stored), c = { ...(j.c || {}) }, m = { ...(j.m || {}) }, held = {}, heldM = {};
   let shinyHeld = 0;
   for (const r of coins) {
     if (r.dusty) continue;
     const k = `${r.metal_idx}:${r.rarity ?? 0}`;
     held[k] = (held[k] || 0) + 1;
     if (r.shiny) shinyHeld++;
+    if (r.material) heldM[r.material] = (heldM[r.material] || 0) + 1;
   }
   for (const [k, n] of Object.entries(held)) c[k] = Math.max(c[k] || 0, n);
-  return { c, shiny: Math.max(j.shiny || 0, shinyHeld), best: j.best || 0 };
+  for (const [k, n] of Object.entries(heldM)) m[k] = Math.max(m[k] || 0, n);
+  return { c, m, shiny: Math.max(j.shiny || 0, shinyHeld), best: j.best || 0 };
 }
 
 export async function loadState(db, pid, now = Date.now(), tz = 0) {
@@ -51,7 +54,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   if (!ps) throw new Refusal("State missing — your account may need recreating", 500);
 
   const [coins, scrolls, chests] = await Promise.all([
-    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
+    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
     db.prepare(`SELECT id, rarity, seed FROM scrolls WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
     db.prepare(`SELECT id, tier FROM chests WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
   ]);

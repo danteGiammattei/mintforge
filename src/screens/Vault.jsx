@@ -6,7 +6,7 @@ import { coinRarity, coinValue } from "../lib/coin.js";
 import { METALS, RARITIES } from "../lib/data.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
 import Journal from "../components/Journal.jsx";
-import { coinName } from "../lib/coinview.js";
+import { coinName, matterOf } from "../lib/coinview.js";
 import CoinModal from "../components/CoinModal.jsx";
 import Forge from "../components/Forge.jsx";
 import { FORGE } from "../../shared/tuning.js";
@@ -23,7 +23,7 @@ const SORTS = [
 ];
 
 export function CoinTile({ coin, selected, pinned, disabled, onClick, label }) {
-  const m = METALS[coin.metalIdx], r = RARITIES[coinRarity(coin)];
+  const m = matterOf(coin), r = RARITIES[coinRarity(coin)];
   return (
     <button className="tile" aria-pressed={selected ? true : undefined} disabled={disabled} onClick={onClick}
             style={{ borderTopColor: r.color, ...(r.id >= 4 && !selected ? { background: `radial-gradient(circle at 50% 38%, ${r.glow}, transparent 70%), var(--stone-1)` } : {}) }}

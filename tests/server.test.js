@@ -20,8 +20,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 014 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql"]);
+test("migrations 009 and 011 to 015 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -622,4 +622,33 @@ test("cabinet score: rarity counts most, six coins, grades in order", async () =
   const top = cabinetScore(Array(6).fill({ metalIdx: 8, rarity: 5, shiny: true }));
   assert.equal(top.next, null);
   assert.equal(top.grade, "A MYTHIC HOARD");
+});
+
+test("materials: about one coin in fifteen is its tier's twin, worth more, and counted in the journal", async () => {
+  const { rollCoin } = await import("../shared/economy.js");
+  const { MATERIAL } = await import("../shared/tuning.js");
+  const { MATERIALS } = await import("../src/lib/data.js");
+  const { coinValue, mkCoin } = await import("../src/lib/coin.js");
+  // the rule's list and the drawings agree, one twin per tier
+  assert.deepEqual(MATERIAL.byTier, Object.keys(MATERIALS));
+  MATERIAL.byTier.forEach((id, tier) => assert.equal(MATERIALS[id].tier, tier));
+
+  const R = seeded(21);
+  let mat = 0, N = 6000;
+  for (let i = 0; i < N; i++) {
+    const c = rollCoin(i % 5, 0, R);
+    if (c.material) { mat++; assert.equal(c.material, MATERIAL.byTier[c.metalIdx]); }
+  }
+  assert.ok(Math.abs(mat / N - MATERIAL.chance) < 0.015, `twins ${mat / N}`);
+
+  const plain = Object.assign(mkCoin(4242, 1, 3), { rarity: 2 });
+  assert.ok(Math.abs(coinValue({ ...plain, material: "amber" }) - coinValue(plain) * MATERIAL.valueMul) <= 1);
+
+  const { db, pid } = await world();
+  await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material)
+                    VALUES ('c_m', ?1, 99, 5, 0, 0, 1, 0, 1, 'lava')`).bind(pid).run();
+  const r = await driver(db, pid, seeded(4))("brush", { coinId: "c_m" });
+  assert.equal(r.result.coin.material, "lava");
+  assert.equal(r.state.journal.m.lava, 1);
+  assert.equal(r.state.coins.find(c => c.id === "c_m").material, "lava");
 });

@@ -1,13 +1,14 @@
+import { matterOf } from "../lib/coinview.js";
 import { useEffect } from "react";
 import CoinCanvas from "./CoinCanvas.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { coinRarity, coinValue } from "../lib/coin.js";
-import { METALS, RARITIES, SHAPE_NAMES } from "../lib/data.js";
+import { RARITIES, SHAPE_NAMES } from "../lib/data.js";
 
 /* What you found, once the dirt is off. Stays until dismissed: nothing
  * here is on a timer, so nobody has to read against the clock. */
 export default function RevealBanner({ coin, xp, onDone, doneLabel = "KEEP IT" }) {
-  const m = METALS[coin.metalIdx];
+  const m = matterOf(coin);
   const r = RARITIES[coinRarity(coin)];
   useEffect(() => {
     const key = e => { if (e.key === "Escape" || e.key === "Enter") onDone(); };

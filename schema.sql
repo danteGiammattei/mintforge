@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS coins (
   acquired_at     INTEGER NOT NULL,
   dusty           INTEGER NOT NULL DEFAULT 0,         -- fresh from a chest, not yet brushed
   nickname        TEXT,                               -- engraved at the forge
+  material        TEXT,                               -- a twin in another material (migration 015)
   PRIMARY KEY (player_id, id),
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );

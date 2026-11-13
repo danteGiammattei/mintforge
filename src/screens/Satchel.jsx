@@ -1,3 +1,4 @@
+import { matterOf } from "../lib/coinview.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
@@ -9,7 +10,7 @@ import { openScroll, chest as chestSprite, dirtClod } from "../lib/forms.js";
 import { mount as mountChest, SURROUND } from "../scenes/chest.js";
 import { RARITY } from "../../shared/sigil.js";
 import { CHESTS } from "../../shared/tuning.js";
-import { BRUSH_UPS, METALS, RARITIES } from "../lib/data.js";
+import { BRUSH_UPS, RARITIES } from "../lib/data.js";
 import { coinRarity } from "../lib/coin.js";
 
 /* ─── SATCHEL ─────────────────────────────────────────────────────────────
@@ -65,7 +66,7 @@ export default function Satchel() {
       const r = await g.act("brush", { coinId: coin.id });
       feel("reveal");
       setFound({ coin, xp: r.xp });
-      ui.say(`${RARITIES[coinRarity(coin)].name} ${METALS[coin.metalIdx].name} coin${coin.shiny ? ", shiny" : ""}.`);
+      ui.say(`${RARITIES[coinRarity(coin)].name} ${matterOf(coin).name} coin${coin.shiny ? ", shiny" : ""}.`);
     } catch (e) {
       // it is still dusty on the server, so it is still here to brush
       ui.toast(`${e.message}. THE COIN IS STILL IN YOUR SATCHEL.`, "bad");

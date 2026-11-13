@@ -1,5 +1,6 @@
 import { useGame } from "../lib/GameContext.js";
-import { METALS, RARITIES } from "../lib/data.js";
+import { METALS, RARITIES, MATERIALS } from "../lib/data.js";
+import CoinCanvas from "./CoinCanvas.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { LEDGER_MARKS } from "../../shared/economy.js";
 
@@ -69,6 +70,27 @@ export default function Journal() {
         <ul style={{ listStyle: "none", display: "flex", flexWrap: "wrap", gap: "4px 12px", margin: "8px 4px 4px", padding: 0 }} aria-hidden>
           {RARITIES.map(r => <li key={r.name} className="row" style={{ gap: 6, color: r.color }}><i style={{ width: 8, height: 8, background: r.color }}/>{r.name}</li>)}
         </ul>
+      </section>
+
+      {/* the rare twins: one per metal, found or not */}
+      <section className="panel" style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }} aria-label="Materials found">
+        <div className="between"><span className="t-label">MATERIALS</span>
+          <span className="t-label">{Object.keys(MATERIALS).filter(id => (j.m || {})[id] > 0).length} / {Object.keys(MATERIALS).length}</span></div>
+        <div className="grid-3" style={{ gap: 8 }}>
+          {Object.entries(MATERIALS).map(([id, mat]) => {
+            const n = (j.m || {})[id] || 0;
+            return (
+              <div key={id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: 4,
+                                     border: `2px solid ${n ? mat.ramp[4] : "var(--line)"}`, background: n ? "var(--stone-3)" : "var(--stone-0)" }}
+                   aria-label={n ? `${mat.name}: ${n} found` : `A ${METALS[mat.tier].name.toLowerCase()} twin, not found`}>
+                {n ? <CoinCanvas coin={{ seed: 777 + mat.tier, metalIdx: mat.tier, shape: "round", material: id, rarity: 0 }} size={64} aura={false} still/>
+                   : <div style={{ width: 64, height: 64, display: "grid", placeItems: "center" }} className="t-label" aria-hidden>?</div>}
+                <span className="t-label" style={{ color: n ? mat.glow || mat.ramp[6] : "var(--mute)" }}>{n ? mat.name : `${METALS[mat.tier].name} twin`}</span>
+              </div>
+            );
+          })}
+        </div>
+        <p className="t-label" style={{ margin: 0 }}>NOW AND THEN A CHEST HOLDS A METAL'S TWIN IN SOMETHING ELSE. EACH IS WORTH A LITTLE MORE.</p>
       </section>
 
       <p className="t-label" style={{ margin: 0, textAlign: "center" }}>

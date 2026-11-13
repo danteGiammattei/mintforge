@@ -21,7 +21,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { analyse, rollScroll, measure, TRAITS, cravingOn } from "../shared/sigil.js";
-import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE } from "../shared/tuning.js";
+import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
@@ -263,11 +263,18 @@ async function daily(db, pid, stats, statsText, now, tz) {
  * A statement that records one coin as found. Kinds only ever count up. */
 export function journalStmt(db, pid, c) {
   const k = `$.c."${c.metalIdx}:${c.rarity ?? 0}"`;
-  const value = coinValue(hydrate({ seed: c.seed, metal_idx: c.metalIdx, shiny: c.shiny ? 1 : 0, rarity: c.rarity }));
+  // a material is also counted on its own page, by name ($.m); only
+  // known names, since they are written into the path
+  const mat = MATERIAL.byTier.includes(c.material) ? c.material : null;
+  const mk = mat ? `$.m."${mat}"` : null;
+  const value = coinValue(hydrate({ seed: c.seed, metal_idx: c.metalIdx, shiny: c.shiny ? 1 : 0, rarity: c.rarity, material: mat }));
   return db.prepare(
     `UPDATE player_state SET journal = json_set(
-        CASE WHEN json_type(journal, '$.c') IS NULL THEN json_set(journal, '$.c', json('{}')) ELSE journal END,
-        '${k}', COALESCE(json_extract(journal, '${k}'), 0) + 1,
+        json_set(journal,
+          '$.c', json(COALESCE(json_extract(journal, '$.c'), '{}')),
+          '$.m', json(COALESCE(json_extract(journal, '$.m'), '{}'))),
+        '${k}', COALESCE(json_extract(journal, '${k}'), 0) + 1,${mk ? `
+        '${mk}', COALESCE(json_extract(journal, '${mk}'), 0) + 1,` : ""}
         '$.shiny', COALESCE(json_extract(journal, '$.shiny'), 0) + ?2,
         '$.best', MAX(COALESCE(json_extract(journal, '$.best'), 0), ?3))
       WHERE player_id = ?1`
@@ -286,9 +293,9 @@ async function open(db, pid, body, { now, rand }) {
   const id = "c_" + randomHex(8);
   await db.batch([
     db.prepare(
-      `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty)
-       VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, 1)`
-    ).bind(id, pid, c.seed, c.metalIdx, c.shiny ? 1 : 0, c.rarity, now),
+      `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material)
+       VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, 1, ?8)`
+    ).bind(id, pid, c.seed, c.metalIdx, c.shiny ? 1 : 0, c.rarity, now, c.material || null),
     db.prepare(`UPDATE player_state SET xp = xp + ?2 WHERE player_id = ?1`).bind(pid, XP.open),
   ]);
   return { tier: ch.tier, coin: { id, seed: c.seed, metalIdx: c.metalIdx, shiny: c.shiny, locked: false, rarity: c.rarity }, xp: XP.open };
@@ -298,13 +305,13 @@ async function brush(db, pid, body, { now }) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const c = await db.prepare(
     `UPDATE coins SET dusty = 0, acquired_at = ?3 WHERE id = ?1 AND player_id = ?2 AND dusty = 1
-     RETURNING id, seed, metal_idx, shiny, locked, rarity`
+     RETURNING id, seed, metal_idx, shiny, locked, rarity, material`
   ).bind(body.coinId, pid, now).first();
   if (!c) throw new Refusal("That coin is already clean", 404);
   const xp = xpForBrush({ rarity: c.rarity, metalIdx: c.metal_idx, shiny: !!c.shiny });
   await db.batch([
     db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${bump("brushed")} WHERE player_id = ?1`).bind(pid, xp),
-    journalStmt(db, pid, { seed: c.seed, metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity }),
+    journalStmt(db, pid, { seed: c.seed, metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity, material: c.material }),
   ]);
   return { coin: coinOut(c), xp };
 }
@@ -315,6 +322,7 @@ const hydrate = r => {
   const c = mkCoin(r.seed >>> 0, 1, r.metal_idx);
   c.shiny = !!r.shiny;
   if (r.rarity != null) c.rarity = r.rarity;
+  if (r.material) c.material = r.material;
   return c;
 };
 const placeholders = (n, from) => Array.from({ length: n }, (_, i) => `?${i + from}`).join(",");
@@ -325,7 +333,7 @@ async function sell(db, pid, body) {
   // locked coins and dusty ones are simply not matched, so not sold
   const gone = await db.prepare(
     `DELETE FROM coins WHERE player_id = ?1 AND locked = 0 AND dusty = 0 AND id IN (${placeholders(ids.length, 2)})
-     RETURNING id, seed, metal_idx, shiny, rarity`
+     RETURNING id, seed, metal_idx, shiny, rarity, material`
   ).bind(pid, ...ids).all();
   const rows = gone.results || [];
   if (!rows.length) throw new Refusal("None of those can be sold", 409);
@@ -340,7 +348,7 @@ async function sell(db, pid, body) {
 async function forge(db, pid, body, { rand }) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const c = await db.prepare(
-    `SELECT id, seed, metal_idx, shiny, rarity FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
+    `SELECT id, seed, metal_idx, shiny, rarity, material FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
   ).bind(body.coinId, pid).first();
   if (!c) throw new Refusal("That coin is gone", 404);
   if (c.shiny) throw new Refusal("It already shines", 409);

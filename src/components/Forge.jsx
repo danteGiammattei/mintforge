@@ -3,10 +3,10 @@ import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
 import { coinValue, coinRarity } from "../lib/coin.js";
-import { METALS, RARITIES } from "../lib/data.js";
+import { RARITIES } from "../lib/data.js";
 import { forgeCost } from "../../shared/economy.js";
 import { FORGE, ENGRAVE } from "../../shared/tuning.js";
-import { coinName } from "../lib/coinview.js";
+import { coinName, matterOf } from "../lib/coinview.js";
 import { mount, SURROUND } from "../scenes/forge.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
 
@@ -42,7 +42,7 @@ export default function Forge({ coinId, onClose }) {
   if (!coin) return null;
   const cost = forgeCost(coinValue({ ...coin, shiny: false }));
   const short = g.marks < cost;
-  const m = METALS[coin.metalIdx], r = RARITIES[coinRarity(coin)];
+  const m = matterOf(coin), r = RARITIES[coinRarity(coin)];
 
   const strike = () => {
     if (busy || coin.shiny || short) return;

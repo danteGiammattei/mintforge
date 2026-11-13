@@ -8,15 +8,17 @@
  *  Pure apart from drawCoin, which needs a canvas and is only ever called
  *  in the browser — so the server imports this file for coinValue too.
  *
- *  THE GENERATOR (genFace, mkCoin, drawCoin) IS FROZEN. tests/coin.golden
- *  pins its output; if that test fails, the change is wrong, not the test.
+ *  THE GENERATOR (genFace, mkCoin) IS FROZEN. tests/coin.golden pins its
+ *  output; if that test fails, the change is wrong, not the test. How a
+ *  coin is drawn (drawCoin) may change, as it did in November 2026 when
+ *  coins became pixel art; what a coin IS, from its seed, may not.
  * ════════════════════════════════════════════════════════════════════════ */
 
 import {
   METALS, MATERIALS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
   RARITIES,   TITLES, TITLE_LEVELS,
 } from "./data.js";
-import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP } from "../../shared/tuning.js";
+import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP, MATERIAL } from "../../shared/tuning.js";
 
 /* ─── RUNE TRANSLATOR ─────────────────────────────────────────────────── */
 const RL = { A:"ᚨ",B:"ᛒ",C:"ᚲ",D:"ᛞ",E:"ᛖ",F:"ᚠ",G:"ᚷ",H:"ᚺ",I:"ᛁ",J:"ᛃ",K:"ᚲ",L:"ᛚ",M:"ᛗ",N:"ᚾ",O:"ᛟ",P:"ᛈ",R:"ᚱ",S:"ᛊ",T:"ᛏ",U:"ᚢ",V:"ᚡ",W:"ᚹ",X:"ᛪ",Y:"ᚤ",Z:"ᛉ" };
@@ -395,7 +397,8 @@ export function coinValue(c) {
   const condMul  = 1 + (3 - condIdx) * CONDITION_STEP;
   const shinyMul = c.shiny ? SHINY_VALUE_MUL : 1;
   const rarMul   = RARITIES[coinRarity(c)]?.valueMul || 1;
-  return Math.max(1, Math.round(base * condMul * shinyMul * rarMul));
+  const matMul   = c.material ? MATERIAL.valueMul : 1;
+  return Math.max(1, Math.round(base * condMul * shinyMul * rarMul * matMul));
 }
 
 export function vaultMarks(coins) {

@@ -3,7 +3,7 @@ import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
 import { coinRarity } from "../lib/coin.js";
-import { hydrate } from "../lib/coinview.js";
+import { hydrate, matterOf } from "../lib/coinview.js";
 import { METALS, RARITIES, MAX_TIER } from "../lib/data.js";
 import { GAMBLE } from "../../shared/tuning.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
@@ -70,7 +70,7 @@ export default function Tavern() {
     const prize = coins.find(c => c.shiny || coinRarity(c) >= 3);
     if (prize && !(await ui.confirm({
       title: "STAKE THIS ONE?",
-      body: `${prize.shiny ? "A SHINY " : "A "}${RARITIES[coinRarity(prize)].name} ${METALS[prize.metalIdx].name} COIN. YOU MAY NOT SEE IT AGAIN.`,
+      body: `${prize.shiny ? "A SHINY " : "A "}${RARITIES[coinRarity(prize)].name} ${matterOf(prize).name} COIN. YOU MAY NOT SEE IT AGAIN.`,
       yes: "STAKE IT", tone: "danger",
     }))) return;
 
@@ -157,7 +157,7 @@ export default function Tavern() {
                   {[...res.minted, ...res.keptCoins].map(c => (
                     <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                       <CoinCanvas coin={c} size={64}/>
-                      <span style={{ color: METALS[c.metalIdx].hl }}>{METALS[c.metalIdx].name}</span>
+                      <span style={{ color: matterOf(c).hl }}>{matterOf(c).name}</span>
                       <span style={{ color: RARITIES[coinRarity(c)].color }}>{RARITIES[coinRarity(c)].name}</span>
                     </div>
                   ))}

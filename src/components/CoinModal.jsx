@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { drawCoin, coinRarity, coinValue } from "../lib/coin.js";
 import Aura from "./Aura.jsx";
-import { METALS, RARITIES, SHAPE_NAMES } from "../lib/data.js";
+import { RARITIES, SHAPE_NAMES } from "../lib/data.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
-import { coinName } from "../lib/coinview.js";
+import { coinName, matterOf } from "../lib/coinview.js";
 
 /* ─── COIN MODAL ──────────────────────────────────────────────────────────
  * The coin inspector. Drag to turn the coin over in the light; the canvas
@@ -21,7 +21,7 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
   const lastPos  = useRef(null);
   const rafRef   = useRef();
   const [rot, setRot] = useState({ x: 12, y: 0 });
-  const m = METALS[coin.metalIdx];
+  const m = matterOf(coin);
   const r = RARITIES[coinRarity(coin)];
 
   useEffect(() => {

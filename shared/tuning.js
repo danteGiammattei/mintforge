@@ -271,3 +271,13 @@ export const WAR = {
   fan:      7,           // face-down cards each player picks from, every round
   recentMs: 600_000,     // how long a finished table is still shown
 };
+
+/* ─── materials ───────────────────────────────────────────────────────
+ * A coin from a chest is, now and then, its metal tier's twin in another
+ * material (src/lib/data.js MATERIALS): same tier, a different look,
+ * worth a little more for being rarer. byTier must match MATERIALS. */
+export const MATERIAL = {
+  chance: 1 / 15,
+  valueMul: 1.6,
+  byTier: ["wood", "stone", "ice", "amber", "pearl", "lava", "meteorite", "jade", "crystal"],
+};

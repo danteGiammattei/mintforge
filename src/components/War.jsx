@@ -3,8 +3,8 @@ import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
 import { coinRarity } from "../lib/coin.js";
-import { hydrate } from "../lib/coinview.js";
-import { METALS, RARITIES } from "../lib/data.js";
+import { hydrate, matterOf } from "../lib/coinview.js";
+import { RARITIES } from "../lib/data.js";
 import { CARD_W, CARD_H, cardImage, cardName, loadCards } from "../lib/cards.js";
 import CoinCanvas from "./CoinCanvas.jsx";
 import { CoinTile } from "../screens/Vault.jsx";
@@ -19,7 +19,7 @@ const SEEN_KEY = "mintforge:war-seen";
 const readSeen = () => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "[]"); } catch { return []; } };
 const writeSeen = ids => { try { localStorage.setItem(SEEN_KEY, JSON.stringify(ids.slice(-30))); } catch { /* fine */ } };
 const clock = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
-const coinLine = c => `${RARITIES[coinRarity(c)].name} ${METALS[c.metalIdx].name}`.toUpperCase();
+const coinLine = c => `${RARITIES[coinRarity(c)].name} ${matterOf(c).name}`.toUpperCase();
 
 /* ms left on a server countdown, ticking down here between polls */
 function useLeft(ms) {
