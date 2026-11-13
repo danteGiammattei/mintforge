@@ -2,21 +2,22 @@ import { useEffect, useRef } from "react";
 import { paintAura, onAuraFrame, auraFrame, auraStill } from "../lib/aura.js";
 import { coinRarity } from "../lib/coin.js";
 
-/* A coin's rarity, as light around it (lib/aura.js). Sits over a coin of
- * `size` px (a multiple of 64) and spills `margin` coin-pixels past it.
- * Pointer-transparent; ticks only while on screen. */
-export default function Aura({ coin, size, margin = 8 }) {
+/* A coin's rarity, as light around it, and a shiny's glint across it
+ * (lib/aura.js). Sits over a coin of `size` px (a multiple of 64) and
+ * spills `margin` coin-pixels past it. Pointer-transparent; ticks only
+ * while on screen. `rare: false` leaves out the rarity, keeping the shine. */
+export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rare = true }) {
   const ref = useRef();
-  const rarity = coinRarity(coin), k = Math.max(1, Math.round(size / 64));
+  const rarity = rare ? coinRarity(coin) : 0, k = Math.max(1, Math.round(size / 64));
   const G = 64 + 2 * margin;
 
   useEffect(() => {
     const cv = ref.current;
-    if (!cv || rarity <= 0) return;
+    if (!cv || (rarity <= 0 && !shine)) return;
     const ctx = cv.getContext("2d");
-    const paint = f => paintAura(ctx, coin, rarity, f, margin);
+    const paint = f => paintAura(ctx, coin, rarity, f, margin, shine);
     paint(auraFrame());
-    if (rarity < 2 || auraStill()) return;
+    if ((rarity < 2 && !shine) || auraStill()) return;
     let off = null;
     const io = new IntersectionObserver(([e]) => {
       if (e.isIntersecting && !off) off = onAuraFrame(paint);
@@ -25,9 +26,9 @@ export default function Aura({ coin, size, margin = 8 }) {
     io.observe(cv);
     return () => { io.disconnect(); off?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coin.seed, coin.shape, rarity, margin]);
+  }, [coin.seed, coin.shape, rarity, margin, shine]);
 
-  if (rarity <= 0) return null;
+  if (rarity <= 0 && !shine) return null;
   return (
     <canvas ref={ref} width={G} height={G} aria-hidden style={{
       position: "absolute", left: -margin * k, top: -margin * k, width: G * k, height: G * k,

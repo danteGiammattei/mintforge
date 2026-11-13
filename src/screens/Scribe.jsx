@@ -33,6 +33,7 @@ export default function Scribe() {
   useEffect(() => {
     scene.current = mount(ref.current, {
       inkMax: () => live.current.inkMax,
+      craving: () => live.current.craving,
       deeper: () => live.current.wellLevel < SCRIBE.wells.length - 1,
       well: () => buyRef.current(),
       seal: strokes => live.current.act("seal", { strokes }),

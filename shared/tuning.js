@@ -39,8 +39,21 @@ export const SCRIBE = {
  * `npm run sim` so no single archetype of drawing wins on average. */
 export const SIGIL = {
   baseline: [62, 25, 9, 3.1, 0.8, 0.1],
-  bump: 0.22,            // chance a present trait lifts the scroll one tier
-  maxBumps: 2,           // however many traits a drawing has
+  bump: 0.45,            // chance a present trait lifts the scroll one tier
+  maxBumps: 3,           // however many traits a drawing has
+  // the highest tier a scroll can reach, by how many traits it has: a
+  // bare mark tops out at rare, one trait at epic; legendary and mythic
+  // take two or more. The roll and every lift are held to it.
+  capByTraits: [2, 3, 5],
+  // time spent drawing (pen down, pauses counted only a beat) earns care:
+  // none below fromMs, all of it at fullMs, and full care is this chance
+  // of one more lift. The server never credits more time than has passed
+  // since the last seal.
+  care: { fromMs: 2000, fullMs: 12000, bump: 0.6 },
+  hurriedMs: 2500,       // pen-down time at which a drawing stops counting as hurried
+  // one trait a day he craves (the same for everyone, by their calendar
+  // day): it always lifts, and sometimes lifts twice
+  craving: { again: 0.35 },
   thresholds: {
     symmetric: 0.66,         // mirrored overlap, left against right, more than
     symmetricMinCells: 28,   //   …of a shape with at least this many grid cells inked
@@ -54,7 +67,7 @@ export const SIGIL = {
     vast: 0.42,              // share of the sheet the drawing's box covers, more than
   },
   effortInk: 150,        // ink at which a drawing counts as a real attempt
-  faintChance: 0.7,      // with no ink at all, how often the roll comes to nothing
+  faintChance: 0.85,     // with no ink or time at all, how often the roll comes to nothing
   familiar: 0.86,        // signature similarity that counts as a repeat
   familiarPenalty: 2,    // tiers lost for a repeat
 };
@@ -78,7 +91,7 @@ export const FAVOUR_PER_RARITY = [1, 2, 4, 9, 20, 50];
  * player more chests. It is the long game. */
 export const CHESTS = {
   names: ["WOODEN", "IRON", "GILDED", "OBSIDIAN", "VOID"],
-  cost:  [8, 20, 45, 90, 180],
+  cost:  [10, 26, 60, 120, 240],
   early: [70, 22, 6, 1.7, 0.3],
   late:  [42, 31, 16, 8, 3],
   trustChests: 60,                    // chests received at which `late` applies in full

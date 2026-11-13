@@ -8,7 +8,8 @@
  *  collects strokes and nothing else; the judging happens on the server
  *  (shared/sigil.js) and comes back through the bus as a verdict.
  *
- *    bus.seal(strokes)   → Promise<{ scroll: { rarity, seed }, familiar }>
+ *    bus.seal(strokes)   → Promise<{ scroll: { rarity, seed }, familiar, base, steps }>
+ *    bus.craving()       the trait he craves today (shared/sigil.js TRAITS)
  *    bus.room()          how many more scrolls the satchel will take
  *    bus.firstTime()     true until the player has sealed once
  *    bus.say(text)       for the aria-live region
@@ -18,12 +19,13 @@
  *    bus.deeper()        true if a deeper well can still be bought
  *    bus.well()          the player tapped the ink: offer the next well
  *
- *  The player is never told what makes a scroll good. Nothing in here
- *  may hint at it.
+ *  The player is never told the rules, but is shown what happened: the
+ *  seal climbs a tier for each lift and names it, the care meter fills
+ *  while they draw, and the desk says what he craves today.
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { rolledScroll } from "../lib/forms.js";
-import { RARITY } from "../../shared/sigil.js";
+import { RARITY, TRAITS, LIFTS, careOf } from "../../shared/sigil.js";
 import { SCRIBE } from "../../shared/tuning.js";
 import { stage, pointer, W, H, FONT, INK, rnd, wrap, feather } from "./kit.js";
 
@@ -38,6 +40,8 @@ const inkMax = () => bus.inkMax();          // the well on the desk decides
 const WELL = [W - 96, 14, 80, 34];           // the ink meter is a button: a deeper well
 
 const P = { room:"#080705", deskA:"#17120c", deskEdge:"#2f2518", ink:"#17140d" };
+const STEP = 18;                             // frames between each lift on the seal
+const markOf = why => (TRAITS[why] || LIFTS[why] || { mark: why }).mark;
 const BTN = { undo:[20,304,48,30], clear:[74,304,48,30], seal:[128,304,47,30] };
 
 const S = {
@@ -120,6 +124,22 @@ function drawChrome() {
   plot(W - 20 - 62, 36, Math.round(62 * frac), 4, low ? "#9a5a3a" : "#7d6a44");
   if (bus.deeper()) { ctx.textAlign = "left"; ctx.fillStyle = INK.warmHi; ctx.fillText("+", W - 20 - 62, 30); }
 
+  // care: time spent drawing, the same count the judge makes (sigil.js)
+  const care = careOf(penDown()), barX = W - 20 - 62;
+  ctx.textAlign = "right"; ctx.fillStyle = care >= 1 ? INK.warmHi : INK.warm;
+  ctx.fillText("CARE", barX - 4, 46);
+  plot(barX, 42, 62, 4, "#1d1812");
+  plot(barX, 42, Math.round(62 * care), 4, care >= 1 ? "#c9a25a" : "#6a5636");
+
+  // what he craves today, on the desk
+  const crave = TRAITS[bus.craving()];
+  if (crave) {
+    ctx.textAlign = "left"; ctx.fillStyle = INK.warm;
+    ctx.fillText("TODAY HE CRAVES", 20, 56);
+    ctx.fillStyle = INK.warmHi;
+    ctx.fillText(crave.want, 20, 64);
+  }
+
   const can = S.strokes.length > 0 && S.phase === "draw", full = bus.room() <= 0;
   btn(BTN.undo, "UNDO", can);
   btn(BTN.clear, "CLEAR", can);
@@ -155,13 +175,20 @@ function btn([x, y, w, h], label, on) {
   ctx.fillText(label, x + w / 2, y + h / 2 + 3);
 }
 
-/* ─── the seal: the scroll rolls up and the ribbon goes on ────────── */
+/* ─── the seal: the scroll rolls up, the ribbon goes on, and it climbs ──
+ * The ribbon takes the roll's colour, then steps up a tier for each lift
+ * (a trait, care, the craving), naming each as it lands. */
+const shownSteps = () => (S.result ? Math.max(0, Math.min(S.result.steps.length, Math.floor((S.sealT - 40) / (view.calm ? 1 : STEP)) + 1)) : 0);
+const sealDone = () => S.phase === "sealed" && S.sealT > 58 + (view.calm ? 0 : STEP * (S.result?.steps.length || 0));
 function drawSeal() {
   const waiting = S.phase === "sealing";
   const k = waiting ? Math.min(0.5, S.sealT / 58) : Math.min(1, S.sealT / 58);
   const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
   const r = S.result;
-  const col = r ? RARITY[r.rarity].c : "#3a3226";       // no ribbon colour until the verdict is in
+  const n = shownSteps();
+  if (r && n > S.lifted) { S.lifted = n; bus.feel("rarity" + r.steps[n - 1].to); }
+  const tier = r ? (n ? r.steps[n - 1].to : r.base) : 0;
+  const col = r ? RARITY[tier].c : "#3a3226";           // no ribbon colour until the verdict is in
 
   ctx.globalAlpha = 0.94 * Math.min(1, e * 2);
   plot(0, 0, W, H, `rgb(${SURROUND})`);       // the desk falls away into the room
@@ -180,12 +207,19 @@ function drawSeal() {
   if (k > 0.55) {
     ctx.globalAlpha = Math.min(1, (k - 0.55) / 0.3);
     ctx.fillStyle = col;
-    ctx.fillText(RARITY[r.rarity].n, W / 2, 246);
+    ctx.fillText(RARITY[tier].n, W / 2, 246);
     ctx.fillStyle = INK.warm;
-    ctx.fillText(r.familiar ? "HE HAS SEEN THIS ONE BEFORE" : "SEALED", W / 2, 262);
+    if (r.familiar) ctx.fillText("HE HAS SEEN THIS ONE BEFORE", W / 2, 262);
+    else if (!r.steps.length) ctx.fillText("SEALED", W / 2, 262);
+    // each lift, as it lands
+    for (let i = 0; i < n; i++) {
+      const st = r.steps[i], fresh = i === n - 1 && S.sealT - 40 - i * STEP < 8 && !view.calm;
+      ctx.fillStyle = fresh ? "#fff0c8" : RARITY[st.to].c;
+      ctx.fillText("+ " + markOf(st.why), W / 2, 262 + i * 11);
+    }
     ctx.globalAlpha = 1;
   }
-  if (k >= 1) { ctx.fillStyle = INK.warm; ctx.fillText("TAP TO BEGIN ANOTHER", W / 2, 300); }
+  if (sealDone()) { ctx.fillStyle = INK.warm; ctx.fillText("TAP TO BEGIN ANOTHER", W / 2, 330); }
 }
 
 /* ─── loop ────────────────────────────────────────────────────────── */
@@ -211,7 +245,7 @@ function clear() { if (S.phase !== "draw") return; S.strokes = []; recount(); bu
 
 const onDown = e => {
   const p = pointer(cv, e);
-  if (S.phase === "sealed") { if (S.sealT > 58) newSheet(); return; }
+  if (S.phase === "sealed") { if (sealDone()) newSheet(); return; }
   if (S.phase !== "draw") return;
   if (hit(p, WELL) && bus.deeper()) return bus.well();
   if (hit(p, BTN.undo))  return undo();
@@ -244,6 +278,13 @@ cv.addEventListener("pointermove", onMove);
 cv.addEventListener("pointerup", onUp);
 cv.addEventListener("pointercancel", onUp);
 
+/* time spent drawing, counted as the judge counts it: pauses only a beat */
+function penDown() {
+  let ms = 0;
+  for (const s of S.strokes) for (let i = 1; i < s.length; i++) ms += Math.min(250, Math.max(4, s[i].t - s[i - 1].t));
+  return ms;
+}
+
 function recount() {
   S.ink = 0;
   for (const s of S.strokes) for (let i = 1; i < s.length; i++)
@@ -263,10 +304,12 @@ function seal() {
   bus.feel("seal");
   bus.seal(rel).then(res => {
     if (!alive) return;
-    S.result = { rarity: res.scroll.rarity, familiar: !!res.familiar };
-    S.phase = "sealed"; S.sealT = Math.min(S.sealT, 29); S.fresh = false;
-    bus.feel("rarity" + res.scroll.rarity);
-    bus.say("SEALED. A " + RARITY[res.scroll.rarity].n + " SCROLL." + (res.familiar ? " HE HAS SEEN THIS ONE BEFORE." : ""));
+    const steps = Array.isArray(res.steps) ? res.steps : [];
+    S.result = { rarity: res.scroll.rarity, base: res.base ?? res.scroll.rarity, steps, familiar: !!res.familiar };
+    S.phase = "sealed"; S.sealT = Math.min(S.sealT, 29); S.fresh = false; S.lifted = 0;
+    if (!steps.length) bus.feel("rarity" + res.scroll.rarity);
+    bus.say("SEALED. A " + RARITY[res.scroll.rarity].n + " SCROLL." + (steps.length ? " LIFTED BY " + steps.map(s => markOf(s.why)).join(", ") + "." : "")
+      + (res.familiar ? " HE HAS SEEN THIS ONE BEFORE." : ""));
   }, err => {
     if (!alive) return;
     // nothing was sealed, so nothing is lost: the drawing is still on the sheet
@@ -305,6 +348,6 @@ teardown.scrawl = () => {
   S.strokes.push(stroke); recount();
   bus.say("A MARK IS ON THE SHEET.");
 };
-teardown.seal = () => (S.phase === "sealed" ? newSheet() : seal());
+teardown.seal = () => (S.phase === "sealed" ? (sealDone() && newSheet()) : seal());
 return teardown;
 }

@@ -4,7 +4,7 @@
  * what a trait is. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { analyse, traitsOf, rollScroll, similarity, TRAITS, RARITY } from "../shared/sigil.js";
+import { analyse, traitsOf, rollScroll, similarity, TRAITS, RARITY, TRAIT_KEYS, cravingOn, careOf } from "../shared/sigil.js";
 import { SCRIBE, SIGIL } from "../shared/tuning.js";
 import { seeded } from "./d1.js";
 
@@ -125,4 +125,63 @@ test("faint marks mostly come to nothing; real drawings follow the baseline", ()
   const base = SIGIL.baseline[0] / SIGIL.baseline.reduce((a, b) => a + b, 0);
   assert.ok(tickCommon / N > base + 0.15, `tick common ${tickCommon / N}`);
   assert.ok(fullCommon / N < base, `circle common ${fullCommon / N}`);
+});
+
+/* ─── what care pays ───────────────────────────────────────────────── */
+const share = (a, opts, test, N = 3000) => {
+  const R = seeded(9);
+  let n = 0;
+  for (let i = 0; i < N; i++) if (test(rollScroll(a, [], (R() * 2 ** 32) >>> 0, opts))) n++;
+  return n / N;
+};
+
+test("a mark with no traits can be rare at best; legendary and mythic need two traits or more", () => {
+  const bare = analyse([stroke([[20, 40], [60, 44], [40, 90]], 0.15, 0)], SHEET);
+  bare.time = 8000;                               // not hurried, so only the cap holds it
+  assert.equal(traitsOf(bare).length, 0);
+  assert.equal(share(bare, {}, r => r.rarity > SIGIL.capByTraits[0]), 0);
+  const circle = analyse([stroke(ring(78, 100, 40), 0.05)], SHEET);
+  assert.ok(traitsOf(circle).length >= 2);
+  assert.ok(share(circle, {}, r => r.rarity >= 4) > 0, "a circle can reach legendary");
+});
+
+test("every lift is shown, in order, climbing from the roll to the result", () => {
+  const a = analyse([stroke(ring(78, 100, 40), 0.03)], SHEET);
+  const R = seeded(3);
+  for (let i = 0; i < 400; i++) {
+    const r = rollScroll(a, [], (R() * 2 ** 32) >>> 0, { craving: "closed" });
+    if (r.familiar) continue;
+    let at = r.base;
+    for (const st of r.steps) { assert.equal(st.to, at + 1); at = st.to; assert.ok(TRAITS[st.why] || st.why === "care" || st.why === "crave"); }
+    assert.equal(at, r.rarity);
+  }
+});
+
+test("time spent drawing pays, up to a point, and the server's clock caps what is believed", () => {
+  assert.equal(careOf(0), 0); assert.equal(careOf(SIGIL.care.fullMs * 2), 1);
+  const a = analyse([stroke(ring(78, 100, 40), 0.1)], SHEET);       // the same circle, timed differently
+  const at = ms => ({ ...a, time: ms });
+  const mean = (x, o) => { const R = seeded(5); let s = 0; for (let i = 0; i < 3000; i++) s += rollScroll(x, [], (R() * 2 ** 32) >>> 0, o).rarity; return s / 3000; };
+  assert.ok(mean(at(SIGIL.care.fullMs), {}) > mean(at(SIGIL.care.fromMs), {}) + 0.2, "more time, higher on average");
+  assert.ok(Math.abs(mean(at(SIGIL.care.fullMs * 3), {}) - mean(at(SIGIL.care.fullMs), {})) < 0.05, "past the cap, time adds nothing");
+  for (let i = 1; i < 50; i++) assert.deepEqual(rollScroll(at(60000), [], i * 7919, { maxMs: 3000 }), rollScroll(at(3000), [], i * 7919, { maxMs: 3000 }),
+    "time claimed past the server's clock counts for nothing");
+});
+
+test("a hurried scrap usually comes to nothing", () => {
+  const scrap = analyse([stroke([[20, 40], [140, 46]], 2)], SHEET);
+  assert.ok(scrap.time < SIGIL.hurriedMs);
+  assert.ok(share(scrap, {}, r => r.rarity === 0) > 0.8);
+});
+
+test("today's craving always lifts a drawing that has it, and is the same all day for everyone", () => {
+  const a = analyse([stroke(ring(78, 100, 40), 0.05)], SHEET), has = traitsOf(a);
+  const R = seeded(11);
+  for (let i = 0; i < 300; i++) {
+    const r = rollScroll(a, [], (R() * 2 ** 32) >>> 0, { craving: has[0] });
+    if (r.base < SIGIL.capByTraits[2]) assert.equal(r.steps[0]?.why, has[0]);
+  }
+  assert.equal(cravingOn(20000), cravingOn(20000));
+  const week = new Set(Array.from({ length: 60 }, (_, d) => cravingOn(20000 + d)));
+  assert.equal(week.size, TRAIT_KEYS.length, "every trait gets its day");
 });

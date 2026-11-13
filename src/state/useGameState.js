@@ -178,7 +178,7 @@ export function useGameState() {
     brushLevel: snap?.brushLevel || 0, lean: snap?.lean || 0, stats: snap?.stats || {},
     scrollCap: snap?.scrollCap || 8,
     inkMax: snap?.inkMax || 520, wellLevel: snap?.wellLevel || 0, streak: snap?.streak || 0,
-    dailyReady: !!snap?.dailyReady, dailyIn: snap?.dailyIn || 0,
+    dailyReady: !!snap?.dailyReady, dailyIn: snap?.dailyIn || 0, craving: snap?.craving || null,
     journal: snap?.journal || { c: {}, shiny: 0, best: 0 },
     frame: snap?.frame || "stone", fr: FRAMES[snap?.frame] || FRAMES.stone,
     bio: snap?.bio || "", selectedTitle: snap?.selectedTitle || "",

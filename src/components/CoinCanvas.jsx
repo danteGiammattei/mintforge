@@ -17,14 +17,7 @@ export default function CoinCanvas({ coin, size, hideShine = false, aura = true,
   return (
     <div style={{ position: "relative", width: size, height: size, display: "inline-block", flexShrink: 0 }}>
       <canvas ref={canvasRef} aria-hidden style={{ imageRendering: "pixelated", display: "block", width: size, height: size }}/>
-      {aura && <Aura coin={coin} size={size} margin={auraMargin}/>}
-      {shiny && (
-        <div aria-hidden style={{
-          position: "absolute", inset: 0, borderRadius: "50%",
-          background: "conic-gradient(from 0deg, transparent 0deg, rgba(255,232,160,.55) 30deg, transparent 60deg, transparent 360deg)",
-          mixBlendMode: "screen", animation: "shinyRotate 3.6s linear infinite", pointerEvents: "none", opacity: 0.7,
-        }}/>
-      )}
+      {(aura || shiny) && <Aura coin={coin} size={size} margin={auraMargin} shine={shiny} rare={aura}/>}
     </div>
   );
 }

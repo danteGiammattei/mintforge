@@ -14,8 +14,13 @@
  *    legendary  all that, and rays that turn and breathe
  *    mythic     a burning rim, and embers that rise off it and die
  *
- *  Rare and above move, at 8 frames a second, all coins on one shared
- *  clock, and only while on screen. With reduced motion they hold still.
+ *  A shiny coin also catches the light: a glint sweeps across its face
+ *  every few seconds and small stars twinkle on it, held to the coin's
+ *  own pixels, whatever its shape.
+ *
+ *  Rare and above, and shinies, move at 8 frames a second, all coins on
+ *  one shared clock, and only while on screen. With reduced motion they
+ *  hold still.
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { drawCoin } from "./coin.js";
@@ -64,14 +69,15 @@ function rings(coin, M) {
     }
     if (edge) inner[i] = pass;
   }
-  const c = G / 2, out = [[], [], [], [], []], ins = [[], [], []];
+  const c = G / 2, out = [[], [], [], [], []], ins = [[], [], []], face = [];
   for (let i = 0; i < G * G; i++) {
     const x = i % G, y = (i / G) | 0, p = { x, y, a: Math.atan2(y - c, x - c) };
     if (dist[i] >= 1 && dist[i] <= 4) out[dist[i]].push(p);
     else if (inner[i]) ins[inner[i]].push(p);
+    if (dist[i] === 0) face.push(p);
   }
   out.forEach(r => r.sort((p, q) => p.a - q.a));
-  const res = { G, ring: out, inner: ins };
+  const res = { G, ring: out, inner: ins, face, inside: dist };
   shapes.set(key, res);
   return res;
 }
@@ -85,10 +91,10 @@ const h32 = (n) => { n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d); n = Math.imul(n 
 /* Paint one frame of a coin's aura into ctx, at 1 unit = 1 pixel. The
  * canvas is (64 + 2·margin) square, the coin sitting in the middle; the
  * layer lies over the coin, but touches only its outermost two pixels. */
-export function paintAura(ctx, coin, rarity, frame, M = 8) {
-  const { G, ring, inner } = rings(coin, M);
+export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false) {
+  const { G, ring, inner, face, inside } = rings(coin, M);
   ctx.clearRect(0, 0, G, G);
-  if (rarity <= 0) return;
+  if (rarity <= 0 && !shine) return;
   const img = ctx.createImageData(G, G), d = img.data;
   const put = (x, y, rgb, al) => {
     x = Math.round(x); y = Math.round(y);
@@ -98,6 +104,8 @@ export function paintAura(ctx, coin, rarity, frame, M = 8) {
     d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = Math.round(a * 255);
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
+  if (shine) paintShine(put, G, face, inside, seed, frame);
+  if (rarity <= 0) { ctx.putImageData(img, 0, 0); return; }
   const hot = [255, 236, 170], warm = [255, 160, 70];
   const burn = rarity === 5, beat = (frame >> 1) % 4;      // a slow 4-step pulse
   const flick = i => h32(seed + i * 7 + (frame >> 1) * 131);
@@ -181,6 +189,39 @@ export function paintAura(ctx, coin, rarity, frame, M = 8) {
   }
 
   ctx.putImageData(img, 0, 0);
+}
+
+/* A shiny's light: a glint band sweeping corner to corner across the
+ * coin's face, then a rest; and four small stars that open and close on
+ * the face at their own times. Only ever on the coin's own pixels. */
+const GLINT = [255, 252, 232], GOLD = [255, 226, 150];
+function paintShine(put, G, face, inside, seed, frame) {
+  const CYCLE = 26, SWEEP = 9;                         // frames: ~3 s round, ~1 s of sweep
+  const f = (frame + (seed % CYCLE)) % CYCLE;
+  if (f < SWEEP) {
+    const at = -8 + (f / (SWEEP - 1)) * (2 * G + 8);  // along x + y
+    for (const p of face) {
+      const d = p.x + p.y - at;
+      if (d >= 0 && d < 2) put(p.x, p.y, GLINT, 0.85);
+      else if (d >= -4 && d < 0) put(p.x, p.y, GOLD, 0.45);
+      else if (d >= 2 && d < 4) put(p.x, p.y, GOLD, 0.3);
+    }
+  }
+  const on = (x, y) => x >= 0 && y >= 0 && x < G && y < G && inside[y * G + x] === 0;
+  for (let k = 0; k < 4; k++) {
+    const LIFE = 6, PERIOD = 13 + k * 3;
+    const age = (frame + Math.floor(h32(seed + k * 31) * PERIOD)) % PERIOD;
+    if (age >= LIFE) continue;
+    const gen = Math.floor((frame + Math.floor(h32(seed + k * 31) * PERIOD)) / PERIOD);
+    const p = face[Math.floor(h32(seed * 7 + k * 131 + gen * 977) * face.length)];
+    if (!p) continue;
+    const arm = [0, 1, 2, 2, 1, 0][age];
+    put(p.x, p.y, GLINT, 1);
+    for (let s = 1; s <= arm; s++) {
+      const a = s === arm ? 0.55 : 0.85;
+      for (const [dx, dy] of [[s, 0], [-s, 0], [0, s], [0, -s]]) if (on(p.x + dx, p.y + dy)) put(p.x + dx, p.y + dy, GOLD, a);
+    }
+  }
 }
 
 /* ─── the one clock ───────────────────────────────────────────────── */

@@ -10,7 +10,8 @@
  *  and title to wear, the bio, the cabinet, which coins are locked.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait } from "../shared/economy.js";
+import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay } from "../shared/economy.js";
+import { cravingOn } from "../shared/sigil.js";
 import { SCRIBE } from "../shared/tuning.js";
 import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
@@ -82,6 +83,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     stats,
     gifts: parseList(ps.gifts).length,
     sealReadyIn: Math.max(0, SCRIBE.cooldownMs - (now - (ps.last_seal_at || 0))),
+    craving: cravingOn(localDay(now, tz)),     // the trait he craves today
   };
 }
 

@@ -215,17 +215,17 @@ export function drawCoin(canvas, coin, px) {
   // Edge stroke
   c.lineWidth = 1; c.strokeStyle = m.eng; clip(); c.stroke();
 
-  // Shiny rotating diagonal sheen
+  // Shiny: an iridescent film in hard diagonal pixel bands, faint enough
+  // that the metal still reads. Fixed per coin; the moving glint and the
+  // twinkles are drawn over it by lib/aura.js.
   if (coin.shiny) {
     c.save(); clip(); c.clip();
-    const ang = (Date.now() / 40) % 360;
-    const lg  = c.createLinearGradient(0, 0, S, S);
-    lg.addColorStop(0,   "rgba(255,255,255,0)");
-    lg.addColorStop(.4,  `hsla(${ang},100%,75%,.35)`);
-    lg.addColorStop(.5,  `hsla(${(ang + 60)  % 360},100%,80%,.5)`);
-    lg.addColorStop(.6,  `hsla(${(ang + 120) % 360},100%,75%,.35)`);
-    lg.addColorStop(1,   "rgba(255,255,255,0)");
-    c.fillStyle = lg; c.fillRect(0, 0, S, S);
+    const film = ["rgba(120,230,255,.15)", null, "rgba(255,120,220,.13)", null, "rgba(255,230,120,.15)", null];
+    const off = (coin.seed >>> 3) % 6;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const band = film[(Math.floor((x + y) / 8) + off) % film.length];
+      if (band) { c.fillStyle = band; c.fillRect(x, y, 1, 1); }
+    }
     c.restore();
   }
 

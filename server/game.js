@@ -20,7 +20,7 @@
  *  whose reply it never received.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { analyse, rollScroll, measure, TRAITS } from "../shared/sigil.js";
+import { analyse, rollScroll, measure, TRAITS, cravingOn } from "../shared/sigil.js";
 import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
@@ -66,7 +66,7 @@ function sealSalt(nonce, count) {
   return h >>> 0;
 }
 
-async function seal(db, pid, body, { now, rand }) {
+async function seal(db, pid, body, { now, rand, tz }) {
   const strokes = cleanStrokes(body.strokes);
   const a = analyse(strokes, SCRIBE.sheet);
   if (!a) throw new Refusal("Nothing to seal");
@@ -87,7 +87,12 @@ async function seal(db, pid, body, { now, rand }) {
 
   const nonce = ps.seal_nonce || (u32(rand) || 1);
   const recent = parseList(ps.recent_sigs);
-  const r = rollScroll(a, recent, sealSalt(nonce, ps.seal_count));
+  const r = rollScroll(a, recent, sealSalt(nonce, ps.seal_count), {
+    craving: cravingOn(localDay(now, tz)),
+    // the client stamps its own strokes, so never believe more drawing
+    // time than has really passed since the last seal
+    maxMs: ps.last_seal_at ? now - ps.last_seal_at + 1000 : Infinity,
+  });
   const hint = r.bumped.length ? r.bumped[Math.min(r.bumped.length - 1, Math.floor(rand() * r.bumped.length))] : null;
   const id = "s_" + randomHex(8);
   const xp = xpForSeal(r.rarity);
@@ -105,7 +110,7 @@ async function seal(db, pid, body, { now, rand }) {
               stats = ${bump("sealed")} WHERE player_id = ?1`
     ).bind(pid, xp, nonce, JSON.stringify(sigs)),
   ]);
-  return { scroll: { id, rarity: r.rarity, seed: r.seed }, familiar: r.familiar, xp };
+  return { scroll: { id, rarity: r.rarity, seed: r.seed }, familiar: r.familiar, xp, base: r.base, steps: r.steps };
 }
 
 /* ─── offer ───────────────────────────────────────────────────────── */

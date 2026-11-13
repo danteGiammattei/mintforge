@@ -8,15 +8,18 @@
  *     a seeded roll taken from the stroke data itself — deterministic
  *     (the same drawing always gives the same scroll) but unguessable.
  *
- *  2. It must not be nothing. If the drawing had no influence at all we
- *     could roll dice and skip the canvas. So traits sit ON TOP of the
- *     baseline as occasional bumps, and the traits conflict with each
- *     other, which is what stops the meta being solved in a week.
+ *  2. Care must pay, plainly. Playtesting showed a hidden, gentle lift
+ *     reads as "it doesn't matter", and the fastest scribble won. So:
+ *     traits lift often and can stack; the top tiers need traits (a
+ *     bare mark cannot be legendary); time spent drawing earns a lift of
+ *     its own; a hurried scrap usually comes to nothing; and each day he
+ *     craves one trait, which always lifts. The traits still conflict
+ *     with each other, and the craving moves daily, so no one drawing
+ *     wins forever.
  *
- *  The player is never told any of this. The goblin alludes to a trait
- *  only when it actually fired, and only ever to praise one — positive
- *  examples with no negatives produce superstition rather than a rule,
- *  which is the texture we want.
+ *  The player is shown each lift as it lands (the seal climbs a tier and
+ *  names why), never the thresholds. They learn what he likes by
+ *  watching, not by being told the rule.
  *
  *  This file is pure: no DOM, no clock, no Math.random. The server runs
  *  it to judge a scroll; the client only ever sees the verdict. Every
@@ -39,14 +42,34 @@ export const RARITY = [
 /* Each trait carries the line the goblin uses for it. The hint lives
  * with the rule so the two can never drift apart. */
 export const TRAITS = {
-  symmetric:  { hint: "HE SMILES UPON THE HILLS OF SYMMETRY" },
-  closed:     { hint: "HE LINGERS ON THE CLOSED SHAPE" },
-  continuous: { hint: "A LINE THAT NEVER LIFTED. HE APPROVES" },
-  woven:      { hint: "SOMETHING IN THE KNOTS PLEASES HIM" },
-  sparse:     { hint: "HE HOLDS IT TO THE LIGHT. THE EMPTINESS SUITS HIM" },
-  deliberate: { hint: "NOTHING HERE WAS HURRIED. HE NOTICES" },
-  vast:       { hint: "IT BARELY FITS HIS HANDS. HE IS PLEASED" },
+  symmetric:  { hint: "HE SMILES UPON THE HILLS OF SYMMETRY",             mark: "SYMMETRY",  want: "SYMMETRY" },
+  closed:     { hint: "HE LINGERS ON THE CLOSED SHAPE",                    mark: "CLOSED",    want: "CLOSED SHAPES" },
+  continuous: { hint: "A LINE THAT NEVER LIFTED. HE APPROVES",             mark: "UNBROKEN",  want: "ONE UNBROKEN LINE" },
+  woven:      { hint: "SOMETHING IN THE KNOTS PLEASES HIM",                mark: "KNOTS",     want: "KNOTS" },
+  sparse:     { hint: "HE HOLDS IT TO THE LIGHT. THE EMPTINESS SUITS HIM", mark: "EMPTINESS", want: "EMPTINESS" },
+  deliberate: { hint: "NOTHING HERE WAS HURRIED. HE NOTICES",              mark: "SLOW HAND", want: "A SLOW HAND" },
+  vast:       { hint: "IT BARELY FITS HIS HANDS. HE IS PLEASED",           mark: "VASTNESS",  want: "SOMETHING VAST" },
 };
+/* the lifts that are not traits */
+export const LIFTS = {
+  care:  { mark: "CARE" },                 // time spent drawing
+  crave: { mark: "CRAVED" },               // today's craving, lifting twice
+};
+export const TRAIT_KEYS = Object.keys(TRAITS);
+
+/* Today's craving: one trait, the same for everyone on the same calendar
+ * day (`day` is a day number, e.g. economy.localDay). */
+export function cravingOn(day) {
+  let h = Math.imul((day | 0) ^ 0x5bd1e995, 0x9e3779b1) >>> 0;
+  h ^= h >>> 15; h = Math.imul(h, 0x85ebca6b) >>> 0; h ^= h >>> 13;
+  return TRAIT_KEYS[(h >>> 0) % TRAIT_KEYS.length];
+}
+
+/* How much of the care lift a drawing has earned, 0..1. */
+export function careOf(penDownMs) {
+  const { fromMs, fullMs } = SIGIL.care;
+  return Math.max(0, Math.min(1, (penDownMs - fromMs) / (fullMs - fromMs)));
+}
 
 const GRID = 24;          // the occupancy grid traits are measured on
 
@@ -95,6 +118,7 @@ export function analyse(strokes, sheet) {
     bbox: { x: minX, y: minY, w: bw, h: bh },
     sheetFrac: (bw * bh) / (sheet.w * sheet.h),
     pace: penDown > 0 ? ink / penDown : 0,          // scene pixels per millisecond, pen down
+    time: penDown,                                  // milliseconds spent drawing, pauses counted a beat
     seed: hashStrokes(strokes),
     signature: signature(grid),
   };
@@ -143,45 +167,67 @@ export function measure(a) {
     pace: a.pace,
     ink: a.ink,
     strokes: a.strokes.length,
+    time: a.time,
   };
 }
 
 /* ─── the roll ────────────────────────────────────────────────────────
- * recent: signatures of the player's last few scrolls, so the same
- * sigil drawn over and over stops paying. The goblin has seen it.
- * salt:   mixed into the drawing's seed. The server passes a secret
- * per-player value that moves with every seal, so the roll cannot be
- * searched for offline and a winning drawing cannot be replayed. */
-export function rollScroll(a, recent = [], salt = 0) {
+ * recent:  signatures of the player's last few scrolls, so the same
+ *          sigil drawn over and over stops paying. The goblin has seen it.
+ * salt:    mixed into the drawing's seed. The server passes a secret
+ *          per-player value that moves with every seal, so the roll cannot
+ *          be searched for offline and a winning drawing cannot be replayed.
+ * opts:    craving  today's craved trait (cravingOn)
+ *          maxMs    the most drawing time to believe (time since last seal)
+ *
+ * Returns the rarity, and how it got there: `base` is the roll, `steps`
+ * each lift in order ({ why: trait | "care" | "crave", to }). */
+export function rollScroll(a, recent = [], salt = 0, opts = {}) {
   if (!a) return null;
   const seed = (a.seed ^ (salt >>> 0)) >>> 0;
   const rng = rnd(seed);
+  const time = Math.min(a.time || 0, opts.maxMs ?? Infinity);
 
   // baseline: weighted, from the drawing's own seed
   const tot = RARITY.reduce((s, r) => s + r.w, 0);
   let roll = rng() * tot, rarity = 0;
   for (let i = 0; i < RARITY.length; i++) { roll -= RARITY[i].w; if (roll <= 0) { rarity = i; break; } }
 
-  // a two-second dot should not pay like a sigil: too little ink and the
-  // roll often comes to nothing, whatever it would have been
-  const effort = Math.min(1, a.ink / SIGIL.effortInk);
+  // a hurried scrap should not pay like a sigil: too little ink, or too
+  // little time, and the roll usually comes to nothing
+  const effort = Math.min(1, a.ink / SIGIL.effortInk, time / SIGIL.hurriedMs);
   const faint = rng() < (1 - effort) * SIGIL.faintChance;
   if (faint) rarity = 0;
 
-  // traits bump, sometimes — at most a couple, in an order that changes
-  // from scroll to scroll. The ones that land are the ones he can mention.
-  const traits = traitsOf(a), bumped = [];
-  const order = traits.map(t => [rng(), t]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
-  for (const t of order) {
-    if (bumped.length >= SIGIL.maxBumps || faint) break;
-    if (rng() < SIGIL.bump && rarity < RARITY.length - 1) { rarity++; bumped.push(t); }
+  // how high this drawing may climb, by how many traits it has
+  const traits = traitsOf(a);
+  const cap = SIGIL.capByTraits[Math.min(traits.length, SIGIL.capByTraits.length - 1)];
+  rarity = Math.min(rarity, cap);
+  const base = rarity, steps = [], bumped = [];
+  const lift = why => { if (rarity >= cap) return false; rarity++; steps.push({ why, to: rarity }); return true; };
+
+  if (!faint) {
+    // today's craving always lifts, and sometimes lifts again
+    const craved = opts.craving && traits.includes(opts.craving) ? opts.craving : null;
+    if (craved && lift(craved)) {
+      bumped.push(craved);
+      if (rng() < SIGIL.craving.again) lift("crave");
+    }
+    // the other traits lift often, in an order that changes scroll to scroll
+    const order = traits.filter(t => t !== craved).map(t => [rng(), t]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
+    for (const t of order) {
+      if (bumped.length >= SIGIL.maxBumps) break;
+      if (rng() < SIGIL.bump && lift(t)) bumped.push(t);
+    }
+    // and care: time spent drawing
+    if (rng() < careOf(time) * SIGIL.care.bump) lift("care");
   }
 
   // a near-copy of something recent is worth much less
   const familiar = recent.some(sig => similarity(sig, a.signature) > SIGIL.familiar);
-  if (familiar) { rarity = Math.max(0, rarity - SIGIL.familiarPenalty); bumped.length = 0; }
+  if (familiar) { rarity = Math.max(0, rarity - SIGIL.familiarPenalty); bumped.length = 0; steps.length = 0; }
 
-  return { rarity, traits, bumped, familiar, ink: a.ink, seed, signature: a.signature };
+  return { rarity, base: familiar ? rarity : base, steps, traits, bumped, familiar, faint, ink: a.ink, seed, signature: a.signature };
 }
 
 /* ─── measurements ────────────────────────────────────────────────── */

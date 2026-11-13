@@ -25,7 +25,7 @@
  *    · the first chests should come quickly and later ones slower.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { analyse, traitsOf, rollScroll, RARITY, TRAITS } from "../shared/sigil.js";
+import { analyse, traitsOf, rollScroll, RARITY, TRAITS, TRAIT_KEYS } from "../shared/sigil.js";
 import { SCRIBE, FAVOUR_PER_RARITY, CHESTS, XP, GAMBLE, FORGE, SHINY_VALUE_MUL } from "../shared/tuning.js";
 import { offerScroll, rollCoin, levelOf, xpForSeal, xpForOffer, xpForBrush, nextGift, forgeCost, plinkoOdds } from "../shared/economy.js";
 import { mkCoin, coinValue } from "../src/lib/coin.js";
@@ -81,11 +81,13 @@ function hand(path, R, care, t0) {
   }
   return out;
 }
-function draw(paths, R, care) {
+/* slow: how much slower than the generated hand this player draws (×1 is
+ * the generator's own pace, which is brisk; a careful person is ×2–4) */
+function draw(paths, R, care, slow = 1) {
   let t = 0;
   const strokes = [];
   for (const path of paths) {
-    const s = hand(path, R, care, t);
+    const s = hand(path, R, care, t).map(p => (slow === 1 ? p : { ...p, t: t + (p.t - t) * slow }));
     if (s.length > 1) { strokes.push(s); t = s[s.length - 1].t + R.range(180, 700); }
   }
   return trimToInk(strokes);
@@ -179,7 +181,7 @@ for (const [name, gen] of Object.entries(ARCHETYPES)) {
     const a = analyse(strokes, SCRIBE.sheet);
     if (!a) { st.fail++; continue; }
     const tr = traitsOf(a);
-    const r = rollScroll(a, [], (R0() * 4294967296) >>> 0);
+    const r = rollScroll(a, [], (R0() * 4294967296) >>> 0, { craving: TRAIT_KEYS[(R0() * TRAIT_KEYS.length) | 0] });
     st.n++; st.ink += a.ink; st.nTraits += tr.length; st.rar[r.rarity]++; st.favour += FAVOUR_PER_RARITY[r.rarity];
     if (r.bumped.length) st.bumped++;
     for (const t of tr) st.traits[t] = (st.traits[t] || 0) + 1;
@@ -217,6 +219,39 @@ const crowdRar = RARITY.map((_, i) => crowd(st => st.rar[i] / st.n));
 console.log(pad("CROWD", 10) + crowdRar.map(v => (100 * v).toFixed(1).padStart(8)).join("") + num(crowdFavour, 13, 2));
 const ratios = Object.values(perType).map(st => st.favour / st.n / crowdFavour);
 console.log(`\nbest archetype ×${Math.max(...ratios).toFixed(2)} of the crowd average, worst ×${Math.min(...ratios).toFixed(2)}`);
+
+/* the effort ladder: the same kinds of drawing, made hurriedly or with
+ * care, and what each pays per minute at the desk (drawing time plus a
+ * few seconds to seal and start again). Care should win, per minute too. */
+{
+  head("2b. Effort: what care pays, per scroll and per minute");
+  const rungs = [
+    ["a flick",           ["tick", "line"],                 0,   0.6],
+    ["a quick mark",      ["line", "cross", "rune", "word"], 0.2, 1],
+    ["a casual drawing",  Object.keys(MIX),                 0.3, 1.5],
+    ["a careful drawing", ["circle", "star", "heart", "box", "face", "scribble"], 0.9, 3],
+    ["…of today's craving", ["circle", "star", "heart", "box", "face", "scribble"], 0.9, 3, true],
+  ];
+  console.log(pad("", 22) + RARITY.map(r => r.n.slice(0, 6).padStart(8)).join("") + "  favour   draw s   per min");
+  const R = rng(777), rows = [];
+  for (const [label, kinds, care, slow, craved] of rungs) {
+    const rar = [0, 0, 0, 0, 0, 0]; let fav = 0, secs = 0, n = 0;
+    for (let i = 0; i < N_DRAW; i++) {
+      const kind = kinds[(R() * kinds.length) | 0];
+      const strokes = draw(ARCHETYPES[kind](R), R, care, slow);
+      const a = analyse(strokes, SCRIBE.sheet); if (!a) continue;
+      const tr = traitsOf(a);
+      const craving = craved ? (tr[(R() * tr.length) | 0] || null) : TRAIT_KEYS[(R() * TRAIT_KEYS.length) | 0];
+      const r = rollScroll(a, [], (R() * 2 ** 32) >>> 0, { craving });
+      const last = strokes[strokes.length - 1];
+      rar[r.rarity]++; fav += FAVOUR_PER_RARITY[r.rarity]; secs += (last[last.length - 1].t - strokes[0][0].t) / 1000; n++;
+    }
+    const perMin = (fav / n) / ((secs / n + 4) / 60);
+    rows.push(perMin);
+    console.log(pad(label, 22) + rar.map(v => (100 * v / n).toFixed(1).padStart(8)).join("") + num(fav / n, 8, 2) + num(secs / n, 9, 1) + num(perMin, 10, 1));
+  }
+  console.log(`careful vs flick: ×${(rows[3] / rows[0]).toFixed(2)} per minute`);
+}
 
 /* a repeat: the same drawing sealed again and again */
 {
@@ -273,7 +308,7 @@ for (let p = 0; p < N_PLAYERS; p++) {
     // fill the satchel at the desk, then walk it to the door
     const batch = [];
     for (let i = 0; i < SCRIBE.scrollCap; i++) {
-      const r = rollScroll(someDrawing(R), [], (R() * 2 ** 32) >>> 0);
+      const r = rollScroll(someDrawing(R), [], (R() * 2 ** 32) >>> 0, { craving: TRAIT_KEYS[(R() * TRAIT_KEYS.length) | 0] });
       batch.push(r.rarity); t += TIME.seal; xp += xpForSeal(r.rarity); stats.sealed++;
     }
     visit();
