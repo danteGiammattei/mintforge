@@ -95,6 +95,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false) {
   const { G, ring, inner, face, inside } = rings(coin, M);
   ctx.clearRect(0, 0, G, G);
   if (rarity <= 0 && !shine) return;
+  if (rarity === 5 && !auraStill() && turnAt(coin, frame)) return;
   const img = ctx.createImageData(G, G), d = img.data;
   const put = (x, y, rgb, al) => {
     x = Math.round(x); y = Math.round(y);
@@ -222,6 +223,18 @@ function paintShine(put, G, face, inside, seed, frame) {
       for (const [dx, dy] of [[s, 0], [-s, 0], [0, s], [0, -s]]) if (on(p.x + dx, p.y + dy)) put(p.x + dx, p.y + dy, GOLD, a);
     }
   }
+}
+
+/* ─── a mythic turns over ─────────────────────────────────────────────
+ * Every nine seconds or so (each coin at its own moment) a mythic turns:
+ * face, edge, its plain back with the mint's mark, edge, face again. The
+ * aura steps aside while it turns, since it hugs the coin's flat outline. */
+const TURN = [54, 40, 24, 10, 4, 10, 24, 40, 54, 64, 64, 64, 54, 40, 24, 10, 4, 10, 24, 40, 54];
+const BACK = TURN.map((_, i) => i >= 5 && i <= 15);
+const TURN_EVERY = 72;
+export function turnAt(coin, frame) {
+  const i = (frame + ((coin.seed >>> 0) % TURN_EVERY)) % TURN_EVERY;
+  return i < TURN.length ? { turn: TURN[i], back: BACK[i] } : null;
 }
 
 /* ─── the one clock ───────────────────────────────────────────────── */

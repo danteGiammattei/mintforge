@@ -21,6 +21,23 @@ export const METALS = [
   { name:"Astral",  base:"#f0e8d0", mid:"#a89060", dark:"#605030", hl:"#fff8a0", eng:"#806010", accent:"#f0c840", flash:"rgba(255,240,160,.28)",rarity:"Celestial" },
 ];
 export const MAX_TIER = 8;
+/* ─── MATERIALS ───────────────────────────────────────────────────────────
+ * Each metal tier has a rare twin made of something else: the same tier
+ * and value band, a different look. Ramps run outline → glint (seven
+ * steps), `eng` colours the cut-in parts of the face, `tex` is its grain
+ * (lib/coin.js GRAIN) and `glow` the colour of anything that burns. */
+export const MATERIALS = {
+  wood:      { tier: 0, name: "Wood",      tex: "wood",  eng: "#2a1608", ramp: ["#1e1008", "#3d2412", "#5c3a1e", "#7a5030", "#96673e", "#b38350", "#d4a670"] },
+  stone:     { tier: 1, name: "Stone",     tex: "stone", eng: "#1e1e22", ramp: ["#141416", "#2e2e34", "#46464e", "#5e5e66", "#76767e", "#93939a", "#b8b8be"] },
+  ice:       { tier: 2, name: "Ice",       tex: "ice",   eng: "#1a4a70", ramp: ["#102a40", "#2a5a80", "#4a86b0", "#6aa8d0", "#8cc8ea", "#b8e4f8", "#f0fcff"] },
+  amber:     { tier: 3, name: "Amber",     tex: "plain", eng: "#4a2200", ramp: ["#2a1200", "#6a3400", "#9a5408", "#c87a10", "#e89a20", "#f8c050", "#fff0b0"] },
+  pearl:     { tier: 4, name: "Pearl",     tex: "plain", eng: "#7a6a8a", ramp: ["#3a3040", "#7a6a80", "#a898b0", "#c8b8d0", "#e0d4e8", "#f2eaf6", "#ffffff"] },
+  lava:      { tier: 5, name: "Lava",      tex: "lava",  eng: "#ff7020", ramp: ["#120404", "#2a0a0a", "#401010", "#561a14", "#6a2418", "#86321e", "#c0603a"], glow: "#ffb030" },
+  meteorite: { tier: 6, name: "Meteorite", tex: "speck", eng: "#9090c0", ramp: ["#08080c", "#1a1a22", "#2c2c38", "#3e3e4c", "#525264", "#74748a", "#c8c8e0"] },
+  jade:      { tier: 7, name: "Jade",      tex: "stone", eng: "#0a2a16", ramp: ["#06180e", "#0f3a22", "#1b5a36", "#2a7a4a", "#3f9a62", "#6cc08a", "#b8f0cc"] },
+  crystal:   { tier: 8, name: "Crystal",   tex: "facet", eng: "#ffe0f4", ramp: ["#3a0a2a", "#7a1a5a", "#a8307a", "#d04a9a", "#ec70b8", "#f8a8d8", "#fff0fa"] },
+};
+export const MATERIAL_OF_TIER = Object.fromEntries(Object.entries(MATERIALS).map(([id, m]) => [m.tier, id]));
 /* ─── SHAPES ──────────────────────────────────────────────────────────── */
 export const SHAPES      = ["round","round","round","round","octagonal","octagonal","hexagonal","hexagonal","holed","shield","diamond","oval"];
 export const SHAPE_NAMES = { round:"Round", octagonal:"Octagonal", hexagonal:"Hexagonal", holed:"Pierced", shield:"Shield", diamond:"Diamond", oval:"Oval" };

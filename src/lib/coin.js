@@ -13,7 +13,7 @@
  * ════════════════════════════════════════════════════════════════════════ */
 
 import {
-  METALS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
+  METALS, MATERIALS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
   RARITIES,   TITLES, TITLE_LEVELS,
 } from "./data.js";
 import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP } from "../../shared/tuning.js";
@@ -157,83 +157,199 @@ export const newSeed = () => (Date.now() ^ (Math.random() * 0xffffffff | 0)) >>>
  *
  * Exported under both names: `drawCoin` for legacy callers,
  * `drawCoinFallback` for the new CoinCanvas's defensive fallback path. */
-export function drawCoin(canvas, coin, px) {
-  const S = 64, off = document.createElement("canvas"); off.width = S; off.height = S;
-  const c   = off.getContext("2d");
-  const m   = METALS[coin.metalIdx];
-  const noise = new RNG(coin.seed ^ 0xcafeba);
-  const cx  = S / 2, cy = S / 2, r = S / 2 - 1;
+/* ─── drawing a coin ───────────────────────────────────────────────────
+ * Pixel art, after hand-drawn coin sprites: a seven-step tone ramp per
+ * metal (or material), a dark outline, a bevelled rim lit from the top
+ * left, the face embossed (raised pixels catch the light on their top-left
+ * edges and cast one pixel of shadow down-right), two gloss streaks. No
+ * gradients, no anti-aliasing: every pixel is one of the ramp's colours.
+ *
+ * The face is genFace's 13 × 13, mirror-symmetric by construction, laid on
+ * cells that alternate 4 and 3 pixels (4,3,4,…,4 = 46): a palindrome, so
+ * the face stays symmetric and sits exactly centred on the 64-pixel coin.
+ * Shapes are tested at pixel centres about the coin's centre, so they are
+ * symmetric too. Only the light (and the gloss) is one-sided, on purpose.
+ *
+ * opts.turn  how wide the coin shows as it spins (64 = face on, ~4 = edge)
+ * opts.back  draw the reverse: a plain field and the mint's mark */
+const SZ = 64;
+const CELLS = [4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4];
+const CELL_AT = (() => { const at = new Int8Array(SZ).fill(-1); let p = (SZ - 46) / 2; CELLS.forEach((w, i) => { for (let k = 0; k < w; k++) at[p + k] = i; p += w; }); return at; })();
+const MINT = ["#...#", "##.##", "#.#.#", "#...#", "#...#"];         // the mint's mark: an M
+const MINT_CELLS = [4, 3, 4, 3, 4];
+const hexRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const mixRgb = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const rgbCss = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 
-  const clip = () => {
-    c.beginPath();
-    const sh = coin.shape;
-    if (sh === "round" || sh === "holed") c.arc(cx, cy, r, 0, Math.PI * 2);
-    else if (sh === "octagonal") { for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + Math.PI / 8; i ? c.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a)) : c.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a)); } c.closePath(); }
-    else if (sh === "hexagonal")  { for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2 + Math.PI / 6; i ? c.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a)) : c.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a)); } c.closePath(); }
-    else if (sh === "shield")     { const hw = r * .88; c.moveTo(cx - hw, cy - r); c.lineTo(cx + hw, cy - r); c.lineTo(cx + hw, cy - .1 * r); c.quadraticCurveTo(cx + hw, cy + r * .65, cx, cy + r); c.quadraticCurveTo(cx - hw, cy + r * .65, cx - hw, cy - .1 * r); c.closePath(); }
-    else if (sh === "diamond")    { c.moveTo(cx, cy - r); c.lineTo(cx + r * .78, cy); c.lineTo(cx, cy + r); c.lineTo(cx - r * .78, cy); c.closePath(); }
-    else if (sh === "oval")       c.ellipse(cx, cy, r * .7, r, 0, 0, Math.PI * 2);
-    else                          c.rect(cx - r + 1, cy - r + 1, (r - 1) * 2, (r - 1) * 2);
+/* outline, deep, dark, mid, base, light, glint */
+export function coinRamp(coin) {
+  const mat = coin.material && MATERIALS[coin.material];
+  if (mat) return { ramp: mat.ramp.map(hexRgb), eng: hexRgb(mat.eng), tex: mat.tex, glow: mat.glow ? hexRgb(mat.glow) : null };
+  const m = METALS[coin.metalIdx], dark = hexRgb(m.dark), mid = hexRgb(m.mid), base = hexRgb(m.base), hl = hexRgb(m.hl);
+  return {
+    ramp: [mixRgb(dark, [0, 0, 0], 0.55), dark, mixRgb(dark, mid, 0.55), mid, base, hl, mixRgb(hl, [255, 255, 255], 0.5)],
+    eng: hexRgb(m.eng), tex: "metal", glow: null,
   };
+}
 
-  clip(); c.save(); c.clip();
-  const grd = c.createRadialGradient(cx - r * .3, cy - r * .3, 0, cx, cy, r);
-  grd.addColorStop(0, m.base); grd.addColorStop(.55, m.mid); grd.addColorStop(1, m.dark);
-  c.fillStyle = grd; c.fillRect(0, 0, S, S);
-
-  // Noise specks across the coin face — adds patina texture
-  for (let i = 0; i < 420; i++) {
-    const a = noise.next() * Math.PI * 2;
-    const d = noise.next() * r * .95;
-    const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d;
-    const b = noise.next();
-    c.fillStyle = `rgba(${b > .5 ? 255 : 0},${b > .5 ? 255 : 0},${b > .5 ? 255 : 0},${.04 + noise.next() * .06})`;
-    c.fillRect(x | 0, y | 0, 1, 1);
-  }
-
-  // Engraved face — 13×13 grid centered on the canvas
-  const face       = genFace(coin.seed);
-  const cellSize   = 3.5;
-  const faceOffset = (S - 13 * cellSize) / 2;
-  for (let y = 0; y < 13; y++) for (let x = 0; x < 13; x++) {
-    const v = face[y][x]; if (!v) continue;
-    const px2 = faceOffset + x * cellSize, py = faceOffset + y * cellSize;
-    c.fillStyle = v === 2 ? m.eng : m.hl;
-    c.fillRect(Math.floor(px2), Math.floor(py), Math.ceil(cellSize), Math.ceil(cellSize));
-    if (v === 1) {
-      c.fillStyle = "rgba(255,255,255,.22)"; c.fillRect(Math.floor(px2), Math.floor(py), Math.ceil(cellSize), 1);
-      c.fillStyle = "rgba(0,0,0,.26)";       c.fillRect(Math.floor(px2), Math.floor(py) + Math.ceil(cellSize) - 1, Math.ceil(cellSize), 1);
+export function inShape(shape, x, y, r) {
+  const c = SZ / 2, dx = x + 0.5 - c, dy = y + 0.5 - c;
+  const poly = (n, off) => {
+    const a = Math.atan2(dy, dx), seg = (Math.PI * 2) / n, t = ((((a - off) % seg) + seg) % seg) - seg / 2;
+    return Math.hypot(dx, dy) * Math.cos(t) <= r * Math.cos(seg / 2);
+  };
+  switch (shape) {
+    case "octagonal": return poly(8, Math.PI / 8);
+    case "hexagonal": return poly(6, Math.PI / 6);
+    case "diamond":   return Math.abs(dx) / (r * 0.78) + Math.abs(dy) / r <= 1;
+    case "oval":      return (dx / (r * 0.72)) ** 2 + (dy / r) ** 2 <= 1;
+    case "shield": {
+      const hw = r * 0.88;
+      if (dy < -r || Math.abs(dx) > hw) return false;
+      if (dy <= -0.1 * r) return true;
+      const k = (dy + 0.1 * r) / (1.1 * r);
+      return Math.abs(dx) <= hw * Math.sqrt(Math.max(0, 1 - k * k));
     }
+    default: return dx * dx + dy * dy <= r * r;
   }
+}
 
-  // Top-left highlight glow
-  c.fillStyle = "rgba(255,255,255,.14)"; c.beginPath(); c.arc(cx - r * .4, cy - r * .4, r * .55, 0, Math.PI * 2); c.fill();
-  // Pierced shape — punch a hole in the center
-  if (coin.shape === "holed") { c.save(); c.globalCompositeOperation = "destination-out"; c.beginPath(); c.arc(cx, cy, r * .18, 0, Math.PI * 2); c.fill(); c.restore(); }
-  c.restore();
+const hashPx = (x, y, s) => ((Math.imul((x * 73856093) ^ (y * 19349663) ^ s, 2654435761) >>> 0) % 1000) / 1000;
+/* a material's grain: (x, y, tone) → tone; 7 means its glow colour */
+const GRAIN = {
+  metal: s => (x, y, t) => t + (hashPx(x, y, s) < 0.025 ? -1 : hashPx(x, y, s) > 0.985 ? 1 : 0),
+  wood:  s => (x, y, t) => t + (Math.sin((y + Math.sin(x * 0.35 + s) * 2.2) * 0.9) > 0.75 ? -1 : 0),
+  stone: s => (x, y, t) => t + (hashPx(x >> 1, y >> 1, s) < 0.12 ? -1 : hashPx(x, y, s) > 0.94 ? 1 : 0),
+  speck: s => (x, y, t) => (hashPx(x, y, s) > 0.965 ? 6 : hashPx(x >> 1, y >> 1, s) < 0.1 ? t - 1 : t),
+  lava:  s => (x, y, t) => (Math.abs(Math.sin(x * 0.45 + s) + Math.sin(y * 0.5 - s * 0.7) + Math.sin((x + y) * 0.3)) < 0.28 ? 7 : t),
+  ice:   s => (x, y, t) => ((x * 3 + y * 5 + s) % 23 === 0 || (x - y + 64 + s) % 29 === 0 ? 6 : t),
+  facet: () => (x, y, t) => t + ((Math.floor((x + 2 * y) / 9) + Math.floor((2 * x - y + 64) / 11)) % 3 === 0 ? 1 : 0),
+  plain: () => (x, y, t) => t,
+};
 
-  // Edge stroke
-  c.lineWidth = 1; c.strokeStyle = m.eng; clip(); c.stroke();
+/* Paint a coin, face on, into a 64 × 64 canvas (kept: a coin that turns
+ * is drawn many times a second). */
+const painted = new Map();
+function paintCoin(coin, back = false) {
+  const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.shiny ? 1 : 0}:${back ? 1 : 0}`;
+  if (painted.has(key)) return painted.get(key);
+  const out = paintFresh(coin, back);
+  if (painted.size > 400) painted.delete(painted.keys().next().value);
+  painted.set(key, out);
+  return out;
+}
+function paintFresh(coin, back) {
+  const off = document.createElement("canvas"); off.width = SZ; off.height = SZ;
+  const g = off.getContext("2d"), img = g.createImageData(SZ, SZ), d = img.data;
+  const { ramp: R, eng, tex, glow } = coinRamp(coin);
+  const grain = GRAIN[tex || "metal"]((coin.seed >>> 0) % 997);
+  const r = SZ / 2 - 1, mid = SZ / 2;
+  const holed = coin.shape === "holed";
+  const ring = (x, y) => Math.hypot(x + 0.5 - mid, y + 0.5 - mid);
+  const inside = (x, y, rr) => inShape(coin.shape, x, y, rr) && !(holed && ring(x, y) <= 5.5);
+  const face = back ? null : genFace(coin.seed);
+  const faceAt = (x, y) => {
+    if (back) {
+      // the mint's mark, centred on its own 4/3 cells
+      const o = (SZ - 18) / 2, fx = x - o, fy = y - o;
+      if (fx < 0 || fy < 0 || fx >= 18 || fy >= 18) return 0;
+      let cx = 0, cy = 0, a = 0; while (a + MINT_CELLS[cx] <= fx) a += MINT_CELLS[cx++];
+      a = 0; while (a + MINT_CELLS[cy] <= fy) a += MINT_CELLS[cy++];
+      return MINT[cy][cx] === "#" ? 1 : 0;
+    }
+    if (x < 0 || y < 0 || x >= SZ || y >= SZ) return 0;
+    const fx = CELL_AT[x], fy = CELL_AT[y];
+    return fx < 0 || fy < 0 ? 0 : face[fy][fx];
+  };
+  const set = (x, y, c) => { const i = (y * SZ + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
+
+  for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
+    if (!inside(x, y, r)) continue;
+    const lit = (x - mid) + (y - mid);                         // < 0 toward the light, top left
+    const outer = !inShape(coin.shape, x, y, r - 1) || (holed && ring(x, y) <= 6.5);
+    const rim = !inShape(coin.shape, x, y, r - 4) || (holed && ring(x, y) <= 8.5);
+    const lip = !inShape(coin.shape, x, y, r - 5) || (holed && ring(x, y) <= 9.5);
+    let t;
+    if (outer) t = 0;
+    else if (rim) t = lit < -16 ? 5 : lit < 0 ? 4 : lit < 16 ? 3 : 2;
+    else if (lip) t = lit < 0 ? 2 : 4;                         // the step down to the field
+    else {
+      t = grain(x, y, lit < 4 ? 4 : 3);
+      const v = faceAt(x, y);
+      if (v === 1) t = faceAt(x - 1, y) !== 1 || faceAt(x, y - 1) !== 1 ? 6 : 5;
+      else if (v === 2) { set(x, y, faceAt(x + 1, y + 1) === 2 ? eng : mixRgb(eng, R[1], 0.35)); continue; }
+      else if (faceAt(x - 1, y - 1) === 1 || faceAt(x - 1, y) === 1 && faceAt(x, y - 1) === 1) t = 2;   // shadow down-right
+      // two gloss streaks across the upper left
+      const u = x + y;
+      if ((u === 24 || u === 25 || u === 29) && x > 10 && y > 10 && v !== 1) t = Math.min(6, t + 1);
+    }
+    if (t === 7 && glow) { set(x, y, glow); continue; }
+    set(x, y, R[Math.max(0, Math.min(6, t))]);
+  }
+  g.putImageData(img, 0, 0);
+  if (coin.shiny) shine(g, coin);
+  return off;
+}
+
+function shine(c, coin) {
+  const clipShape = () => {
+    c.beginPath();
+    for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) if (inShape(coin.shape, x, y, SZ / 2 - 1)) c.rect(x, y, 1, 1);
+  };
 
   // Shiny: an iridescent film in hard diagonal pixel bands, faint enough
   // that the metal still reads. Fixed per coin; the moving glint and the
   // twinkles are drawn over it by lib/aura.js.
-  if (coin.shiny) {
-    c.save(); clip(); c.clip();
+  {
+    c.save(); clipShape(); c.clip();
     const film = ["rgba(120,230,255,.15)", null, "rgba(255,120,220,.13)", null, "rgba(255,230,120,.15)", null];
-    const off = (coin.seed >>> 3) % 6;
-    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-      const band = film[(Math.floor((x + y) / 8) + off) % film.length];
+    const o = (coin.seed >>> 3) % 6;
+    for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
+      const band = film[(Math.floor((x + y) / 8) + o) % film.length];
       if (band) { c.fillStyle = band; c.fillRect(x, y, 1, 1); }
     }
     c.restore();
   }
+}
 
-  // Final blit to the requested size, nearest-neighbor for pixel-perfect scale
-  canvas.width = px; canvas.height = px;
+export function drawCoin(canvas, coin, px, opts = {}) {
+  const off = paintCoin(coin, !!opts.back);
+  if (canvas.width !== px) canvas.width = px;
+  if (canvas.height !== px) canvas.height = px;
   const ctx = canvas.getContext("2d");
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(off, 0, 0, px, px);
+  ctx.clearRect(0, 0, px, px);
+  const w = Math.round(opts.turn ?? SZ);
+  if (w >= SZ) { ctx.drawImage(off, 0, 0, px, px); return; }
+
+  // turning: columns gathered toward the middle (whole pixels, nearest),
+  // the coin's edge showing on the side turned away; edge-on, just a band
+  const { ramp: R } = coinRamp(coin);
+  const tmp = document.createElement("canvas"); tmp.width = SZ; tmp.height = SZ;
+  const t2 = tmp.getContext("2d");
+  const x0 = Math.round((SZ - w) / 2);
+  if (w <= 6) {
+    t2.fillStyle = rgbCss(R[0]); t2.fillRect(x0 - 1, 1, w + 2, SZ - 2);
+    t2.fillStyle = rgbCss(R[3]); t2.fillRect(x0, 2, w, SZ - 4);
+    t2.fillStyle = rgbCss(R[5]); t2.fillRect(x0, 3, 1, SZ - 6);
+  } else {
+    for (let i = 0; i < w; i++) t2.drawImage(off, Math.floor(((i + 0.5) * SZ) / w), 0, 1, SZ, x0 + i, 0, 1, SZ);
+    const side = opts.back ? -1 : 1, band = w < 30 ? 3 : 2;
+    const id = t2.getImageData(0, 0, SZ, SZ), dd = id.data;
+    for (let y = 0; y < SZ; y++) {
+      let edge = -1;
+      if (side > 0) { for (let x = SZ - 1; x >= 0; x--) if (dd[(y * SZ + x) * 4 + 3]) { edge = x; break; } }
+      else { for (let x = 0; x < SZ; x++) if (dd[(y * SZ + x) * 4 + 3]) { edge = x; break; } }
+      if (edge < 0) continue;
+      for (let k = 1; k <= band; k++) {
+        const x = edge + side * k; if (x < 0 || x >= SZ) continue;
+        const col = k === band ? R[0] : R[2], i = (y * SZ + x) * 4;
+        dd[i] = col[0]; dd[i + 1] = col[1]; dd[i + 2] = col[2]; dd[i + 3] = 255;
+      }
+    }
+    t2.putImageData(id, 0, 0);
+  }
+  ctx.drawImage(tmp, 0, 0, px, px);
 }
 
 /* ─── XP / LEVEL CURVE ────────────────────────────────────────────────── */
