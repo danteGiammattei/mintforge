@@ -101,11 +101,13 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   const { G, ring, inner, face, inside } = rings(coin, M);
   ctx.clearRect(0, 0, G, G);
   if (layer === "behind") {
-    // only what stands behind the coin: an eldritch coin's far tentacles
-    if (!tendrils || (rarity === 5 && !auraStill() && turnAt(coin, frame))) return;
+    // only what stands behind the coin: an eldritch coin's far tentacles,
+    // or the great flame of a fire coin
+    if ((!tendrils && !flames) || (rarity === 5 && !auraStill() && turnAt(coin, frame))) return;
     const img = ctx.createImageData(G, G), d = img.data;
     const put = (x, y, rgb) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= G || y >= G) return; const i = (y * G + x) * 4; d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = 255; };
-    paintTentacles(put, G, M, coin.seed >>> 0, frame, "behind");
+    if (flames) paintBlaze(put, G, M, coin.seed >>> 0, frame);
+    if (tendrils) paintTentacles(put, G, M, coin.seed >>> 0, frame, "behind");
     ctx.putImageData(img, 0, 0);
     return;
   }
@@ -122,7 +124,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
   if (rarity <= 0) {
-    if (flames) paintFlames(put, G, M, ring[1], seed, frame);
+    if (flames) paintBlazeEdge(put, inner, seed, frame);
     if (tendrils) paintTentacles(put, G, M, seed, frame, "front");
     if (moon) paintMoon(put, G, M, inside, seed, frame);
     ctx.putImageData(img, 0, 0); return;
@@ -209,7 +211,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
     }
   }
 
-  if (flames) paintFlames(put, G, M, ring[1], seed, frame);
+  if (flames) paintBlazeEdge(put, inner, seed, frame);
   if (tendrils) paintTentacles(put, G, M, seed, frame, "front");
   if (moon) paintMoon(put, G, M, inside, seed, frame);
   ctx.putImageData(img, 0, 0);
@@ -260,13 +262,13 @@ function frontPaths(G, seed, frame) {
   for (let k = 0; k < N; k++) {
     const a = (k / N) * Math.PI * 2 + 0.5 + h32(seed + k * 31) * 0.9, dir = k % 2 ? -1 : 1;
     let x = c + Math.cos(a) * (r - 6), y = c + Math.sin(a) * (r - 6), h = a;
-    const len = 44 + Math.floor(h32(seed + k * 11) * 14), pts = [];
-    const bend = 0.2 + h32(seed + k * 23) * 0.05;                    // how hard it turns back over the coin
+    const len = 24 + Math.floor(h32(seed + k * 11) * 9), pts = [];
+    const bend = 0.22 + h32(seed + k * 23) * 0.05;                   // how hard it turns back over the coin
     for (let i = 0; i < len; i++) {
       const u = i / len;
       pts.push([Math.round(x), Math.round(y), Math.max(0.6, 2.2 * (1 - u) ** 0.8)]);
-      // out past the rim, a hard turn back, a long run across the face, a curl
-      const turn = i < 4 ? 0 : i < 18 ? bend : u < 0.8 ? 0.01 : 0.45;
+      // out past the rim, a hard turn back over the edge, a short reach in, a curl
+      const turn = i < 4 ? 0 : i < 15 ? bend : u < 0.72 ? 0.02 : 0.5;
       h += dir * turn + Math.sin(i * 0.3 + frame * 0.32 + k * 1.9) * 0.16;   // wavier
       x += Math.cos(h); y += Math.sin(h);
     }
@@ -293,42 +295,40 @@ function paintTentacles(put, G, M, seed, frame, layer) {
   }
 }
 
-/* Fire: the coin is engulfed. Licks of flame stand up from all round its
- * edge but the bottom, rooted a little inside it: the top ones tallest,
- * the side ones climbing up along the coin. Each lick is narrow and
- * wavy, swaying as it rises: a gold heart low down, orange, a red edge
- * that frays, and sparks thrown off the tips. Drawn afresh every frame,
- * so it never holds still. */
+/* Fire: the coin burns as one great flame, after the reference: behind
+ * it (a layer under the coin), a single blaze hugs it all round and rises
+ * above it to a point, gold at the heart against the coin, then orange,
+ * hot orange, a red edge, and loose pixels flying off that edge. Its
+ * outline ripples and its pixels flicker every frame. In front, the
+ * coin's own edge catches. */
 const FLAME = { core: [255, 228, 138], mid: [246, 174, 83], hot: [232, 116, 44], edge: [197, 78, 61], ash: [155, 48, 54] };
-function paintFlames(put, G, M, edge, seed, frame) {
-  const c = G / 2;
-  const root = edge.filter(p => !(p.y > c + 10 && Math.abs(p.x - c) < 18));      // all but the bottom
-  const N = 11;
-  for (let k = 0; k < N; k++) {
-    const p = root[Math.floor(((k + 0.5) / N) * root.length)];
-    if (!p) continue;
-    const a = Math.atan2(p.y - c, p.x - c);
-    const bx = p.x - Math.cos(a) * 2, by = p.y - Math.sin(a) * 2;
-    const rnd = i => h32(seed + k * 97 + (frame >> 1) * 131 + i * 7);
-    const high = (c - by) / c;                                          // 1 at the top … -1 at the bottom
-    const H = Math.round(M + 6 + high * 6 + rnd(1) * 7), W = 2.4 + h32(seed + k * 13) * 1.4;
-    for (let row = 0; row < H; row++) {
-      const u = row / H;
-      const hw = W * (1 - u ** 1.3);
-      const cx = bx + Math.sin(row * 0.38 + frame * 0.75 + k * 1.7) * (0.6 + u * 2.4), y = Math.round(by) - row;
-      for (let dx = -Math.ceil(hw) - 1; dx <= Math.ceil(hw) + 1; dx++) {
-        const q = Math.abs(dx + (cx - Math.round(cx))) / Math.max(0.6, hw);
-        if (q > 1.15) continue;
-        if (q > 0.85 && rnd(row * 17 + dx + 50) < 0.5) continue;        // frayed edge
-        const col = q < 0.45 && u < 0.5 ? FLAME.core : q < 0.7 && u < 0.75 ? FLAME.mid : q < 0.92 ? FLAME.hot : FLAME.edge;
-        put(Math.round(cx) + dx, y, col, 1);
-      }
+function paintBlaze(put, G, M, seed, frame) {
+  const c = G / 2, r = 31, s = (seed % 628) / 100, f = frame * 0.9;
+  const side = M * 0.5, yTop = c - r - (M - 1);               // how wide it hugs, and where its tip is
+  for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+    const dx = x + 0.5 - c, dy = y + 0.5 - c, rad = Math.hypot(dx, dy);
+    if (rad < r - 1) continue;                                 // under the coin
+    // the flame's half-width at this height: round below, like the coin
+    // with room to spare; tapering above to a point, a little wavy
+    const ripple = 1.5 * Math.sin(y * 0.5 + f + s) + 1.0 * Math.sin(y * 0.95 - f * 1.4 + s * 2);
+    const W = y >= c
+      ? Math.sqrt(Math.max(0, (r + side) ** 2 - (dy * 1.15) ** 2)) + ripple * 0.6
+      : (r + side) * Math.max(0, (y + 0.5 - yTop) / (c - yTop)) ** 0.75 + ripple;
+    const inside = W - Math.abs(dx) + (h32(seed + (x >> 1) * 31 + (y >> 1) * 977 + (frame >> 1) * 7) - 0.5) * 1.6;
+    const out = Math.max(0, rad - r);                          // how far from the coin
+    let col = null;
+    if (inside > 0) {
+      const t = out / (out + inside);                          // 0 against the coin … 1 at the flame's edge
+      col = t < 0.4 ? FLAME.core : t < 0.62 ? FLAME.mid : t < 0.82 ? FLAME.hot : FLAME.edge;
+    } else if (inside > -4 && W > 0 && dy < r * 0.7 && h32(seed + x * 131 + y * 7919 + frame * 31) < 0.3 * (1 + inside / 4)) {
+      col = inside > -1.5 ? FLAME.edge : FLAME.ash;            // loose pixels flying off the edge
     }
-    for (let sp = 0; sp < 3; sp++) {
-      const sx = Math.round(bx + (rnd(200 + sp) - 0.5) * W * 4), sy = Math.round(by) - Math.round(H * (0.7 + rnd(300 + sp) * 0.6));
-      put(sx, sy, rnd(400 + sp) < 0.5 ? FLAME.hot : FLAME.ash, 1);
-    }
+    if (col) put(x, y, col, 1);
   }
+}
+function paintBlazeEdge(put, inner, seed, frame) {
+  inner[1].forEach((p, i) => { const h = h32(seed + i * 17 + (frame >> 1) * 101); if (h < 0.55) put(p.x, p.y, h < 0.2 ? FLAME.core : FLAME.mid, 1); });
+  inner[2].forEach((p, i) => { if (h32(seed + i * 23 + (frame >> 1) * 59) < 0.22) put(p.x, p.y, FLAME.hot, 1); });
 }
 
 /* The astral moon: a round of 64 frames (8 s), on an ellipse tipped a
