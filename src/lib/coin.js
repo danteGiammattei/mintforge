@@ -18,7 +18,7 @@ import {
   METALS, MATERIALS, CONSTELLATIONS, MAX_TIER, SHAPES, CONS, VOWS, ERAS, EPOCH, HOUSES, CONDS,
   RARITIES,   TITLES, TITLE_LEVELS,
 } from "./data.js";
-import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP, MATERIAL } from "../../shared/tuning.js";
+import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP, MATERIAL, ASTRAL } from "../../shared/tuning.js";
 
 /* ─── RUNE TRANSLATOR ─────────────────────────────────────────────────── */
 const RL = { A:"ᚨ",B:"ᛒ",C:"ᚲ",D:"ᛞ",E:"ᛖ",F:"ᚠ",G:"ᚷ",H:"ᚺ",I:"ᛁ",J:"ᛃ",K:"ᚲ",L:"ᛚ",M:"ᛗ",N:"ᚾ",O:"ᛟ",P:"ᛈ",R:"ᚱ",S:"ᛊ",T:"ᛏ",U:"ᚢ",V:"ᚡ",W:"ᚹ",X:"ᛪ",Y:"ᚤ",Z:"ᛉ" };
@@ -293,9 +293,9 @@ export const shapeOf = coin => (coin.metalIdx === 8 && coin.sign != null ? "hexa
 /* ─── the astral series ────────────────────────────────────────────────
  * A badge of the sky: a pointed hexagon, a cream frame studded with
  * stars, a deep teal field that darkens toward the middle in stepped
- * bands, the sign's glyph above, the coin's own face small in the middle
- * in rose, and the constellation in cream across it all. The back is
- * the field and the glyph, large. */
+ * bands, the sign's glyph above, its constellation large in the middle,
+ * and its name lettered along the bottom. No face: the sign is the
+ * figure. The back is the field and the glyph, large. */
 const ZODIAC = [
   [".##.##.", "#..#..#", "#..#..#", "...#...", "...#...", "...#...", "...#..."],   // Aries
   ["#.....#", ".#...#.", "..###..", ".#...#.", ".#...#.", ".#...#.", "..###.."],   // Taurus
@@ -310,13 +310,21 @@ const ZODIAC = [
   [".......", ".#.#.#.", "#.#.#.#", ".......", ".#.#.#.", "#.#.#.#", "......."],   // Aquarius
   ["#.....#", ".#...#.", ".#...#.", "#######", ".#...#.", ".#...#.", "#.....#"],   // Pisces
 ];
+/* 3 × 5 capitals, for the signs' names */
+const LETTERS = {
+  A: [".#.", "#.#", "###", "#.#", "#.#"], B: ["##.", "#.#", "##.", "#.#", "##."], C: [".##", "#..", "#..", "#..", ".##"],
+  E: ["###", "#..", "##.", "#..", "###"], G: [".##", "#..", "#.#", "#.#", ".##"], I: ["#", "#", "#", "#", "#"],
+  L: ["#..", "#..", "#..", "#..", "###"], M: ["#.#", "###", "###", "#.#", "#.#"], N: ["##.", "#.#", "#.#", "#.#", "#.#"],
+  O: [".#.", "#.#", "#.#", "#.#", ".#."], P: ["##.", "#.#", "##.", "#..", "#.."], Q: [".#.", "#.#", "#.#", "##.", ".##"],
+  R: ["##.", "#.#", "##.", "#.#", "#.#"], S: [".##", "#..", ".#.", "..#", "##."], T: ["###", ".#.", ".#.", ".#.", ".#."],
+  U: ["#.#", "#.#", "#.#", "#.#", "###"], V: ["#.#", "#.#", "#.#", "#.#", ".#."],
+};
 const SKY = {
   out: [11, 28, 38], frame: [251, 246, 210], frameMid: [226, 216, 160], frameDark: [176, 160, 108],
   bands: [[7, 30, 40], [12, 46, 60], [19, 66, 80], [29, 90, 106], [43, 117, 134], [69, 147, 166], [106, 178, 196]],
   rose: [[255, 216, 230], [244, 160, 192], [212, 120, 152], [138, 68, 98]], roseCut: [90, 42, 64],
   ink: [251, 243, 200], star: [255, 255, 255],
 };
-const FACE2 = 26, FACE2_AT = (SZ - FACE2) / 2;                 // the face at 2 px a cell: 26 px, centred
 function paintAstral(coin, back) {
   const off = document.createElement("canvas"); off.width = SZ; off.height = SZ;
   const g = off.getContext("2d"), img = g.createImageData(SZ, SZ), d = img.data;
@@ -357,28 +365,30 @@ function paintAstral(coin, back) {
       for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) set(mid - 11 + gx * 3 + a + 1, mid - 11 + gy * 3 + b + 1, SKY.frame);
   } else {
     // the glyph above, in the frame's cream
-    for (let gy = 0; gy < 7; gy++) for (let gx = 0; gx < 7; gx++) if (glyph[gy][gx] === "#") set(mid - 4 + gx + 1, 9 + gy, SKY.frame);
-    // the coin's own face, small, in rose, carved cell by cell
-    const face = genFace(coin.seed);
-    const at = (x, y) => { const fx = Math.floor((x - FACE2_AT) / 2), fy = Math.floor((y - FACE2_AT) / 2); return fx >= 0 && fy >= 0 && fx < 13 && fy < 13 ? face[fy][fx] : 0; };
-    for (let y = FACE2_AT; y < FACE2_AT + FACE2; y++) for (let x = FACE2_AT; x < FACE2_AT + FACE2; x++) {
-      const v = at(x, y);
-      if (v === 1) set(x, y, at(x - 1, y) !== 1 || at(x, y - 1) !== 1 ? SKY.rose[0] : (y - FACE2_AT) % 2 ? SKY.rose[2] : SKY.rose[1]);
-      else if (v === 2) set(x, y, SKY.roseCut);
-      else if (at(x - 1, y - 1) === 1) set(x, y, SKY.rose[3]);
-    }
-    // the constellation across it all
+    for (let gy = 0; gy < 7; gy++) for (let gx = 0; gx < 7; gx++) if (glyph[gy][gx] === "#") set(mid - 4 + gx + 1, 8 + gy, SKY.frame);
+    // the constellation, large, in the middle: cream lines, and stars that
+    // are small cream diamonds with a bright heart
     const con = CONSTELLATIONS[coin.sign];
-    const pt = ([u, v]) => [Math.round(15 + u * 34), Math.round(18 + v * 30)];
+    const pt = ([u, v]) => [Math.round(14 + u * 36), Math.round(18 + v * 21)];
     for (const [a, b] of con.lines) {
       const [x0, y0] = pt(con.stars[a]), [x1, y1] = pt(con.stars[b]);
       const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-      for (let i = 1; i < n; i++) set(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), SKY.ink);
+      for (let i = 1; i < n; i++) set(Math.round(x0 + ((x1 - x0) * i) / n), Math.round(y0 + ((y1 - y0) * i) / n), SKY.frameMid);
     }
     for (const st of con.stars) {
       const [x, y] = pt(st);
       for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) set(x + ax, y + ay, SKY.ink);
-      set(x, y, SKY.bands[0]);
+      set(x, y, SKY.star);
+    }
+    // and its name along the bottom, with a shadow under it
+    const name = [...ASTRAL.signs[coin.sign].toUpperCase()].map(ch => LETTERS[ch]).filter(Boolean);
+    const w = name.reduce((n, gl) => n + gl[0].length + 1, -1), y0 = 43;
+    for (const [col, dy] of [[SKY.bands[0], 1], [SKY.frame, 0]]) {
+      let x = Math.round(mid - w / 2);
+      for (const gl of name) {
+        for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < gl[0].length; gx++) if (gl[gy][gx] === "#") set(x + gx, y0 + gy + dy, col);
+        x += gl[0].length + 1;
+      }
     }
   }
   g.putImageData(img, 0, 0);

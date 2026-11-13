@@ -30,28 +30,47 @@ function useLeft(ms) {
   return ms == null ? null : Math.max(0, at.ms - (Date.now() - at.t));
 }
 
-function Card({ n, fresh, ready }) {
+/* A card. With `flip`, it turns over as it arrives: its back narrows to
+ * an edge, then its face widens out (columns gathered whole, nothing
+ * smoothed), nine frames at 18 a second. `delay` holds it face down
+ * first, so two cards can turn one after the other. */
+const FLIP = [96, 72, 48, 24, 6, 24, 48, 72, 96];
+const still = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+function Card({ n, fresh, ready, flip = false, delay = 0 }) {
   const ref = useRef();
   useEffect(() => {
     const cv = ref.current; if (!cv) return;
     const g = cv.getContext("2d");
     g.imageSmoothingEnabled = false;
-    g.clearRect(0, 0, CARD_W, CARD_H);
-    g.drawImage(cardImage(n == null ? "back" : n), 0, 0, CARD_W, CARD_H);
-  }, [n, ready]);
+    const paint = (src, w) => {
+      g.clearRect(0, 0, CARD_W, CARD_H);
+      const img = cardImage(src), sw = img.width, x0 = Math.round((CARD_W - w) / 2);
+      if (w >= CARD_W) { g.drawImage(img, 0, 0, CARD_W, CARD_H); return; }
+      for (let i = 0; i < w; i++) g.drawImage(img, Math.floor(((i + 0.5) * sw) / w), 0, 1, img.height, x0 + i, 0, 1, CARD_H);
+    };
+    if (!flip || n == null || still()) { paint(n == null ? "back" : n, CARD_W); return; }
+    paint("back", CARD_W);
+    let i = 0, t = null;
+    const step = () => {
+      paint(i < 5 ? "back" : n, FLIP[i]);
+      if (++i < FLIP.length) t = setTimeout(step, 55);
+    };
+    t = setTimeout(step, delay);
+    return () => clearTimeout(t);
+  }, [n, ready, flip, delay]);
   return <canvas ref={ref} width={CARD_W} height={CARD_H} role="img" aria-label={n == null ? "A card, face down" : cardName(n)}
                  style={{ display: "block", width: CARD_W, height: CARD_H, imageRendering: "pixelated", animation: fresh ? "cardDeal .32s steps(4) both" : undefined }}/>;
 }
 
 /* a card face up with `down` cards fanned beneath it, or a face-down pile */
-function Stack({ up, down = 0, fresh, ready }) {
+function Stack({ up, down = 0, fresh, ready, delay = 0 }) {
   const fan = 8;
   return (
     <div style={{ position: "relative", width: CARD_W + down * fan, height: CARD_H, flexShrink: 0 }}>
       {Array.from({ length: down }, (_, i) => (
         <div key={i} style={{ position: "absolute", left: i * fan, top: 0 }}><Card n={null} ready={ready} fresh={fresh}/></div>
       ))}
-      <div style={{ position: "absolute", left: down * fan, top: 0 }}><Card n={up} ready={ready} fresh={fresh}/></div>
+      <div style={{ position: "absolute", left: down * fan, top: 0 }}><Card n={up} ready={ready} fresh={fresh} flip={fresh} delay={delay + 320}/></div>
     </div>
   );
 }
@@ -124,7 +143,7 @@ function Felt({ t, ready }) {
 
       <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 12 }} aria-live="polite">
         {last ? <Stack key={"t" + t.log.length} up={last.theirs} down={last.down} fresh ready={ready}/> : slot}
-        {last ? <Stack key={"m" + t.log.length} up={last.mine} down={last.down} fresh ready={ready}/> : slot}
+        {last ? <Stack key={"m" + t.log.length} up={last.mine} down={last.down} fresh ready={ready} delay={500}/> : slot}
       </div>
       <div style={{ textAlign: "center", minHeight: 20 }}>
         {tie ? <><span className="t-big" style={{ color: "#ff7060" }}>WAR!</span><div className="t-label">THREE GO DOWN. PICK AGAIN.</div></>
@@ -165,8 +184,8 @@ function Result({ r, ready, onDone }) {
           <div className="t-big" style={{ color: won ? "var(--candle)" : "var(--mute)" }}>{won ? "YOU WIN" : `${r.other} WINS`}</div>
           {last && (
             <div style={{ display: "flex", gap: 16, alignItems: "flex-end", justifyContent: "center", flexWrap: "wrap" }}>
-              <figure style={{ margin: 0 }}><Card n={last.mine} ready={ready}/><figcaption className="t-label">YOU</figcaption></figure>
-              <figure style={{ margin: 0 }}><Card n={last.theirs} ready={ready}/><figcaption className="t-label t-plain">{r.other}</figcaption></figure>
+              <figure style={{ margin: 0 }}><Card n={last.mine} ready={ready} flip delay={250}/><figcaption className="t-label">YOU</figcaption></figure>
+              <figure style={{ margin: 0 }}><Card n={last.theirs} ready={ready} flip delay={750}/><figcaption className="t-label t-plain">{r.other}</figcaption></figure>
             </div>
           )}
           {wars > 0 && <div className="t-label">AFTER {wars === 1 ? "A WAR" : `${wars} WARS`}</div>}
