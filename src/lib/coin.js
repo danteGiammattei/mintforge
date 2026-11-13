@@ -177,11 +177,19 @@ export const newSeed = () => (Date.now() ^ (Math.random() * 0xffffffff | 0)) >>>
 const SZ = 64;
 const CELLS = [4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4];
 const CELL_AT = (() => { const at = new Int8Array(SZ).fill(-1); let p = (SZ - 46) / 2; CELLS.forEach((w, i) => { for (let k = 0; k < w; k++) at[p + k] = i; p += w; }); return at; })();
+// how far into its cell each pixel row (or column) is: 0 is the cell's first
+const CELL_OFF = (() => { const off = new Int8Array(SZ).fill(-1); let p = (SZ - 46) / 2; CELLS.forEach(w => { for (let k = 0; k < w; k++) off[p + k] = k; p += w; }); return off; })();
 const MINT = ["#...#", "##.##", "#.#.#", "#...#", "#...#"];         // the mint's mark: an M
 const MINT_CELLS = [4, 3, 4, 3, 4];
 const hexRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const mixRgb = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgbCss = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+
+/* metals with a texture of their own: void is a piece of night sky,
+ * dithered nebula and stars (glows: white star, blue star, nebula) */
+const METAL_LOOK = {
+  6: { tex: "space", glows: ["#eef4ff", "#3a86f0", "#2c1a50"] },
+};
 
 /* outline, deep, dark, mid, base, light, glint */
 export function coinRamp(coin) {
@@ -190,7 +198,7 @@ export function coinRamp(coin) {
   const m = METALS[coin.metalIdx], dark = hexRgb(m.dark), mid = hexRgb(m.mid), base = hexRgb(m.base), hl = hexRgb(m.hl);
   return {
     ramp: [mixRgb(dark, [0, 0, 0], 0.55), dark, mixRgb(dark, mid, 0.55), mid, base, hl, mixRgb(hl, [255, 255, 255], 0.5)],
-    eng: hexRgb(m.eng), tex: "metal", glows: [],
+    eng: hexRgb(m.eng), tex: METAL_LOOK[coin.metalIdx]?.tex || "metal", glows: (METAL_LOOK[coin.metalIdx]?.glows || []).map(hexRgb),
   };
 }
 
@@ -250,6 +258,24 @@ const GRAIN = {
       return lit < -4 ? 5 : lit < 3 ? 4 : 3;
     };
   },
+  // void: night sky. Nebula in checker-dithered diagonal drifts, single
+  // stars white and blue, and a few that shine in a cross
+  space: s => {
+    const crosses = Array.from({ length: 3 }, (_, i) => [8 + Math.floor(hashPx(i, 5, s) * 48), 8 + Math.floor(hashPx(i, 6, s) * 48)]);
+    return (x, y, t) => {
+      for (const [cx, cy] of crosses) {
+        if (x === cx && y === cy) return 7;
+        if (Math.abs(x - cx) + Math.abs(y - cy) === 1) return 8;
+      }
+      const h = hashPx(x, y, s);
+      if (h > 0.988) return 7;
+      if (h > 0.976) return 8;
+      const n = Math.sin((x + y) * 0.17 + s) + 0.8 * Math.sin((x - y) * 0.07 - s * 0.5);
+      if (n > 0.95) return (x + y) % 2 ? 9 : t;
+      if (n > 0.45) return (x % 2 === 0 && y % 2 === 0) ? 9 : t - 1;
+      return t - 1;
+    };
+  },
   plain: () => (x, y, t) => t,
 };
 
@@ -302,8 +328,23 @@ function paintFresh(coin, back) {
     else {
       t = grain(x, y, lit < 4 ? 4 : 3);
       const v = faceAt(x, y);
-      if (v === 1) t = faceAt(x - 1, y) !== 1 || faceAt(x, y - 1) !== 1 ? 6 : 5;
-      else if (v === 2) { set(x, y, faceAt(x + 1, y + 1) === 2 ? eng : mixRgb(eng, R[1], 0.35)); continue; }
+      if (v === 1) {
+        // raised, and carved cell by cell, as the coins always were: each
+        // cell's top row catches the light, its bottom row falls in shade;
+        // the design's left edges are lit, its right edges dark; and the
+        // side of the coin away from the light is a step dimmer
+        const row = back ? -1 : CELL_OFF[y], last = back ? -2 : CELLS[CELL_AT[y]] - 1;
+        let tt = row === 0 ? 6 : row === last ? 4 : 5;
+        if (faceAt(x - 1, y) !== 1 || faceAt(x, y - 1) !== 1) tt = 6;
+        else if (faceAt(x + 1, y) !== 1 || faceAt(x, y + 1) !== 1) tt = Math.min(tt, 4);
+        if (lit > 18 && tt > 4) tt--;
+        t = tt;
+      } else if (v === 2) {
+        // cut in: shadowed along its top, its own colour below
+        const row = back ? 1 : CELL_OFF[y];
+        set(x, y, row === 0 || faceAt(x, y - 1) !== 2 ? mixRgb(eng, R[0], 0.45) : eng);
+        continue;
+      }
       else if (faceAt(x - 1, y - 1) === 1 || faceAt(x - 1, y) === 1 && faceAt(x, y - 1) === 1) t = 2;   // shadow down-right
       // two gloss streaks across the upper left
       const u = x + y;

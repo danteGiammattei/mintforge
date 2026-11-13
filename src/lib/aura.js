@@ -14,6 +14,9 @@
  *    legendary  all that, and rays that turn and breathe
  *    mythic     a burning rim, and embers that rise off it and die
  *
+ *  An Eldritch coin is never quite still: tentacles curl off its rim
+ *  and sway, dark as the deep, edged with its own sick green light.
+ *
  *  A shiny coin also catches the light: a glint sweeps across its face
  *  every few seconds and small stars twinkle on it, held to the coin's
  *  own pixels, whatever its shape.
@@ -91,10 +94,10 @@ const h32 = (n) => { n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d); n = Math.imul(n 
 /* Paint one frame of a coin's aura into ctx, at 1 unit = 1 pixel. The
  * canvas is (64 + 2·margin) square, the coin sitting in the middle; the
  * layer lies over the coin, but touches only its outermost two pixels. */
-export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false) {
+export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendrils = false) {
   const { G, ring, inner, face, inside } = rings(coin, M);
   ctx.clearRect(0, 0, G, G);
-  if (rarity <= 0 && !shine) return;
+  if (rarity <= 0 && !shine && !tendrils) return;
   if (rarity === 5 && !auraStill() && turnAt(coin, frame)) return;
   const img = ctx.createImageData(G, G), d = img.data;
   const put = (x, y, rgb, al) => {
@@ -106,7 +109,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false) {
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
-  if (rarity <= 0) { ctx.putImageData(img, 0, 0); return; }
+  if (rarity <= 0) { if (tendrils) paintTendrils(put, G, M, seed, frame); ctx.putImageData(img, 0, 0); return; }
   const hot = [255, 236, 170], warm = [255, 160, 70];
   const burn = rarity === 5, beat = (frame >> 1) % 4;      // a slow 4-step pulse
   const flick = i => h32(seed + i * 7 + (frame >> 1) * 131);
@@ -189,7 +192,45 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false) {
     }
   }
 
+  if (tendrils) paintTendrils(put, G, M, seed, frame);
   ctx.putImageData(img, 0, 0);
+}
+
+/* Tentacles off an Eldritch coin: four, rooted on the rim (at places
+ * the coin's seed picks), reaching out and curling tight at the tip, each
+ * swaying on its own beat. Outline, body, and a lit edge toward the
+ * top-left; a sick green glint along the top of each. */
+const T_OUT = [6, 16, 14], T_BODY = [22, 54, 44], T_LIT = [52, 112, 90], T_GLINT = [128, 255, 176];
+function paintTendrils(put, G, M, seed, frame) {
+  const c = G / 2, r = 31;
+  const blot = (x, y, rad, col) => {
+    const R2 = rad * rad + 0.3;
+    for (let dy = -Math.ceil(rad); dy <= Math.ceil(rad); dy++) for (let dx = -Math.ceil(rad); dx <= Math.ceil(rad); dx++)
+      if (dx * dx + dy * dy <= R2) put(x + dx, y + dy, col, 1);
+  };
+  const paths = [];
+  for (let k = 0; k < 4; k++) {
+    const a0 = (k / 4) * Math.PI * 2 + 0.4 + h32(seed + k * 13) * 0.9;
+    const curl = (k % 2 ? 1 : -1) * (0.9 + h32(seed + k * 29) * 0.5);
+    const sway = Math.sin(frame * 0.35 + k * 1.7) * 0.18;
+    // out from under the rim, straight at first, then curling tight
+    const L = M + 10 + Math.floor(h32(seed + k * 41) * 5);
+    let x = c + Math.cos(a0) * (r - 5), y = c + Math.sin(a0) * (r - 5), h = a0 + sway;
+    const pts = [];
+    for (let i = 0; i < L; i++) {
+      const u = i / L;
+      pts.push([Math.round(x), Math.round(y), Math.max(0, Math.round(2.8 * (1 - u)))]);
+      h += curl * (0.01 + 0.75 * u * u * u) + sway * 0.06;
+      x += Math.cos(h); y += Math.sin(h);
+    }
+    paths.push(pts);
+  }
+  for (const pts of paths) for (const [x, y, w] of pts) blot(x, y, w + 1, T_OUT);
+  for (const pts of paths) for (const [x, y, w] of pts) blot(x, y, w, T_BODY);
+  for (const pts of paths) pts.forEach(([x, y, w], i) => {
+    if (w >= 1) put(x - 1, y - 1, T_LIT, 1);
+    if (w >= 1 && i % 4 === 1) put(x - 1, y - w, T_GLINT, 1);
+  });
 }
 
 /* A shiny's light: a glint band sweeping corner to corner across the
