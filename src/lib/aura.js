@@ -223,10 +223,9 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
  * through points given in coin radii from the centre (+x right, +y down);
  * the ones behind are pulled in a little so they fit the margin. Black
  * body, a dark outline, a teal strip down one side; each sways slowly. */
-const TENT = {
-  front:  { body: [20, 28, 32], edge: [7, 10, 12], strip: [58, 128, 112] },
-  behind: { body: [20, 28, 32], edge: [38, 84, 78], strip: [58, 128, 112] },
-};
+// two flat tones, as in the reference: a near-black body and a slate band
+// down the lit side; no outline
+const TENT = { body: [17, 26, 30], lit: [52, 84, 86] };
 const FRONT_ARMS = [
   { w: 5.4, cw: 1, p: [[-0.70, -0.92], [-0.55, -0.74], [-0.42, -0.54], [-0.30, -0.33]] },
   { w: 5.0, cw: -1, p: [[0.56, -1.00], [0.47, -0.78], [0.38, -0.60], [0.30, -0.47]] },
@@ -267,15 +266,15 @@ function armPts(G, arm, k, frame, squeeze) {
   }
   pts.push(P[n - 1]);
   // sway: the tip moves most, the root not at all
-  const m = pts.length, sw = Math.sin(frame * 0.22 + k * 1.9) * 0.05;
+  const m = pts.length, sw = arm.even ? 0 : Math.sin(frame * 0.22 + k * 1.9) * 0.05;
   const [ox, oy] = pts[0];
   return pts.map(([x, y], i) => {
     const u = i / (m - 1), a = sw * u, dx = x - ox, dy = y - oy;
     const rx = ox + dx * Math.cos(a) - dy * Math.sin(a), ry = oy + dx * Math.sin(a) + dy * Math.cos(a);
-    return [c + rx * R, c + ry * R, Math.max(0.8, arm.w * (1 - u) ** 0.8)];
+    return [c + rx * R, c + ry * R, arm.even ? arm.w : Math.max(0.8, arm.w * (1 - u) ** 0.8)];
   });
 }
-function tentacle(put, pts, pal) {
+function tentacle(put, pts, pal = TENT) {
   // each pixel takes its shade from the nearest point of the centre line
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   for (const [x, y, w] of pts) { x0 = Math.min(x0, x - w - 1); y0 = Math.min(y0, y - w - 1); x1 = Math.max(x1, x + w + 1); y1 = Math.max(y1, y + w + 1); }
@@ -286,33 +285,56 @@ function tentacle(put, pts, pal) {
     const [x, y, w] = pts[bi], q = pts[Math.min(pts.length - 1, bi + 1)], b = pts[Math.max(0, bi - 1)];
     const hx = q[0] - b[0], hy = q[1] - b[1], hl = Math.hypot(hx, hy) || 1;
     const side = ((px + 0.5 - x) * -hy / hl + (py + 0.5 - y) * hx / hl) / w;   // across the arm, -1 … 1
-    put(px, py, bd > -0.9 ? pal.edge : side > 0.05 && side < 0.5 && w > 1.6 ? pal.strip : pal.body, 1);
+    put(px, py, side > 0.62 && w > 1.2 ? pal.lit : pal.body, 1);
   }
 }
 
-/* Black flecks drifting outward and up off an eldritch coin, as in the
- * reference: single pixels and 2 × 2 blots, each on its own slow loop. */
-const FLECK = [10, 15, 17], FLECK_LIT = [60, 140, 120];
-function paintFlecks(put, G, M, seed, frame) {
-  const c = G / 2, r = 31;
-  for (let k = 0; k < 12; k++) {
-    const LIFE = 40, age = (frame + Math.floor(h32(seed + k * 3) * LIFE)) % LIFE;
-    const a = h32(seed + k * 71 + Math.floor((frame + h32(seed + k * 3) * LIFE) / LIFE) * 13) * Math.PI * 2;
-    const d = r - 6 + age * 0.45, x = Math.round(c + Math.cos(a) * d), y = Math.round(c + Math.sin(a) * d - age * 0.25);
-    if (age > LIFE - 6 && (age + k) % 2) continue;                  // flickering out
-    if (k % 3 === 0) { put(x, y, FLECK_LIT, 1); put(x + 1, y, FLECK, 1); put(x, y + 1, FLECK, 1); put(x + 1, y + 1, FLECK, 1); }
-    else put(x, y, k % 2 ? FLECK : FLECK_LIT, 1);
+/* The floating bits from the reference: black specks, 2 × 2 blots and
+ * round 3 × 3 blobs hanging round the tentacles, each drifting slowly up
+ * and out on its own loop and blinking out at the end of it. The bigger
+ * ones catch the same slate light as the tentacles. */
+const FLECK = [18, 27, 31];
+function paintFlecks(put, G, seed, frame, from, to, n, salt) {
+  const c = G / 2;
+  for (let k = 0; k < n; k++) {
+    const LIFE = 48, ph = Math.floor(h32(seed + salt + k * 3) * LIFE), age = (frame + ph) % LIFE, gen = Math.floor((frame + ph) / LIFE);
+    const a = h32(seed + salt + k * 71 + gen * 13) * Math.PI * 2, d0 = from + h32(seed + salt + k * 37 + gen * 5) * (to - from);
+    const d = d0 + age * 0.12, x = Math.round(c + Math.cos(a) * d), y = Math.round(c + Math.sin(a) * d - age * 0.18);
+    if (age > LIFE - 6 && (age + k) % 2) continue;                    // blinking out
+    const size = k % 5 === 0 ? 3 : k % 3 === 0 ? 2 : 1;
+    if (size === 1) put(x, y, k % 2 ? FLECK : TENT.lit, 1);
+    else if (size === 2) { put(x, y, TENT.lit, 1); put(x + 1, y, FLECK, 1); put(x, y + 1, FLECK, 1); put(x + 1, y + 1, FLECK, 1); }
+    else {
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx * dy === 0 || dx + dy === 0) put(x + dx, y + dy, FLECK, 1);
+      put(x + 1, y - 1, TENT.lit, 1);
+    }
   }
 }
 
+// each front tentacle comes round from behind the coin: its root rises
+// out from under the coin (drawn on the layer beneath), turns over the rim
+// and lies across the face (drawn over it)
+function wrapArms() {
+  return FRONT_ARMS.map(arm => {
+    const [x0, y0] = arm.p[0], a = Math.atan2(y0, x0), at = (ang, d) => [Math.cos(ang) * d, Math.sin(ang) * d];
+    const out = at(a, 1.16);
+    return {
+      root: { w: arm.w, even: true, p: [at(a - arm.cw * 0.3, 0.84), at(a - arm.cw * 0.14, 1.1), out] },
+      over: { ...arm, p: [out, at(a + arm.cw * 0.05, 0.97), ...arm.p.slice(1)] },
+    };
+  });
+}
+const WRAP = wrapArms();
 function paintTentacles(put, G, M, seed, frame, layer) {
   if (layer === "behind") {
     const squeeze = Math.min(1, (M - 2) / 22);                   // reach no further than the margin
-    BACK_ARMS.forEach((arm, k) => tentacle(put, armPts(G, arm, k, frame, squeeze), TENT.behind));
+    BACK_ARMS.forEach((arm, k) => tentacle(put, armPts(G, arm, k, frame, squeeze)));
+    WRAP.forEach(({ root }, k) => tentacle(put, armPts(G, root, k, frame, 1)));
+    paintFlecks(put, G, seed, frame, 34, 31 + M, 12, 999);
     return;
   }
-  FRONT_ARMS.forEach((arm, k) => tentacle(put, armPts(G, arm, k + 7, frame, 1), TENT.front));
-  paintFlecks(put, G, M, seed, frame);
+  WRAP.forEach(({ over }, k) => tentacle(put, armPts(G, over, k + 7, frame, 1)));
+  paintFlecks(put, G, seed, frame, 20, 31 + M - 1, 14, 0);
 }
 
 /* Fire, traced from Dante's markup: one flame around the whole coin, on
@@ -322,7 +344,7 @@ function paintTentacles(put, G, M, seed, frame, layer) {
  * sides, and a tight band hugging the bottom. Gold against the coin, then
  * orange, hot orange, a red edge and loose pixels beyond. The tongues
  * flicker and the outline ripples. */
-const FLAME = { core: [255, 228, 138], mid: [246, 174, 83], hot: [232, 116, 44], edge: [197, 78, 61], ash: [155, 48, 54] };
+const FLAME = { core: [255, 236, 150], mid: [255, 190, 95], hot: [244, 130, 52], edge: [214, 76, 54], ash: [168, 52, 50] };
 const BLAZE = [
   [-180, 1.03], [-153, 1.10], [-140, 1.10], [-112, 1.21], [-86, 1.30], [-66, 1.23], [-52, 1.55], [-44, 1.40],
   [-36, 1.48], [-28, 1.70], [-21, 2.30], [-13, 1.45], [-4, 1.95], [1, 1.45], [6, 1.85], [12, 1.25],
@@ -344,16 +366,29 @@ function paintBlaze(put, G, M, seed, frame) {
     if (rad < R - 1) continue;                                  // under the coin
     const deg = Math.atan2(dx, -dy) * 180 / Math.PI;
     const reach = (1 + (blazeReach(deg, frame, seed) - 1) * squeeze) * R;
-    const T = reach - R + 1 + (h32(seed + (x >> 1) * 31 + (y >> 1) * 977 + (frame >> 1) * 7) - 0.5) * 1.4;
+    // the bands step in 2-pixel blocks, as the sprites' do
+    const T = reach - R + 1 + (h32(seed + (x >> 1) * 31 + (y >> 1) * 977 + (frame >> 1) * 7) - 0.5) * 2;
     if (T < 0.6) continue;
-    const t = (rad - R + 1) / T;
+    const t = (rad - R + 1) / T, n = (h32(seed + (x >> 1) * 53 + (y >> 1) * 409 + (frame >> 1) * 3) - 0.5) * 0.12;
     let col = null;
-    if (t < 0.3) col = FLAME.core;
-    else if (t < 0.55) col = FLAME.mid;
-    else if (t < 0.8) col = FLAME.hot;
+    if (t < 0.42 + n) col = FLAME.core;
+    else if (t < 0.66 + n) col = FLAME.mid;
+    else if (t < 0.86 + n) col = FLAME.hot;
     else if (t < 1) col = FLAME.edge;
-    else if (t < 1.35 && h32(seed + x * 131 + y * 7919 + frame * 31) < 0.3 * (1.35 - t) / 0.35) col = t < 1.15 ? FLAME.edge : FLAME.ash;
     if (col) put(x, y, col, 1);
+  }
+  // embers: loose square bits flung up off the tongue tips, cooling as they rise
+  const tips = BLAZE.filter(([, r]) => r > 1.4);
+  for (let k = 0; k < 12; k++) {
+    const LIFE = 16, ph = Math.floor(h32(seed * 5 + k) * LIFE), age = (frame + ph) % LIFE, gen = Math.floor((frame + ph) / LIFE);
+    const [deg] = tips[Math.floor(h32(seed + k * 389 + gen * 7919) * tips.length)];
+    const a = (deg + (h32(seed + k * 17 + gen) - 0.5) * 10) * Math.PI / 180;
+    const reach = (1 + (blazeReach(deg, frame, seed) - 1) * squeeze) * R * (0.8 + h32(seed + k * 3 + gen) * 0.2);
+    const x = Math.round(c + Math.sin(a) * reach + Math.sin(age * 0.7 + k) * 0.8), y = Math.round(c - Math.cos(a) * reach - age * 0.9);
+    if (age > LIFE - 4 && age % 2) continue;
+    const col = age < 5 ? FLAME.hot : age < 11 ? FLAME.edge : FLAME.ash;
+    put(x, y, col, 1);
+    if (k % 3 === 0 && age < 8) { put(x + 1, y, col, 1); put(x, y + 1, col, 1); put(x + 1, y + 1, col, 1); }
   }
 }
 function paintBlazeEdge(put, inner, seed, frame) {
