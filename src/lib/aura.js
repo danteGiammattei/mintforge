@@ -103,7 +103,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   if (layer === "behind") {
     // only what stands behind the coin: an eldritch coin's far tentacles,
     // or the great flame of a fire coin
-    if ((!tendrils && !flames) || (rarity === 5 && !auraStill() && turnAt(coin, frame))) return;
+    if (!tendrils && !flames) return;
     const img = ctx.createImageData(G, G), d = img.data;
     const seed = coin.seed >>> 0, f = frame % LOOP;
     if (flames) replay(d, G, `blaze:${seed}:${M}:${f}`, p => paintBlaze(p, G, M, seed, f));
@@ -112,7 +112,6 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
     return;
   }
   if (rarity <= 0 && !shine && !tendrils && !moon && !flames) return;
-  if (rarity === 5 && !auraStill() && turnAt(coin, frame)) return;
   const img = ctx.createImageData(G, G), d = img.data;
   const put = (x, y, rgb, al) => {
     x = Math.round(x); y = Math.round(y);
@@ -303,13 +302,23 @@ function armPts(G, arm, k, frame, squeeze) {
   });
 }
 function tentacle(put, pts, pal = TENT) {
-  // each pixel takes its shade from the nearest point of the centre line
+  // each pixel takes its shade from the nearest point of the centre line:
+  // stamp every point's disc into a small buffer, keeping the nearest
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   for (const [x, y, w] of pts) { x0 = Math.min(x0, x - w - 1); y0 = Math.min(y0, y - w - 1); x1 = Math.max(x1, x + w + 1); y1 = Math.max(y1, y + w + 1); }
-  for (let py = Math.floor(y0); py <= y1; py++) for (let px = Math.floor(x0); px <= x1; px++) {
-    let bi = -1, bd = 1e9;
-    for (let i = 0; i < pts.length; i++) { const p = pts[i], d = Math.hypot(px + 0.5 - p[0], py + 0.5 - p[1]) - p[2]; if (d < bd) { bd = d; bi = i; } }
-    if (bd > 0) continue;
+  x0 = Math.floor(x0); y0 = Math.floor(y0);
+  const bw = Math.ceil(x1) - x0 + 1, bh = Math.ceil(y1) - y0 + 1;
+  const best = new Float32Array(bw * bh).fill(1e9), who = new Int32Array(bw * bh).fill(-1);
+  pts.forEach(([x, y, w], i) => {
+    for (let py = Math.floor(y - w - 1); py <= y + w + 1; py++) for (let px = Math.floor(x - w - 1); px <= x + w + 1; px++) {
+      const d = Math.hypot(px + 0.5 - x, py + 0.5 - y) - w, j = (py - y0) * bw + (px - x0);
+      if (d < best[j]) { best[j] = d; who[j] = i; }
+    }
+  });
+  for (let j = 0; j < who.length; j++) {
+    const bi = who[j];
+    if (bi < 0 || best[j] > 0) continue;
+    const px = x0 + (j % bw), py = y0 + Math.floor(j / bw);
     const [x, y, w] = pts[bi], q = pts[Math.min(pts.length - 1, bi + 1)], b = pts[Math.max(0, bi - 1)];
     const hx = q[0] - b[0], hy = q[1] - b[1], hl = Math.hypot(hx, hy) || 1;
     const side = ((px + 0.5 - x) * -hy / hl + (py + 0.5 - y) * hx / hl) / w;   // across the arm, -1 … 1
@@ -486,17 +495,6 @@ function paintShine(put, G, face, inside, seed, frame) {
   }
 }
 
-/* ─── a mythic turns over ─────────────────────────────────────────────
- * Every nine seconds or so (each coin at its own moment) a mythic turns:
- * face, edge, its plain back with the mint's mark, edge, face again. The
- * aura steps aside while it turns, since it hugs the coin's flat outline. */
-const TURN = [54, 40, 24, 10, 4, 10, 24, 40, 54, 64, 64, 64, 54, 40, 24, 10, 4, 10, 24, 40, 54];
-const BACK = TURN.map((_, i) => i >= 5 && i <= 15);
-const TURN_EVERY = 72;
-export function turnAt(coin, frame) {
-  const i = (frame + ((coin.seed >>> 0) % TURN_EVERY)) % TURN_EVERY;
-  return i < TURN.length ? { turn: TURN[i], back: BACK[i] } : null;
-}
 
 /* ─── the one clock ───────────────────────────────────────────────── */
 const subs = new Set();

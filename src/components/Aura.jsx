@@ -20,11 +20,12 @@ export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rar
     if (!cv || (rarity <= 0 && !shine && !tendrils && !moon && !flames)) return;
     const ctx = cv.getContext("2d");
     const paint = f => paintAura(ctx, coin, rarity, f, margin, shine, tendrils, moon, layer, flames);
-    paint(auraFrame());
-    if ((rarity < 2 && !shine && !tendrils && !moon && !flames) || auraStill()) return;
+    if ((rarity < 2 && !shine && !tendrils && !moon && !flames) || auraStill()) { paint(auraFrame()); return; }
+    // a moving aura is first drawn when it comes on screen, not before:
+    // a long vault would otherwise draw every one of them at once
     let off = null;
     const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting && !off) off = onAuraFrame(paint);
+      if (e.isIntersecting && !off) { paint(auraFrame()); off = onAuraFrame(paint); }
       else if (!e.isIntersecting && off) { off(); off = null; }
     });
     io.observe(cv);
