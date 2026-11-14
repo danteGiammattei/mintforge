@@ -6,10 +6,8 @@ import { lvl } from "../lib/coin.js";
 import { hydrate } from "../lib/coinview.js";
 import { FRAMES, PREMIUM_TITLES, RARITIES } from "../lib/data.js";
 import CoinModal from "../components/CoinModal.jsx";
-import PixelBanner from "../components/PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
-import { CoinTile } from "./Vault.jsx";
-import CabinetFrame from "../components/CabinetFrame.jsx";
+import PublicProfile from "../components/PublicProfile.jsx";
 
 /* ─── FRIENDS ─────────────────────────────────────────────────────────────
  * Find players, follow them, look in their cabinets. */
@@ -51,40 +49,14 @@ function ProfileCard({ soc }) {
         {v.loading && <p style={{ padding: 16, margin: 0 }} role="status">LOOKING THEM UP</p>}
         {v.error && <p className="t-blood" style={{ padding: 16, margin: 0 }} role="alert">{v.error}</p>}
         {d && (
-          <>
-            <PixelBanner frame={d.frame} height={84}/>
-            <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <div className="t-title t-plain">{d.username}</div>
-                <div className="t-label">LV {lvl(d.xp)} · <TitleText label={d.title}/></div>
-                {d.bio && <p className="t-dim t-plain" style={{ margin: "8px 0 0" }}>{d.bio}</p>}
-              </div>
-              <dl style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, margin: 0 }}>
-                {[["COINS", d.coinCount], ["KINDS", `${d.kinds} / 54`], ["SHINY", d.shinyCount]].map(([k, val]) => (
-                  <div key={k} className="panel" style={{ padding: 8, textAlign: "center" }}>
-                    <dd className="t-title" style={{ margin: 0 }}>{val}</dd><dt className="t-label">{k}</dt>
-                  </div>
-                ))}
-              </dl>
-              {d.showcase.length > 0 && (
-                <CabinetFrame rank={d.cabinet?.rank || 0} score={d.cabinet?.score} pad={6}>
-                <div>
-                  <div className="between" style={{ marginBottom: 8, gap: 8 }}>
-                    <span className="t-label">CABINET</span>
-                    {d.cabinet && <CabinetScore cab={d.cabinet} small/>}
-                  </div>
-                  <div className="grid-coins">
-                    {d.showcase.map(r => { const c = hydrate(r); return <CoinTile key={c.id} coin={c} onClick={() => setCoin(c)}/>; })}
-                  </div>
-                </div>
-                </CabinetFrame>
-              )}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {!d.isSelf && <button className={`btn ${d.isFriend ? "" : "btn-gold"}`} style={{ flex: 1 }} disabled={busy} onClick={toggle}>{d.isFriend ? "REMOVE FRIEND" : "ADD FRIEND"}</button>}
-                <button className="btn btn-ghost" style={{ flex: 1 }} onClick={soc.closeView}>CLOSE</button>
-              </div>
+          <PublicProfile frame={d.frame} username={d.username} level={lvl(d.xp)} title={d.title} bio={d.bio}
+                         coins={d.coinCount} kinds={d.kinds} shiny={d.shinyCount} cabinet={d.cabinet}
+                         showcase={d.showcase.map(hydrate)} onCoin={setCoin}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {!d.isSelf && <button className={`btn ${d.isFriend ? "" : "btn-gold"}`} style={{ flex: 1 }} disabled={busy} onClick={toggle}>{d.isFriend ? "REMOVE FRIEND" : "ADD FRIEND"}</button>}
+              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={soc.closeView}>CLOSE</button>
             </div>
-          </>
+          </PublicProfile>
         )}
       </div>
       {coin && <CoinModal coin={coin} onClose={() => setCoin(null)}/>}
