@@ -273,7 +273,28 @@ const GRAIN = {
       return (lit < -5 ? 5 : lit < 3 ? 4 : 3) + mottle;
     };
   },
-  // fire: bands of flame, hottest at the bottom, their edges licking up;
+  // void: night sky. Nebula in checker-dithered diagonal drifts, single
+  // stars white and blue, and a few that shine in a cross
+  // `phase` (0 … SPACE_LOOP-1) moves it: the nebula drifts along its
+  // diagonal and the stars twinkle, looping without a seam
+  space: (s, phase = 0) => {
+    const crosses = Array.from({ length: 3 }, (_, i) => [8 + Math.floor(hashPx(i, 5, s) * 48), 8 + Math.floor(hashPx(i, 6, s) * 48)]);
+    const turn = (phase / SPACE_LOOP) * Math.PI * 2;
+    return (x, y, t) => {
+      for (const [i, [cx, cy]] of crosses.entries()) {
+        const lit = (phase + i * 5) % SPACE_LOOP < SPACE_LOOP / 2;
+        if (x === cx && y === cy) return lit ? 7 : 8;
+        if (lit && Math.abs(x - cx) + Math.abs(y - cy) === 1) return 8;
+      }
+      const h = hashPx(x, y, s);
+      if (h > 0.988) return (Math.floor(h * 1e5) + phase) % 6 === 0 ? 8 : 7;   // now and then a star dims
+      if (h > 0.976) return (Math.floor(h * 1e5) + phase) % 7 === 0 ? t - 1 : 8;
+      const n = Math.sin((x + y) * 0.17 + s - turn) + 0.8 * Math.sin((x - y) * 0.07 - s * 0.5 + turn);
+      if (n > 0.95) return (x + y) % 2 ? 9 : t;
+      if (n > 0.45) return (x % 2 === 0 && y % 2 === 0) ? 9 : t - 1;
+      return t - 1;
+    };
+  },  // fire: bands of flame, hottest at the bottom, their edges licking up;
   // `phase` moves the licks, looping like the void's sky
   fire: (s, phase = 0) => {
     const turn = (phase / SPACE_LOOP) * Math.PI * 2;
@@ -287,6 +308,7 @@ const GRAIN = {
   },
   plain: () => (x, y, t) => t,
 };
+export const GRAIN_NAMES = Object.keys(GRAIN);
 
 /* Paint a coin, face on, into a 64 × 64 canvas (kept: a coin that turns
  * is drawn many times a second). */
@@ -414,7 +436,7 @@ function paintFresh(coin, back, phase) {
   const off = document.createElement("canvas"); off.width = SZ; off.height = SZ;
   const g = off.getContext("2d"), img = g.createImageData(SZ, SZ), d = img.data;
   const { ramp: R, eng, tex, glows } = coinRamp(coin);
-  const grain = GRAIN[tex || "metal"]((coin.seed >>> 0) % 997, phase);
+  const grain = (GRAIN[tex] || GRAIN.metal)((coin.seed >>> 0) % 997, phase);
   const r = SZ / 2 - 1, mid = SZ / 2;
   const holed = coin.shape === "holed";
   const ring = (x, y) => Math.hypot(x + 0.5 - mid, y + 0.5 - mid);

@@ -105,9 +105,9 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
     // or the great flame of a fire coin
     if ((!tendrils && !flames) || (rarity === 5 && !auraStill() && turnAt(coin, frame))) return;
     const img = ctx.createImageData(G, G), d = img.data;
-    const put = (x, y, rgb) => { x = Math.round(x); y = Math.round(y); if (x < 0 || y < 0 || x >= G || y >= G) return; const i = (y * G + x) * 4; d[i] = rgb[0]; d[i + 1] = rgb[1]; d[i + 2] = rgb[2]; d[i + 3] = 255; };
-    if (flames) paintBlaze(put, G, M, coin.seed >>> 0, frame);
-    if (tendrils) paintTentacles(put, G, M, coin.seed >>> 0, frame, "behind");
+    const seed = coin.seed >>> 0, f = frame % LOOP;
+    if (flames) replay(d, G, `blaze:${seed}:${M}:${f}`, p => paintBlaze(p, G, M, seed, f));
+    if (tendrils) replay(d, G, `tent-b:${seed}:${M}:${f}`, p => paintTentacles(p, G, M, seed, f, "behind"));
     ctx.putImageData(img, 0, 0);
     return;
   }
@@ -124,8 +124,9 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
   if (rarity <= 0) {
-    if (flames) paintBlazeEdge(put, inner, seed, frame);
-    if (tendrils) paintTentacles(put, G, M, seed, frame, "front");
+    const f = frame % LOOP;
+    if (flames) replay(d, G, `edge:${seed}:${shapeOf(coin)}:${M}:${f}`, p => paintBlazeEdge(p, inner, seed, f));
+    if (tendrils) replay(d, G, `tent-f:${seed}:${M}:${f}`, p => paintTentacles(p, G, M, seed, f, "front"));
     if (moon) paintMoon(put, G, M, inside, seed, frame);
     ctx.putImageData(img, 0, 0); return;
   }
@@ -211,10 +212,38 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
     }
   }
 
-  if (flames) paintBlazeEdge(put, inner, seed, frame);
-  if (tendrils) paintTentacles(put, G, M, seed, frame, "front");
+  if (flames) replay(d, G, `edge:${seed}:${shapeOf(coin)}:${M}:${frame % LOOP}`, p => paintBlazeEdge(p, inner, seed, frame % LOOP));
+  if (tendrils) replay(d, G, `tent-f:${seed}:${M}:${frame % LOOP}`, p => paintTentacles(p, G, M, seed, frame % LOOP, "front"));
   if (moon) paintMoon(put, G, M, inside, seed, frame);
   ctx.putImageData(img, 0, 0);
+}
+
+/* The tentacles and the fire are costly to draw (every pixel near an arm
+ * hunts for its nearest point; the blaze walks the whole canvas), so they
+ * move on a seamless loop of LOOP frames and each frame is drawn once per
+ * coin, kept as the pixels it set, and replayed after. Every motion in
+ * them is a whole number of turns per loop. */
+const LOOP = 32, TAU_LOOP = (Math.PI * 2) / LOOP;
+const kept = new Map();
+let keptSize = 0;
+function replay(d, G, key, draw) {
+  let rec = kept.get(key);
+  if (!rec) {
+    const pos = [], rgb = [];
+    draw((x, y, c) => {
+      x = Math.round(x); y = Math.round(y);
+      if (x < 0 || y < 0 || x >= G || y >= G) return;
+      pos.push(y * G + x); rgb.push((c[0] << 16) | (c[1] << 8) | c[2]);
+    });
+    rec = { pos: Uint32Array.from(pos), rgb: Uint32Array.from(rgb) };
+    kept.set(key, rec); keptSize += rec.pos.length;
+    for (const [k, v] of kept) { if (keptSize < 6e6) break; kept.delete(k); keptSize -= v.pos.length; }
+  }
+  const { pos, rgb } = rec;
+  for (let j = 0; j < pos.length; j++) {
+    const i = pos[j] * 4, c = rgb[j];
+    d[i] = c >> 16; d[i + 1] = (c >> 8) & 255; d[i + 2] = c & 255; d[i + 3] = 255;
+  }
 }
 
 /* Eldritch, traced from Dante's markup: black tentacles, some lying over
@@ -263,12 +292,12 @@ function armPts(G, arm, k, frame, squeeze) {
   }
   pts.push(P[n - 1]);
   // sway: the tip moves most, the root not at all
-  const m = pts.length, sw = arm.even ? 0 : Math.sin(frame * 0.22 + k * 1.9) * 0.1;
+  const m = pts.length, sw = arm.even ? 0 : Math.sin(frame * TAU_LOOP + k * 1.9) * 0.1;
   const [ox, oy] = pts[0];
   return pts.map(([x, y], i) => {
     const u = i / (m - 1), a = sw * u, dx = x - ox, dy = y - oy;
     // a slow wave runs down each arm toward its tip, on top of the sway
-    const wv = arm.even ? 0 : Math.sin(frame * 0.35 - u * 5 + k * 2.3) * 0.04 * u;
+    const wv = arm.even ? 0 : Math.sin(frame * TAU_LOOP * 2 - u * 5 + k * 2.3) * 0.04 * u;
     const rx = ox + dx * Math.cos(a) - dy * Math.sin(a) - dy * wv, ry = oy + dx * Math.sin(a) + dy * Math.cos(a) + dx * wv;
     return [c + rx * R, c + ry * R, arm.even ? arm.w : Math.max(0.8, arm.w * (1 - u) ** 0.8)];
   });
@@ -296,7 +325,7 @@ const FLECK = [18, 27, 31];
 function paintFlecks(put, G, seed, frame, from, to, n, salt) {
   const c = G / 2;
   for (let k = 0; k < n; k++) {
-    const LIFE = 48, ph = Math.floor(h32(seed + salt + k * 3) * LIFE), age = (frame + ph) % LIFE, gen = Math.floor((frame + ph) / LIFE);
+    const LIFE = LOOP, ph = Math.floor(h32(seed + salt + k * 3) * LIFE), age = (frame + ph) % LIFE, gen = 0;   // one life a loop
     const a = h32(seed + salt + k * 71 + gen * 13) * Math.PI * 2, d0 = from + h32(seed + salt + k * 37 + gen * 5) * (to - from);
     const d = d0 + age * 0.12, x = Math.round(c + Math.cos(a) * d), y = Math.round(c + Math.sin(a) * d - age * 0.18);
     if (age > LIFE - 6 && (age + k) % 2) continue;                    // blinking out
@@ -352,13 +381,13 @@ const BLAZE = [
 ];
 const BLAZE_MAX = Math.max(...BLAZE.map(([, r]) => r)) * 1.1;   // with room for the flicker
 function blazeReach(deg, frame, seed) {
-  deg += Math.sin(frame * 0.45 + deg * 0.04) * 4;                 // the tongues lean and sway
+  deg += Math.sin(frame * TAU_LOOP * 2 + deg * 0.04) * 4;                 // the tongues lean and sway
   let i = 0;
   while (i < BLAZE.length - 2 && BLAZE[i + 1][0] < deg) i++;
   const [a0, r0] = BLAZE[i], [a1, r1] = BLAZE[i + 1], t = (deg - a0) / (a1 - a0 || 1);
   const r = r0 + (r1 - r0) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2;
   // the tongues flicker: the further out, the more
-  return r + (r - 1) * (0.11 * Math.sin(frame * 0.9 + deg * 0.11 + seed % 7) + 0.06 * Math.sin(frame * 1.7 + deg * 0.31));
+  return r + (r - 1) * (0.11 * Math.sin(frame * TAU_LOOP * 5 + deg * 0.11 + seed % 7) + 0.06 * Math.sin(frame * TAU_LOOP * 9 + deg * 0.31));
 }
 function paintBlaze(put, G, M, seed, frame) {
   const c = G / 2, R = 31, squeeze = Math.min(1, (M - 2) / ((BLAZE_MAX - 1) * R * 0.8));
@@ -381,7 +410,7 @@ function paintBlaze(put, G, M, seed, frame) {
   // embers: loose square bits flung up off the tongue tips, cooling as they rise
   const tips = BLAZE.filter(([, r]) => r > 1.4);
   for (let k = 0; k < 12; k++) {
-    const LIFE = 16, ph = Math.floor(h32(seed * 5 + k) * LIFE), age = (frame + ph) % LIFE, gen = Math.floor((frame + ph) / LIFE);
+    const LIFE = LOOP / 2, ph = Math.floor(h32(seed * 5 + k) * LIFE), age = (frame + ph) % LIFE, gen = Math.floor((frame + ph) / LIFE) % 2;
     const [deg] = tips[Math.floor(h32(seed + k * 389 + gen * 7919) * tips.length)];
     const a = (deg + (h32(seed + k * 17 + gen) - 0.5) * 10) * Math.PI / 180;
     const reach = (1 + (blazeReach(deg, frame, seed) - 1) * squeeze) * R * (0.8 + h32(seed + k * 3 + gen) * 0.2);
