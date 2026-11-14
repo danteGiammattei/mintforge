@@ -263,11 +263,13 @@ function armPts(G, arm, k, frame, squeeze) {
   }
   pts.push(P[n - 1]);
   // sway: the tip moves most, the root not at all
-  const m = pts.length, sw = arm.even ? 0 : Math.sin(frame * 0.22 + k * 1.9) * 0.05;
+  const m = pts.length, sw = arm.even ? 0 : Math.sin(frame * 0.22 + k * 1.9) * 0.1;
   const [ox, oy] = pts[0];
   return pts.map(([x, y], i) => {
     const u = i / (m - 1), a = sw * u, dx = x - ox, dy = y - oy;
-    const rx = ox + dx * Math.cos(a) - dy * Math.sin(a), ry = oy + dx * Math.sin(a) + dy * Math.cos(a);
+    // a slow wave runs down each arm toward its tip, on top of the sway
+    const wv = arm.even ? 0 : Math.sin(frame * 0.35 - u * 5 + k * 2.3) * 0.04 * u;
+    const rx = ox + dx * Math.cos(a) - dy * Math.sin(a) - dy * wv, ry = oy + dx * Math.sin(a) + dy * Math.cos(a) + dx * wv;
     return [c + rx * R, c + ry * R, arm.even ? arm.w : Math.max(0.8, arm.w * (1 - u) ** 0.8)];
   });
 }
@@ -350,12 +352,13 @@ const BLAZE = [
 ];
 const BLAZE_MAX = Math.max(...BLAZE.map(([, r]) => r)) * 1.1;   // with room for the flicker
 function blazeReach(deg, frame, seed) {
+  deg += Math.sin(frame * 0.45 + deg * 0.04) * 4;                 // the tongues lean and sway
   let i = 0;
   while (i < BLAZE.length - 2 && BLAZE[i + 1][0] < deg) i++;
   const [a0, r0] = BLAZE[i], [a1, r1] = BLAZE[i + 1], t = (deg - a0) / (a1 - a0 || 1);
   const r = r0 + (r1 - r0) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2;
   // the tongues flicker: the further out, the more
-  return r + (r - 1) * (0.07 * Math.sin(frame * 0.9 + deg * 0.11 + seed % 7) + 0.05 * Math.sin(frame * 1.7 + deg * 0.31));
+  return r + (r - 1) * (0.11 * Math.sin(frame * 0.9 + deg * 0.11 + seed % 7) + 0.06 * Math.sin(frame * 1.7 + deg * 0.31));
 }
 function paintBlaze(put, G, M, seed, frame) {
   const c = G / 2, R = 31, squeeze = Math.min(1, (M - 2) / ((BLAZE_MAX - 1) * R * 0.8));
