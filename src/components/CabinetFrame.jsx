@@ -98,7 +98,11 @@ function paint(ctx, w, h, rank, glint) {
   ctx.putImageData(img, 0, 0);
 }
 
-export default function CabinetFrame({ rank = 0, children, pad = 0 }) {
+// the plaque on the frame's foot, in the frame's own material
+const PLAQUE = [null, WOOD, POLISH, DARK, GOLD, GOLD];
+const css = c => `rgb(${c.join(",")})`;
+
+export default function CabinetFrame({ rank = 0, score = null, children, pad = 0 }) {
   const box = useRef(null), cv = useRef(null);
   useEffect(() => {
     if (!rank) return;
@@ -115,11 +119,20 @@ export default function CabinetFrame({ rank = 0, children, pad = 0 }) {
     return () => { ro.disconnect(); off?.(); };
   }, [rank]);
   if (!rank) return children;
-  const P = FRAME_THICK[rank] * S + pad;
+  const P = FRAME_THICK[rank] * S + pad, m = PLAQUE[rank];
   return (
-    <div ref={box} style={{ position: "relative", padding: P }}>
-      <canvas ref={cv} aria-hidden style={{ position: "absolute", left: 0, top: 0, imageRendering: "pixelated", pointerEvents: "none" }}/>
-      {children}
+    <div style={{ paddingBottom: score != null ? 12 : 0 }}>
+      <div ref={box} style={{ position: "relative", padding: P }}>
+        <canvas ref={cv} aria-hidden style={{ position: "absolute", left: 0, top: 0, imageRendering: "pixelated", pointerEvents: "none" }}/>
+        {children}
+        {score != null && (
+          <div className="t-label" aria-hidden style={{
+            position: "absolute", left: "50%", bottom: 0, transform: "translate(-50%, 50%)", padding: "4px 10px",
+            background: css(m.mid), color: rank >= 4 ? "#2a1a08" : css(rank === 3 ? GOLD.hi : BRASS.hi),
+            boxShadow: `0 0 0 2px #000, inset 2px 2px 0 ${css(m.hi)}, inset -2px -2px 0 ${css(m.lo)}`, whiteSpace: "nowrap",
+          }}>{score.toLocaleString()}</div>
+        )}
+      </div>
     </div>
   );
 }

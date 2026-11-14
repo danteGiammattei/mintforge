@@ -67,7 +67,7 @@ function ProfileCard({ soc }) {
                 ))}
               </dl>
               {d.showcase.length > 0 && (
-                <CabinetFrame rank={d.cabinet?.rank || 0} pad={6}>
+                <CabinetFrame rank={d.cabinet?.rank || 0} score={d.cabinet?.score} pad={6}>
                 <div>
                   <div className="between" style={{ marginBottom: 8, gap: 8 }}>
                     <span className="t-label">CABINET</span>
