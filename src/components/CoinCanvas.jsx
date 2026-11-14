@@ -39,9 +39,9 @@ export default function CoinCanvas({ coin, size, hideShine = false, aura = true,
 
   return (
     <div style={{ position: "relative", width: size, height: size, display: "inline-block", flexShrink: 0 }}>
-      {aura && coin.metalIdx === METAL.eldritch && <Aura coin={coin} size={size} margin={auraMargin + 10} rare layer="behind" shine={false}/>}
+      {aura && coin.metalIdx === METAL.eldritch && <Aura coin={coin} size={size} margin={auraMargin + 16} rare layer="behind" shine={false}/>}
       {/* a fire coin's great flame stands behind it, taller than the usual margin */}
-      {aura && coin.metalIdx === METAL.fire && <Aura coin={coin} size={size} margin={auraMargin + 10} rare layer="behind" shine={false}/>}
+      {aura && coin.metalIdx === METAL.fire && <Aura coin={coin} size={size} margin={auraMargin + 18} rare layer="behind" shine={false}/>}
       <canvas ref={canvasRef} aria-hidden style={{ position: "relative", imageRendering: "pixelated", display: "block", width: size, height: size }}/>
       {(aura || shiny) && <Aura coin={coin} size={size} margin={auraMargin} shine={shiny} rare={aura}/>}
     </div>

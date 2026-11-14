@@ -78,8 +78,8 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
              onPointerDown={onStart} onPointerMove={onMove} onPointerUp={onEnd} onPointerCancel={onEnd}>
           <div style={{ transform: `perspective(560px) rotateY(${rot.y}deg) rotateX(${-rot.x}deg)` }}>
             <div style={{ position: "relative", width: SIZE, height: SIZE }}>
-              {coin.metalIdx === METAL.eldritch && <Aura coin={coin} size={SIZE} margin={22} layer="behind" shine={false}/>}
-              {coin.metalIdx === METAL.fire && <Aura coin={coin} size={SIZE} margin={22} layer="behind" shine={false}/>}
+              {coin.metalIdx === METAL.eldritch && <Aura coin={coin} size={SIZE} margin={26} layer="behind" shine={false}/>}
+              {coin.metalIdx === METAL.fire && <Aura coin={coin} size={SIZE} margin={34} layer="behind" shine={false}/>}
               <canvas ref={cvRef} aria-hidden style={{ position: "relative", imageRendering: "pixelated", display: "block", width: SIZE, height: SIZE }}/>
               <Aura coin={coin} size={SIZE} margin={12}/>
             </div>

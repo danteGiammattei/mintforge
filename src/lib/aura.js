@@ -217,35 +217,76 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   ctx.putImageData(img, 0, 0);
 }
 
-/* Eldritch, after the reference: three thick tentacles rise from behind
- * the coin's top and curl outward at the tips, tight like a fern. Black,
- * with a darker outline and a teal strip down the inside of each curl,
- * swaying slowly. Drawn on the layer under the coin, so the coin itself
- * hides where they come from. Black flecks drift round them. */
-const TENT = { body: [20, 28, 32], edge: [38, 84, 78], strip: [62, 134, 118] };
-function tentaclePts(G, M, seed, frame, k, a, turn) {
-  const c = G / 2, r = 31, pts = [];
-  let x = c + Math.sin(a) * (r - 5), y = c - Math.cos(a) * (r - 5), h = a - Math.PI / 2;
-  const L = Math.round(17 + M * 0.6 + h32(seed + k * 17) * 3);
-  for (let i = 0; i < L; i++) {
-    const u = i / L;
-    pts.push([x, y, Math.max(0.9, 6.2 * (1 - u) ** 0.85), h]);
-    h += turn * (0.012 + 2.1 * u ** 4.5) + Math.sin(frame * 0.22 + k * 2.3) * 0.018 * (1 - u);
-    x += Math.cos(h); y += Math.sin(h);
+/* Eldritch, traced from Dante's markup: black tentacles, some lying over
+ * the coin and its rim (front), some reaching out behind it (on the layer
+ * under the coin). Each is drawn from its thick root to its curled tip
+ * through points given in coin radii from the centre (+x right, +y down);
+ * the ones behind are pulled in a little so they fit the margin. Black
+ * body, a dark outline, a teal strip down one side; each sways slowly. */
+const TENT = {
+  front:  { body: [20, 28, 32], edge: [7, 10, 12], strip: [58, 128, 112] },
+  behind: { body: [20, 28, 32], edge: [38, 84, 78], strip: [58, 128, 112] },
+};
+const FRONT_ARMS = [
+  { w: 5.4, cw: 1, p: [[-0.70, -0.92], [-0.55, -0.74], [-0.42, -0.54], [-0.30, -0.33]] },
+  { w: 5.0, cw: -1, p: [[0.56, -1.00], [0.47, -0.78], [0.38, -0.60], [0.30, -0.47]] },
+  { w: 4.6, cw: 1, p: [[1.05, -0.20], [0.93, -0.03], [0.80, 0.10], [0.72, 0.18]] },
+  { w: 4.8, cw: -1, p: [[-0.80, 0.04], [-0.91, 0.30], [-1.01, 0.52], [-0.99, 0.68]] },
+  { w: 5.6, cw: 1, p: [[-0.62, 1.04], [-0.46, 0.74], [-0.29, 0.48], [-0.11, 0.26]] },
+  { w: 5.0, cw: -1, p: [[0.20, 1.07], [0.42, 0.82], [0.62, 0.65], [0.70, 0.55]] },
+];
+const BACK_ARMS = [
+  { w: 6.2, p: [[0.04, -0.80], [0.06, -1.06], [0.13, -1.28], [0.21, -1.52], [0.33, -1.60], [0.44, -1.50], [0.40, -1.32], [0.29, -1.27]] },
+  { w: 5.6, p: [[0.78, -0.40], [0.96, -0.50], [0.96, -0.66], [1.08, -0.78], [1.25, -0.85], [1.27, -0.70], [1.15, -0.66]] },
+  { w: 6.0, p: [[-0.78, -0.08], [-0.98, -0.12], [-1.21, -0.20], [-1.33, -0.40], [-1.54, -0.44], [-1.64, -0.23], [-1.63, -0.02], [-1.73, 0.06]] },
+  { w: 5.8, p: [[0.06, 0.80], [0.08, 1.08], [0.13, 1.35], [0.08, 1.56], [-0.08, 1.65], [-0.26, 1.60], [-0.29, 1.50]] },
+];
+function armPts(G, arm, k, frame, squeeze) {
+  const c = G / 2, R = 31;
+  let P = arm.p.map(([x, y]) => {
+    const d = Math.hypot(x, y), s = d > 1 ? (1 + (d - 1) * squeeze) / d : 1;
+    return [x * s, y * s];
+  });
+  if (arm.cw) {
+    // bow the run into a gentle S, then curl the tip round on itself
+    const [sx, sy] = P[0], [ex, ey] = P[P.length - 1], L = Math.hypot(ex - sx, ey - sy) || 1;
+    const nx = -(ey - sy) / L, ny = (ex - sx) / L;
+    P = P.map(([x, y], i) => { const u = i / (P.length - 1), b = Math.sin(u * Math.PI * 2) * 0.06 * arm.cw; return [x + nx * b, y + ny * b]; });
+    let [x, y] = P[P.length - 1], h = Math.atan2(ey - P[P.length - 2][1], ex - P[P.length - 2][0]), step = 0.11;
+    for (let k = 0; k < 4; k++) { h += arm.cw * 1.05; step *= 0.78; x += Math.cos(h) * step; y += Math.sin(h) * step; P.push([x, y]); }
   }
-  return pts;
+  const pts = [], n = P.length;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(n - 1, i + 2)];
+    const steps = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) * R * 2));
+    for (let j = 0; j < steps; j++) {
+      const t = j / steps, t2 = t * t, t3 = t2 * t;
+      const cr = (a, b, cc, d) => 0.5 * (2 * b + (-a + cc) * t + (2 * a - 5 * b + 4 * cc - d) * t2 + (-a + 3 * b - 3 * cc + d) * t3);
+      pts.push([cr(p0[0], p1[0], p2[0], p3[0]), cr(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  pts.push(P[n - 1]);
+  // sway: the tip moves most, the root not at all
+  const m = pts.length, sw = Math.sin(frame * 0.22 + k * 1.9) * 0.05;
+  const [ox, oy] = pts[0];
+  return pts.map(([x, y], i) => {
+    const u = i / (m - 1), a = sw * u, dx = x - ox, dy = y - oy;
+    const rx = ox + dx * Math.cos(a) - dy * Math.sin(a), ry = oy + dx * Math.sin(a) + dy * Math.cos(a);
+    return [c + rx * R, c + ry * R, Math.max(0.8, arm.w * (1 - u) ** 0.8)];
+  });
 }
-function tentacle(put, pts, turn) {
+function tentacle(put, pts, pal) {
   // each pixel takes its shade from the nearest point of the centre line
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   for (const [x, y, w] of pts) { x0 = Math.min(x0, x - w - 1); y0 = Math.min(y0, y - w - 1); x1 = Math.max(x1, x + w + 1); y1 = Math.max(y1, y + w + 1); }
   for (let py = Math.floor(y0); py <= y1; py++) for (let px = Math.floor(x0); px <= x1; px++) {
-    let best = null, bd = 1e9;
-    for (const p of pts) { const d = Math.hypot(px - p[0], py - p[1]) - p[2]; if (d < bd) { bd = d; best = p; } }
-    if (bd > 0.35) continue;
-    const [x, y, w, h] = best, sn = turn > 0 ? 1 : -1;
-    const side = ((px - x) * Math.cos(h + sn * Math.PI / 2) + (py - y) * Math.sin(h + sn * Math.PI / 2)) / w;
-    put(px, py, bd > -0.8 ? TENT.edge : side > 0.1 && side < 0.55 && w > 1.8 ? TENT.strip : TENT.body, 1);
+    let bi = -1, bd = 1e9;
+    for (let i = 0; i < pts.length; i++) { const p = pts[i], d = Math.hypot(px + 0.5 - p[0], py + 0.5 - p[1]) - p[2]; if (d < bd) { bd = d; bi = i; } }
+    if (bd > 0) continue;
+    const [x, y, w] = pts[bi], q = pts[Math.min(pts.length - 1, bi + 1)], b = pts[Math.max(0, bi - 1)];
+    const hx = q[0] - b[0], hy = q[1] - b[1], hl = Math.hypot(hx, hy) || 1;
+    const side = ((px + 0.5 - x) * -hy / hl + (py + 0.5 - y) * hx / hl) / w;   // across the arm, -1 … 1
+    put(px, py, bd > -0.9 ? pal.edge : side > 0.05 && side < 0.5 && w > 1.6 ? pal.strip : pal.body, 1);
   }
 }
 
@@ -265,46 +306,55 @@ function paintFlecks(put, G, M, seed, frame) {
 }
 
 function paintTentacles(put, G, M, seed, frame, layer) {
-  if (layer !== "behind") { paintFlecks(put, G, M, seed, frame); return; }
-  const mid = h32(seed + 5) < 0.5 ? -1 : 1;
-  [[-0.62, -1], [0.04 * mid, mid], [0.64, 1]].forEach(([a, turn], k) =>
-    tentacle(put, tentaclePts(G, M, seed, frame, k, a + (h32(seed + k * 29) - 0.5) * 0.25, turn), turn));
+  if (layer === "behind") {
+    const squeeze = Math.min(1, (M - 2) / 22);                   // reach no further than the margin
+    BACK_ARMS.forEach((arm, k) => tentacle(put, armPts(G, arm, k, frame, squeeze), TENT.behind));
+    return;
+  }
+  FRONT_ARMS.forEach((arm, k) => tentacle(put, armPts(G, arm, k + 7, frame, 1), TENT.front));
+  paintFlecks(put, G, M, seed, frame);
 }
 
-/* Fire, after the reference sprites: the coin burns as a few separate
- * flames, each a teardrop that rises to a curling point, gold at the
- * heart, orange, then a red edge, with a loose pixel or two flicking off
- * its tip. Behind the coin (the layer under it) they stand round its top
- * half, tallest at the crown, and its top edge catches. Every flame flickers on its own beat. */
-const FLAME = { core: [255, 228, 138], mid: [246, 174, 83], hot: [232, 116, 44], edge: [197, 78, 61] };
-function flame(put, bx, by, H, W, lean, seed, frame, k) {
-  H = Math.max(4, Math.round(H * (0.88 + 0.12 * Math.sin(frame * 0.8 + k * 1.9))));
-  let tx = bx, ty = by - H;
-  for (let j = 0; j < H; j++) {
-    const t = j / H;
-    const w = W * (t < 0.35 ? Math.sqrt(1 - ((0.35 - t) / 0.35) ** 2 * 0.75) : ((1 - t) / 0.65) ** 1.1);
-    const cx = bx + lean * t * t * H * 0.35 + Math.sin(frame * 0.6 + t * 4 + k) * t * 0.9;
-    const n = Math.round(w);
-    if (n < 0.5) { put(Math.round(cx), by - j, FLAME.edge, 1); tx = cx; ty = by - j; continue; }
-    for (let dx = -n; dx <= n; dx++) {
-      const q = Math.abs(dx) / (n + 0.5);
-      put(Math.round(cx) + dx, by - j, q > 0.8 ? FLAME.edge : q < 0.45 && t < 0.5 ? FLAME.core : q < 0.7 && t < 0.75 ? FLAME.mid : FLAME.hot, 1);
-    }
-    tx = cx; ty = by - j;
-  }
-  // a loose pixel or two flicking off the tip
-  for (let e = 0; e < 2; e++) {
-    const f = h32(seed + k * 53 + e * 7 + (frame >> 1) * 11);
-    if (f < 0.45) put(Math.round(tx + (f - 0.22) * 6), Math.round(ty - 2 - e * 2 - f * 2), e ? FLAME.edge : FLAME.hot, 1);
-  }
+/* Fire, traced from Dante's markup: one flame around the whole coin, on
+ * the layer under it. Its outline is given as a reach (in coin radii from
+ * the centre) at angles round the coin, 0 at the top, clockwise: tall
+ * tongues over the top, the tallest leaning left, a lower fringe down the
+ * sides, and a tight band hugging the bottom. Gold against the coin, then
+ * orange, hot orange, a red edge and loose pixels beyond. The tongues
+ * flicker and the outline ripples. */
+const FLAME = { core: [255, 228, 138], mid: [246, 174, 83], hot: [232, 116, 44], edge: [197, 78, 61], ash: [155, 48, 54] };
+const BLAZE = [
+  [-180, 1.03], [-153, 1.10], [-140, 1.10], [-112, 1.21], [-86, 1.30], [-66, 1.23], [-52, 1.55], [-44, 1.40],
+  [-36, 1.48], [-28, 1.70], [-21, 2.30], [-13, 1.45], [-4, 1.95], [1, 1.45], [6, 1.85], [12, 1.25],
+  [19, 1.89], [28, 1.08], [40, 1.30], [55, 1.46], [62, 1.30], [69, 1.39], [84, 1.22], [98, 1.31],
+  [111, 1.20], [134, 1.04], [171, 1.02], [180, 1.03],
+];
+function blazeReach(deg, frame, seed) {
+  let i = 0;
+  while (i < BLAZE.length - 2 && BLAZE[i + 1][0] < deg) i++;
+  const [a0, r0] = BLAZE[i], [a1, r1] = BLAZE[i + 1], t = (deg - a0) / (a1 - a0 || 1);
+  const r = r0 + (r1 - r0) * (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2;
+  // the tongues flicker: the further out, the more
+  return r + (r - 1) * (0.07 * Math.sin(frame * 0.9 + deg * 0.11 + seed % 7) + 0.05 * Math.sin(frame * 1.7 + deg * 0.31));
 }
-const CROWN = [[0, 1, 4], [-0.52, 0.72, 3], [0.52, 0.72, 3], [-1.05, 0.5, 0], [1.05, 0.5, 0]];
 function paintBlaze(put, G, M, seed, frame) {
-  const c = G / 2, r = 31, Hmax = M + 4;
-  CROWN.forEach(([a, sc, inset], k) => {
-    a += (h32(seed + k * 13) - 0.5) * 0.12;
-    flame(put, c + Math.sin(a) * (r - inset), c - Math.cos(a) * (r - inset), Hmax * sc, Hmax * 0.34 * Math.sqrt(sc), Math.sign(a) * 0.8, seed, frame, k);
-  });
+  const c = G / 2, R = 31, squeeze = Math.min(1, (M - 2) / 34);
+  for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+    const dx = x + 0.5 - c, dy = y + 0.5 - c, rad = Math.hypot(dx, dy);
+    if (rad < R - 1) continue;                                  // under the coin
+    const deg = Math.atan2(dx, -dy) * 180 / Math.PI;
+    const reach = (1 + (blazeReach(deg, frame, seed) - 1) * squeeze) * R;
+    const T = reach - R + 1 + (h32(seed + (x >> 1) * 31 + (y >> 1) * 977 + (frame >> 1) * 7) - 0.5) * 1.4;
+    if (T < 0.6) continue;
+    const t = (rad - R + 1) / T;
+    let col = null;
+    if (t < 0.3) col = FLAME.core;
+    else if (t < 0.55) col = FLAME.mid;
+    else if (t < 0.8) col = FLAME.hot;
+    else if (t < 1) col = FLAME.edge;
+    else if (t < 1.35 && h32(seed + x * 131 + y * 7919 + frame * 31) < 0.3 * (1.35 - t) / 0.35) col = t < 1.15 ? FLAME.edge : FLAME.ash;
+    if (col) put(x, y, col, 1);
+  }
 }
 function paintBlazeEdge(put, inner, seed, frame) {
   const ys = inner[1].map(p => p.y), c = (Math.min(...ys) + Math.max(...ys)) / 2;
