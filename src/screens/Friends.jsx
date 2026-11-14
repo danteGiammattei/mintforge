@@ -9,6 +9,7 @@ import CoinModal from "../components/CoinModal.jsx";
 import PixelBanner from "../components/PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { CoinTile } from "./Vault.jsx";
+import CabinetFrame from "../components/CabinetFrame.jsx";
 
 /* ─── FRIENDS ─────────────────────────────────────────────────────────────
  * Find players, follow them, look in their cabinets. */
@@ -66,6 +67,7 @@ function ProfileCard({ soc }) {
                 ))}
               </dl>
               {d.showcase.length > 0 && (
+                <CabinetFrame rank={d.cabinet?.rank || 0} pad={6}>
                 <div>
                   <div className="between" style={{ marginBottom: 8, gap: 8 }}>
                     <span className="t-label">CABINET</span>
@@ -75,6 +77,7 @@ function ProfileCard({ soc }) {
                     {d.showcase.map(r => { const c = hydrate(r); return <CoinTile key={c.id} coin={c} onClick={() => setCoin(c)}/>; })}
                   </div>
                 </div>
+                </CabinetFrame>
               )}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {!d.isSelf && <button className={`btn ${d.isFriend ? "" : "btn-gold"}`} style={{ flex: 1 }} disabled={busy} onClick={toggle}>{d.isFriend ? "REMOVE FRIEND" : "ADD FRIEND"}</button>}

@@ -11,6 +11,7 @@ import PixelBanner from "../components/PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import Friends, { TitleText, CabinetScore } from "./Friends.jsx";
 import { CoinTile } from "./Vault.jsx";
+import CabinetFrame from "../components/CabinetFrame.jsx";
 
 /* ─── PROFILE ─────────────────────────────────────────────────────────────
  * Who you are to other players: banner, title, bio and the cabinet of six
@@ -28,6 +29,7 @@ function Cabinet({ g }) {
     if (await ui.confirm({ title: "RESET THE CABINET?", body: "IT WILL SHOW YOUR SIX BEST COINS AGAIN.", yes: "RESET" })) g.setPinnedIds(null);
   };
   return (
+    <CabinetFrame rank={cab.rank}>
     <section className="panel" style={{ padding: 12 }} aria-label="Display cabinet">
       <div className="between" style={{ marginBottom: 12 }}>
         <h2 className="t-title" style={{ margin: 0 }}>CABINET</h2>
@@ -59,6 +61,7 @@ function Cabinet({ g }) {
         </div>
       )}
     </section>
+    </CabinetFrame>
   );
 }
 
