@@ -97,11 +97,12 @@ function Ware({ w, onBuy, big }) {
 export default function Stall({ onClose }) {
   const g = useGame(), ui = useUi();
   const [s, setS] = useState(null);
+  const [err, setErr] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [line] = useState(() => LINES[Math.floor(Math.random() * LINES.length)]);
   const busy = useRef(false);
 
-  const load = useCallback(() => g.act("stall").then(setS).catch(e => ui.toast(e.message, "bad")), [g, ui]);
+  const load = useCallback(() => g.act("stall").then(r => { setS(r); setErr(null); }).catch(e => setErr(e.message || "THE STALL IS SHUT")), [g]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
   useEffect(() => {
@@ -137,7 +138,12 @@ export default function Stall({ onClose }) {
           <span className="t-label">NEW WARES IN {untilMidnight(now)}</span>
         </div>
         <p className="t-dim" style={{ margin: 0 }}>"{line}"</p>
-        {!s ? <p className="t-dim">HE IS LAYING THINGS OUT…</p> : (
+        {err && !s ? (
+          <div className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }} role="alert">
+            <span className="t-blood">THE STALL IS SHUT: {String(err).toUpperCase()}</span>
+            <button className="btn" onClick={() => { setErr(null); load(); }}>TRY AGAIN</button>
+          </div>
+        ) : !s ? <p className="t-dim">HE IS LAYING THINGS OUT…</p> : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <Ware w={s.wares[4]} big onBuy={() => buy(s.wares[4], 4)}/>
             {s.wares.slice(0, 4).map((w, i) => <Ware key={i} w={w} onBuy={() => buy(w, i)}/>)}
