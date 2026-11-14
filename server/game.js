@@ -33,6 +33,7 @@ import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
 import { loadState, parseList, parseObj, coinOut } from "./state.js";
+import { stall, buy } from "./stall.js";
 
 const u32 = rand => Math.floor(rand() * 4294967296) >>> 0;
 const bump = key => `json_set(stats, '$.${key}', COALESCE(json_extract(stats, '$.${key}'), 0) + 1)`;
@@ -477,7 +478,7 @@ async function gamble(db, pid, body, { now, rand }) {
 
 /* ─── dispatch ────────────────────────────────────────────────────── */
 
-const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, engrave, well };
+const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, engrave, well, stall, buy };
 
 export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, tz = 0 } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;

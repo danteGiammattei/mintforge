@@ -163,6 +163,17 @@ CREATE TABLE IF NOT EXISTS war_tables (
 CREATE INDEX IF NOT EXISTS war_host_idx  ON war_tables(host_id, status);
 CREATE INDEX IF NOT EXISTS war_guest_idx ON war_tables(guest_id, status);
 
+-- ── the goblin's stall (018) ──
+CREATE TABLE IF NOT EXISTS stall_buys (
+  player_id  INTEGER NOT NULL,
+  day        INTEGER NOT NULL,           -- the player's local day number
+  slot       INTEGER NOT NULL,
+  price      INTEGER NOT NULL,
+  item       TEXT    NOT NULL,           -- JSON: what was bought
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (player_id, day, slot)
+);
+
 -- ── migrations that must only ever run once mark themselves here (017) ──
 CREATE TABLE IF NOT EXISTS migration_marks (id TEXT PRIMARY KEY, at INTEGER);
 INSERT OR IGNORE INTO migration_marks (id, at) VALUES ('017', 0);

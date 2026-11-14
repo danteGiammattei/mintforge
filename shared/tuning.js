@@ -296,3 +296,24 @@ export const ASTRAL = {
   instead: 9,
   signs: ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"],
 };
+
+/* ─── the goblin's stall ──────────────────────────────────────────────
+ * Five slots of wares, rolled for each player each local day (shared/
+ * stall.js), each bought once. What it sells costs more than it is worth
+ * — a chest about twice what its coins fetch, a coin coinMul × its sale
+ * price — so buying to sell is never a way to print marks. */
+export const STALL = {
+  chestPrice: [25, 100, 450, 1500, 4500],
+  chestTier:  [45, 30, 15, 8, 2],        // slot 1's chest
+  coinMul: 2.5,
+  missingChance: 0.7,                     // a coin slot picks a kind missing from your journal
+  featured: { coin: 40, chest: 35, oddity: 25, discount: 0.88, chestTier: [0, 0, 0, 70, 30], rarity: [0, 0, 0, 75, 25, 0] },
+  // never a mythic: those are only ever found
+  oddities: [                             // shop-only cosmetics: titles in shared/../data.js PREMIUM_TITLES
+    { type: "title", id: "goblin_friend",  price: 1500 },
+    { type: "title", id: "coin_monger",    price: 2500 },
+    { type: "title", id: "night_buyer",    price: 4000 },
+    { type: "title", id: "ill_gotten",     price: 6000 },
+    { type: "title", id: "stall_favourite",price: 9000 },
+  ],
+};

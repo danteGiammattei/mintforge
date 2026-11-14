@@ -155,6 +155,12 @@ export const PREMIUM_TITLES = [
   { id:"cataloguer",   label:"The Cataloguer",      minLvl:1,  effect:"shimmer" },
   { id:"mythbound",    label:"Mythbound",           minLvl:1,  effect:"void" },
   { id:"keeper",       label:"Keeper of the Ledger",minLvl:1,  effect:"astral" },
+  // sold at the goblin's stall
+  { id:"goblin_friend",  label:"Goblin-Friend",           minLvl:1, effect:"shimmer" },
+  { id:"coin_monger",    label:"Coin-Monger",             minLvl:1, effect:"shimmer" },
+  { id:"night_buyer",    label:"Night Buyer",             minLvl:1, effect:"void" },
+  { id:"ill_gotten",     label:"Of Ill-Gotten Wares",     minLvl:1, effect:"void" },
+  { id:"stall_favourite",label:"The Stallholder's Favourite", minLvl:1, effect:"astral" },
 ];
 export const PREMIUM_TITLE_BY_ID  = Object.fromEntries(PREMIUM_TITLES.map(t => [t.id, t]));
 export const PREMIUM_TITLE_LABELS = new Set(PREMIUM_TITLES.map(t => t.label));

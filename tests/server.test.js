@@ -13,6 +13,7 @@ import { TRAITS } from "../shared/sigil.js";
 import { coinValue, mkCoin } from "../src/lib/coin.js";
 import { onRequestPost as vaultPost } from "../functions/api/vault/index.js";
 import { onRequestPost as actPost } from "../functions/api/act.js";
+import { STALL } from "../shared/tuning.js";
 
 const refuses = (p, status) => assert.rejects(p, e => (assert.equal(e.status, status, e.message), true));
 const post = (token, body) => new Request("http://x/api", {
@@ -20,8 +21,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 017 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql"]);
+test("migrations 009 and 011 to 018 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -34,7 +35,7 @@ test("migrations 009 and 011 to 017 bring the pre-rebuild schema to schema.sql e
 test("schema.sql has every table the code reads", () => {
   const db = makeDb();
   const have = new Set(db.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all().map(r => r.name));
-  for (const t of ["players", "player_state", "coins", "sessions", "friends", "scrolls", "chests", "action_log", "login_attempts", "seal_log", "war_tables"]) {
+  for (const t of ["players", "player_state", "coins", "sessions", "friends", "scrolls", "chests", "action_log", "login_attempts", "seal_log", "war_tables", "stall_buys"]) {
     assert.ok(have.has(t), `missing table ${t}`);
   }
 });
@@ -252,7 +253,8 @@ test("every gift names something that exists", async () => {
   const s = await loadState(db, pid);
   assert.equal(s.brushLevel, 4);
   assert.equal(s.ownedFrames.length, 4);
-  assert.equal(s.ownedTitles.length, PREMIUM_TITLES.length);
+  // every title but the ones only the stall sells
+  assert.equal(s.ownedTitles.length, PREMIUM_TITLES.length - STALL.oddities.filter(o => o.type === "title").length);
 });
 
 /* ─── chest → coin → vault → marks ────────────────────────────────── */

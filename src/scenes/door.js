@@ -19,6 +19,11 @@
  *    bus.toDesk()         the player asked to go and draw
  *    bus.more()           true while he still has something waiting (the daily gift)
  *    bus.coach()          a line for a player who has never offered, or null
+ *    bus.toStall()        he has walked away to his stall: show it
+ *
+ *  A swipe up from high in the frame (on him, not the satchel) asks for
+ *  his wares: he turns, walks off into the light and the scene goes to
+ *  black. teardown.back() brings him back to the door.
  *
  *  There is no menu, no price and no tooltip in here, and there must not
  *  be. His posture is the only meter.
@@ -59,7 +64,8 @@ const colourOf = r => (RARITY[r] || RARITY[0]).c;
 
 const S = {
   t: 0,
-  mode: "idle",            // idle | drawer | give | arrive
+  mode: "idle",            // idle | drawer | give | arrive | leave | gone | back
+  away: 0,                 // 0..1 how far he has walked off; dark: the black over all
   drawer: 0,               // 0..1 slide
   sel: new Set(),          // ids of the scrolls picked to offer
   phase: "", anim: 0,
@@ -73,6 +79,7 @@ const S = {
   blink: 0,
   hurry: false, say: [], queue: [],   // skip-ahead; hints and chests still to come
   arriving: null,          // { kind: "chest"|"gift", tier, k, what }
+  dark: 0,
   dust: Array.from({ length: 22 }, () => ({ x: GX + Math.random() * GW, y: Math.random() * H, v: 0.04 + Math.random() * 0.10, p: Math.random() * 6.28 })),
   motes: [],
 };
@@ -115,9 +122,18 @@ function drawFigure(lean) {
   // He stands hard against the far jamb and leans round it, so only his
   // near half ever clears the frame. No cloak: a bare skull, long swept
   // ears, a thin hunched body, all of it flat black against the slot.
-  const cx = GX + GW - 7 - lean * 5;
+  // Walking away (S.away) he is drawn smaller about a point deep in the
+  // slot, drifting to its middle, his back to us (no eyes), bobbing.
+  const k = 1 - 0.62 * S.away, AX = GX + GW / 2, AY = 236;
+  const step = S.away > 0.2 && !view.calm ? Math.abs(Math.sin(S.t * 0.22)) * 2 * (1 - S.away) : 0;
+  const cx0 = GX + GW - 7 - lean * 5, cx = cx0 + (AX - cx0) * Math.min(1, S.away * 1.6);
   const sway = view.calm ? 0 : Math.sin(S.t * 0.012) * 1.0;
   const HEADCY = HEADY + 11;
+  const px = (x, y, w, h, c) => {
+    if (k === 1) { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, w | 0, h | 0); return; }
+    const X = AX + (x - AX) * k, Y = AY + (y - AY) * k - step;
+    ctx.fillStyle = c; ctx.fillRect(Math.round(X), Math.round(Y), Math.max(1, Math.round(w * k)), Math.max(1, Math.ceil(h * k)));
+  };
 
   ctx.save();
   ctx.beginPath(); ctx.rect(GX - 2, 0, GW + 2, H); ctx.clip();   // the jamb cuts him off
@@ -155,7 +171,7 @@ function drawFigure(lean) {
   // eyes, set under the brow
   S.blink -= 1;
   if (S.blink < -40 && Math.random() < 0.012) S.blink = 14;
-  const shut = S.blink > 0 && S.blink < 9;
+  const shut = (S.blink > 0 && S.blink < 9) || S.away > 0.06;     // turned away, his eyes are gone
   if (!shut) {
     const ey = HEADCY + 1;
     const pulse = view.calm ? 0.8 : 0.72 + Math.sin(S.t * 0.035) * 0.2 + Math.sin(S.t * 0.11) * 0.07;
@@ -416,6 +432,24 @@ function beginGive(ids) {
     err => { S.fail = (err && err.message ? String(err.message).toUpperCase() : "THE DOOR DOES NOT ANSWER"); });
 }
 
+/* ── to the stall: he turns, walks off into the light, all goes black ── */
+function beginLeave() {
+  if (S.mode !== "idle") return;
+  S.mode = "leave"; S.anim = 0; S.want = 0; S.sel = new Set();
+  speak("HE TURNS AND WALKS OFF. FOLLOW HIM.", 2.2); bus.feel("drawer");
+}
+function stepLeave() {
+  S.anim++;
+  if (view.calm) { S.away = 1; S.dark = Math.min(1, S.dark + 0.06); }
+  else if (S.anim > 14) S.away = Math.min(1, S.away + 0.011);       // a beat to turn, then the walk
+  if (S.away > 0.7 || view.calm) S.dark = Math.min(1, S.dark + 0.035);
+  if (S.dark >= 1) { S.mode = "gone"; bus.toStall(); }
+}
+function stepBack() {
+  S.away = 0; S.dark = Math.max(0, S.dark - 0.05);
+  if (S.dark <= 0) { S.mode = "idle"; S.want = 1; }
+}
+
 function stepHands() { S.reach += (S.want - S.reach) * (S.phase === "withdraw" ? 0.05 : 0.035); }
 
 function frame() {
@@ -429,6 +463,8 @@ function frame() {
   // a tap during the exchange hurries it along: the same steps, four at a time
   if (S.mode === "give") for (let n = 0, N = S.hurry ? 4 : 1; n < N && S.mode === "give"; n++) { stepGive(); if (n) stepHands(); }
   if (S.mode === "arrive") stepArrive();
+  if (S.mode === "leave") stepLeave();
+  if (S.mode === "back") stepBack();
   if (S.mode === "idle") {
     S.hurry = false;
     if (S.say?.length && S.lineA < 1) speak(S.say.shift());           // anything else he had to say
@@ -444,7 +480,7 @@ function frame() {
   // his posture follows the pot, slowly: he does not jump
   S.lean += (bus.lean() - S.lean) * 0.02;
   const patience = 0.3 + 0.7 * S.lean;
-  if (S.mode !== "give") S.want = 0.74 + patience * 0.2;
+  if (S.mode !== "give" && S.mode !== "leave" && S.mode !== "gone") S.want = 0.74 + patience * 0.2;
   stepHands();
   if (S.mode !== "give" && S.curl > 0.001) S.curl += (0 - S.curl) * 0.1;
 
@@ -492,6 +528,8 @@ function frame() {
   drawLine();
   drawDrawer();
 
+  if (S.dark > 0) { ctx.globalAlpha = S.dark; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+
   // swipe affordance, only when nothing is happening
   if (S.mode === "idle" && S.drawer < 0.01) {
     ctx.globalAlpha = view.calm ? 0.9 : 0.85 + Math.sin(S.t * 0.04) * 0.15;
@@ -508,7 +546,10 @@ const onDown = e => { down = pointer(cv, e); cv.setPointerCapture?.(e.pointerId)
 const onMove = e => {
   if (!down) return;
   const p = pointer(cv, e);
-  if (S.mode === "idle" && down.y - p.y > 26) { S.mode = "drawer"; down = null; bus.feel("drawer"); }
+  if (S.mode === "idle" && down.y - p.y > 26) {
+    if (down.y < H * 0.45) beginLeave(); else { S.mode = "drawer"; bus.feel("drawer"); }
+    down = null;
+  }
 };
 const onUp = e => {
   if (!down) return;
@@ -577,6 +618,8 @@ const teardown = () => {
   cv.removeEventListener("pointercancel", onCancel);
 };
 /* for controls outside the canvas (keyboard, screen readers) */
+teardown.back = () => { if (S.mode === "gone" || S.mode === "leave") { S.mode = "back"; S.dark = 1; S.away = 0; } };
+teardown.toStall = () => beginLeave();
 teardown.offer = ids => {
   const want = (Array.isArray(ids) ? ids : [ids]).filter(id => bus.scrolls().some(s => s.id === id));
   if (want.length && (S.mode === "idle" || S.mode === "drawer")) beginGive(want);
