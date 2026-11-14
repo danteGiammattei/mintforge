@@ -100,7 +100,6 @@ node tools/migrate.mjs migrations/014_war_picks.sql --remote
 node tools/migrate.mjs migrations/015_materials.sql --remote
 node tools/migrate.mjs migrations/016_astral_signs.sql --remote
 node tools/migrate.mjs migrations/017_new_ladder.sql --remote
-node tools/migrate.mjs migrations/018_raffles.sql --remote
 node tools/cards.mjs path/to/Jorels_Card_Pack.zip                  # once per machine
 npm run build
 npx wrangler pages deploy dist --project-name mintforge --branch main
