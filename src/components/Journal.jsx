@@ -1,15 +1,29 @@
 import { useGame } from "../lib/GameContext.js";
-import { METALS, RARITIES, MATERIALS } from "../lib/data.js";
+import { METALS, RARITIES } from "../lib/data.js";
 import { ASTRAL } from "../../shared/tuning.js";
 import CoinCanvas from "./CoinCanvas.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { LEDGER_MARKS } from "../../shared/economy.js";
+import { GIFTS, CHESTS } from "../../shared/tuning.js";
+import { PREMIUM_TITLE_BY_ID } from "../lib/data.js";
 
 /* ─── JOURNAL ─────────────────────────────────────────────────────────────
- * Every kind of coin you have ever cleaned or won: nine metals by six
- * rarities, fifty-four kinds. A kind stays found after the coin is sold.
+ * Every kind of coin you have ever cleaned or won: eleven metals by six
+ * rarities, sixty-six kinds. A kind stays found after the coin is sold.
+ * Every five or six kinds the goblin has something for you (shared/
+ * tuning.js GIFTS): the meter marks where, and the next one is named.
  * Kinds not yet found show nothing — not even that they exist is hinted
  * beyond the empty square. */
+// what the goblin gives at a milestone, in words
+function prize(kinds) {
+  const r = GIFTS.find(g => g.when.kinds === kinds)?.reward;
+  if (!r) return "SOMETHING";
+  if (r.type === "marks") return `${r.n.toLocaleString()} MARKS`;
+  if (r.type === "chest") return `${/^[AEIOU]/.test(CHESTS.names[r.tier]) ? "AN" : "A"} ${CHESTS.names[r.tier]} CHEST`;
+  if (r.type === "title") return `A TITLE: ${(PREMIUM_TITLE_BY_ID[r.id]?.label || r.id).toUpperCase()}`;
+  return "SOMETHING";
+}
+
 export default function Journal() {
   const g = useGame(), j = g.journal;
   const count = (m, r) => j.c[`${m}:${r}`] || 0;
@@ -34,7 +48,7 @@ export default function Journal() {
         {/* where the goblin is watching for */}
         {LEDGER_MARKS.map(k => <i key={k} aria-hidden style={{ position: "absolute", top: -2, left: `calc(${k / total * 100}% - 1px)`, width: 2, height: 12, background: k <= found ? "var(--candle)" : "var(--bone-dim)" }}/>)}
       </div>
-      {next ? <p className="t-magic" style={{ margin: 0, textAlign: "center" }}>HE IS KEEPING COUNT. SOMETHING WAITS AT {next} KINDS.</p>
+      {next ? <p className="t-magic" style={{ margin: 0, textAlign: "center" }}>AT {next} KINDS HE HAS {prize(next)} FOR YOU. COLLECT IT AT THE DOOR.</p>
             : <p className="t-gold" style={{ margin: 0, textAlign: "center" }}>EVERY KIND THERE IS. THE LEDGER IS COMPLETE.</p>}
 
       <section className="panel" style={{ padding: 8, overflowX: "auto" }} aria-label="Kinds of coin found">
@@ -71,27 +85,6 @@ export default function Journal() {
         <ul style={{ listStyle: "none", display: "flex", flexWrap: "wrap", gap: "4px 12px", margin: "8px 4px 4px", padding: 0 }} aria-hidden>
           {RARITIES.map(r => <li key={r.name} className="row" style={{ gap: 6, color: r.color }}><i style={{ width: 8, height: 8, background: r.color }}/>{r.name}</li>)}
         </ul>
-      </section>
-
-      {/* the rare twins: one per metal, found or not */}
-      <section className="panel" style={{ padding: 8, display: "flex", flexDirection: "column", gap: 8 }} aria-label="Materials found">
-        <div className="between"><span className="t-label">MATERIALS</span>
-          <span className="t-label">{Object.keys(MATERIALS).filter(id => (j.m || {})[id] > 0).length} / {Object.keys(MATERIALS).length}</span></div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
-          {Object.entries(MATERIALS).map(([id, mat]) => {
-            const n = (j.m || {})[id] || 0;
-            return (
-              <div key={id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: 4,
-                                     border: `2px solid ${n ? mat.ramp[4] : "var(--line)"}`, background: n ? "var(--stone-3)" : "var(--stone-0)" }}
-                   aria-label={n ? `${mat.name}: ${n} found` : `A ${METALS[mat.tier].name.toLowerCase()} twin, not found`}>
-                {n ? <CoinCanvas coin={{ seed: 777 + mat.tier, metalIdx: mat.tier, shape: "round", material: id, rarity: 0 }} size={64} aura={false} still/>
-                   : <div style={{ width: 64, height: 64, display: "grid", placeItems: "center" }} className="t-label" aria-hidden>?</div>}
-                <span className="t-label" style={{ color: n ? mat.glows?.[0] || mat.ramp[6] : "var(--mute)" }}>{n ? mat.name : `${METALS[mat.tier].name} twin`}</span>
-              </div>
-            );
-          })}
-        </div>
-        <p className="t-label" style={{ margin: 0 }}>NOW AND THEN A SILVER COIN COMES OUT OF ICE, OR AN OBSIDIAN ONE OUT OF LAVA. EACH IS WORTH A LITTLE MORE.</p>
       </section>
 
       {/* the twelve signs: which this player holds right now */}

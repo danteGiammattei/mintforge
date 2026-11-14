@@ -436,7 +436,7 @@ function beginGive(ids) {
 function beginLeave() {
   if (S.mode !== "idle") return;
   S.mode = "leave"; S.anim = 0; S.want = 0; S.sel = new Set();
-  speak("HE TURNS AND WALKS OFF. FOLLOW HIM.", 2.2); bus.feel("drawer");
+  S.lineA = 0; bus.feel("drawer");
 }
 function stepLeave() {
   S.anim++;

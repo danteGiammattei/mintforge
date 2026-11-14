@@ -102,7 +102,7 @@ export default function Forge({ coinId, onClose }) {
             <label className="t-dim" htmlFor="forge-name" style={{ margin: 0 }}>
               {coin.nick ? <>IT IS CALLED {coin.nick}. IT WAS STRUCK AS {coin.raw}.</> : <>IT WAS STRUCK AS {coin.raw}. CUT A NAME OF YOUR OWN INTO IT.</>}
             </label>
-            <input id="forge-name" className="field" value={name} maxLength={ENGRAVE.maxLength} placeholder="THE RABBIT" autoComplete="off" spellCheck={false}
+            <input id="forge-name" className="field" value={name} maxLength={ENGRAVE.maxLength} placeholder="OLD SOL" autoComplete="off" spellCheck={false}
                    onChange={e => setName(e.target.value.replace(/[^A-Za-z0-9 '-]/g, ""))}/>
             <button type="submit" className="btn btn-gold btn-block" disabled={busy || !typed || typed === coin.nick || g.marks < ENGRAVE.cost}>
               <PixelIcon name="mark" size={11}/>ENGRAVE FOR {ENGRAVE.cost}

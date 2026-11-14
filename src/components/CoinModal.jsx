@@ -132,7 +132,7 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
         </div>
         {onToggleLock && (
           <div className="t-label" style={{ textAlign: "center" }}>
-            {coin.locked ? "A LOCKED COIN CANNOT BE SOLD OR WAGERED." : "LOCK IT TO KEEP IT FROM SALES AND WAGERS."}
+            LOCKED COINS STAY PUT.
           </div>
         )}
       </div>

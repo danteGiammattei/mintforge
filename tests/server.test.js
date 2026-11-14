@@ -244,7 +244,7 @@ test("later gifts wait for their conditions", async () => {
 
 test("every gift names something that exists", async () => {
   const { db, pid } = await world();
-  const full = { c: Object.fromEntries(Array.from({ length: 54 }, (_, i) => [`${i % 9}:${(i / 9) | 0}`, 1])) };
+  const full = { c: Object.fromEntries(Array.from({ length: 66 }, (_, i) => [`${i % 11}:${(i / 11) | 0}`, 1])) };
   db.raw.prepare(`UPDATE player_state SET xp = 220 * 10000, journal = ?, stats = '{"visits":999,"sealed":999,"offered":999,"chests":999,"brushed":999,"gambles":999}' WHERE player_id = ?`).run(JSON.stringify(full), pid);
   const go = driver(db, pid, seeded(2));
   const got = [];
@@ -551,9 +551,12 @@ test("the journal earns gifts: kinds found, and the first of a rarity", async ()
   const go = driver(db, pid, seeded(5));
   await go("visit");                                                // the welcome chest
   const set = j => db.raw.prepare(`UPDATE player_state SET journal = ? WHERE player_id = ?`).run(JSON.stringify({ c: j }), pid);
-  set(Object.fromEntries(Array.from({ length: 8 }, (_, i) => [`${i}:0`, 1])));
-  assert.equal((await go("visit")).result.gift?.daily ?? null, null, "eight kinds is not nine");
-  set(Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`${i}:0`, 1])));
+  set(Object.fromEntries(Array.from({ length: 5 }, (_, i) => [`${i}:0`, 1])));
+  assert.equal((await go("visit")).result.gift?.daily ?? null, null, "five kinds is not six");
+  set(Object.fromEntries(Array.from({ length: 6 }, (_, i) => [`${i}:0`, 1])));
+  const six = await go("visit");
+  assert.deepEqual([six.result.gift.type, six.result.gift.n], ["marks", 150]);
+  set(Object.fromEntries(Array.from({ length: 11 }, (_, i) => [`${i}:0`, 1])));
   const g = await go("visit");
   assert.deepEqual([g.result.gift.type, g.result.gift.tier], ["chest", 1]);
   set({ "0:0": 1, "2:3": 1 });                                      // an epic: the first-epic pouch

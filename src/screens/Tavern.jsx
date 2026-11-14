@@ -26,7 +26,7 @@ const GAMES = {
   toss:     { label: "TOSS",     need: 1, rule: `1 COIN · ${pct(GAMBLE.toss.win)} IT RISES A METAL · OTHERWISE IT IS LOST` },
   crucible: { label: "CRUCIBLE", need: 3, rule: `3 COINS OF ONE METAL · ${pct(GAMBLE.crucible.win)} ALL THREE RISE · OTHERWISE YOU KEEP ONE` },
   roulette: { label: "ROULETTE", need: 1, rule: "1 COIN ON THE WHEEL" },
-  plinko:   { label: "PLINKO",   need: 1, rule: "1 COIN DOWN THE PEGS. IT BOUNCES LEFT OR RIGHT AT EVERY ROW" },
+  plinko:   { label: "PLINKO",   need: 1, rule: "1 COIN DOWN THE PEGS." },
   war:      { label: "WAR",      need: 0, rule: "" },
 };
 const OUTCOME_LINE = {
@@ -192,7 +192,6 @@ export default function Tavern() {
           )}
         </section>
         )}
-        <p className="t-label" style={{ margin: 0, textAlign: "center" }}>WAGERS ARE COINS ONLY. NOTHING HERE COSTS OR PAYS REAL MONEY.</p>
       </div>
     </div>
   );

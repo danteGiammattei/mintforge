@@ -65,7 +65,7 @@ function Ware({ w, onBuy, big }) {
   let pic, name, sub;
   if (w.kind === "chest") {
     pic = <ChestPic tier={w.tier} size={big ? 96 : 72}/>;
-    name = `${CHESTS.names[w.tier]} CHEST`; sub = "FOR THE SATCHEL";
+    name = `${CHESTS.names[w.tier]} CHEST`; sub = "";
   } else if (w.kind === "coin") {
     const c = mkCoin(w.coin.seed, 1, w.coin.metalIdx, undefined, w.coin.rarity);
     const r = RARITIES[w.coin.rarity];

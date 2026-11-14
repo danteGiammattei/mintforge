@@ -94,7 +94,7 @@ function Body({ r }) {
     return (
       <>
         <div className="t-big" style={{ textAlign: "center", lineHeight: 1.3 }}><TitleText label={r.label}/></div>
-        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>{r.from === "gift" ? "NOBODY ELSE WAS GIVEN THIS FOR NOTHING." : "IT IS YOURS TO WEAR."}</p>
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>{r.from === "gift" ? "HE DOES NOT GIVE THIS TO JUST ANYONE." : "IT IS YOURS TO WEAR."}</p>
       </>
     );
   }
@@ -159,7 +159,7 @@ function Body({ r }) {
     return (
       <>
         <div className="t-big t-gold row" style={{ justifyContent: "center", gap: 10 }}><PixelIcon name="mark" size={22}/>{r.n.toLocaleString()}</div>
-        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>SPEND THEM AT THE FORGE, OR ON A DEEPER INKWELL AT THE DESK.</p>
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>SPEND THEM AT THE FORGE, THE DESK, OR HIS STALL.</p>
       </>
     );
   }

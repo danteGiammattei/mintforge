@@ -62,10 +62,11 @@ export default function Satchel() {
 
   const revealed = useCallback(async () => {
     const coin = brushing;
+    const isNew = !(g.journal.c[`${coin.metalIdx}:${coinRarity(coin)}`] > 0);    // before the brush writes it in
     try {
       const r = await g.act("brush", { coinId: coin.id });
       feel("reveal");
-      setFound({ coin, xp: r.xp });
+      setFound({ coin, xp: r.xp, isNew });
       ui.say(`${RARITIES[coinRarity(coin)].name} ${matterOf(coin).name} coin${coin.shiny ? ", shiny" : ""}.`);
     } catch (e) {
       // it is still dusty on the server, so it is still here to brush
@@ -142,7 +143,7 @@ export default function Satchel() {
         </div>
       )}
 
-      {found && <RevealBanner coin={found.coin} xp={found.xp} onDone={() => { setFound(null); ui.toast("IT IS IN YOUR VAULT."); }}/>}
+      {found && <RevealBanner coin={found.coin} xp={found.xp} isNew={found.isNew} onDone={() => { setFound(null); ui.toast("IT IS IN YOUR VAULT."); }}/>}
     </div>
   );
 }

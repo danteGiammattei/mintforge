@@ -188,16 +188,25 @@ export const GAMBLE = {
 export const GIFTS = [
   { id: "welcome",      when: { visits: 1 },                reward: { type: "chest", tier: 0 } },
   { id: "brush1",       when: { brushed: 3 },               reward: { type: "brush", level: 1 } },
-  // the journal: `kinds` is how many of the 54 metal × rarity kinds have
-  // been cleaned or won, `found` the rarest rarity ever found
-  { id: "ledger9",      when: { kinds: 9 },                 reward: { type: "chest", tier: 1 } },
+  // the journal: `kinds` is how many of the 66 metal × rarity kinds have
+  // been cleaned or won, `found` the rarest rarity ever found. A reward
+  // every five or six kinds, the last for a complete journal. (The ids
+  // are what players have been given, so old ones keep their names.)
+  { id: "ledger6",      when: { kinds: 6 },                 reward: { type: "marks", n: 150 } },
+  { id: "ledger9",      when: { kinds: 11 },                reward: { type: "chest", tier: 1 } },
+  { id: "ledger17",     when: { kinds: 17 },                reward: { type: "marks", n: 500 } },
   { id: "firstEpic",    when: { found: 3 },                 reward: { type: "marks", n: 150 } },
-  { id: "ledger18",     when: { kinds: 18 },                reward: { type: "chest", tier: 2 } },
+  { id: "ledger18",     when: { kinds: 22 },                reward: { type: "chest", tier: 2 } },
+  { id: "ledger28",     when: { kinds: 28 },                reward: { type: "marks", n: 1500 } },
   { id: "firstLegend",  when: { found: 4 },                 reward: { type: "chest", tier: 3 } },
-  { id: "cataloguer",   when: { kinds: 27 },                reward: { type: "title", id: "cataloguer" } },
+  { id: "cataloguer",   when: { kinds: 33 },                reward: { type: "title", id: "cataloguer" } },
+  { id: "ledger39",     when: { kinds: 39 },                reward: { type: "chest", tier: 3 } },
   { id: "firstMythic",  when: { found: 5 },                 reward: { type: "title", id: "mythbound" } },
-  { id: "ledger40",     when: { kinds: 40 },                reward: { type: "chest", tier: 4 } },
-  { id: "keeper",       when: { kinds: 54 },                reward: { type: "title", id: "keeper" } },
+  { id: "ledger40",     when: { kinds: 44 },                reward: { type: "chest", tier: 4 } },
+  { id: "ledger50",     when: { kinds: 50 },                reward: { type: "marks", n: 6000 } },
+  { id: "ledger55",     when: { kinds: 55 },                reward: { type: "chest", tier: 4 } },
+  { id: "ledger60",     when: { kinds: 60 },                reward: { type: "marks", n: 12000 } },
+  { id: "keeper",       when: { kinds: 66 },                reward: { type: "title", id: "keeper" } },
   { id: "pouch1",       when: { offered: 10 },              reward: { type: "marks", n: 40 } },
   { id: "brush2",       when: { brushed: 15 },              reward: { type: "brush", level: 2 } },
   { id: "goldspun",     when: { level: 10, chests: 12 },    reward: { type: "title", id: "goldspun" } },
