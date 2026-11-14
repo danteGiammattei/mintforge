@@ -19,9 +19,10 @@ python3 tools/chest/snap.py gemini-output.png public/sprites/chests/chest-2.png
 each frame, measures the base (which does not move), rebuilds the chest on
 a 36-cell grid from it, and gives all six frames one shared palette.
 
-Wooden (0), gilded (2) and obsidian (3) are Gemini's. Iron (1) and void (4)
-are stand-ins recoloured from wooden and obsidian; replace them with real
-ones the same way whenever.
+All five are Gemini's. Iron came back as a 4 × 2 grid of eight frames, so
+six were picked out and laid in a row before snapping; iron and void also
+came with black outlines, which were stripped (any dark pixel on the
+silhouette's edge) to match the others.
 
 The sheets are lit by the candle (low, left, in front), which is the light
 of the satchel and the opening. The doorway re-grades them colder and
