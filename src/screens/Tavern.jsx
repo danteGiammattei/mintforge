@@ -12,6 +12,7 @@ import Plinko from "../components/Plinko.jsx";
 import { plinkoOdds } from "../../shared/economy.js";
 import { CoinTile } from "./Vault.jsx";
 import War from "../components/War.jsx";
+import Raffle from "../components/Raffle.jsx";
 
 /* ─── TAVERN ──────────────────────────────────────────────────────────────
  * Three wagers, all staked in coins, all resolved by the server:
@@ -20,6 +21,7 @@ import War from "../components/War.jsx";
  *   ROULETTE  one coin on a six-sector wheel.
  *   PLINKO    one coin down eight rows of pegs into one of nine slots.
  *   WAR       a friend's coin against yours, high card (components/War.jsx).
+ *   RAFFLE    coins as tickets in a daily draw for marks (components/Raffle.jsx).
  * The odds are printed. Locked coins cannot be staked. */
 const pct = p => Math.round(p * 100) + "%";
 const GAMES = {
@@ -28,6 +30,7 @@ const GAMES = {
   roulette: { label: "ROULETTE", need: 1, rule: "1 COIN ON THE WHEEL" },
   plinko:   { label: "PLINKO",   need: 1, rule: "1 COIN DOWN THE PEGS. IT BOUNCES LEFT OR RIGHT AT EVERY ROW" },
   war:      { label: "WAR",      need: 0, rule: "" },
+  raffle:   { label: "RAFFLE",   need: 0, rule: "" },
 };
 const OUTCOME_LINE = {
   lose: "IT IS GONE", same: "IT CAME BACK", up1: "IT ROSE A METAL", x2: "IT CAME BACK TWICE",
@@ -105,7 +108,7 @@ export default function Tavern() {
           ))}
         </div>
 
-        {game === "war" ? <War/> : (
+        {game === "war" ? <War/> : game === "raffle" ? <Raffle/> : (
         <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
           <p className="t-dim" style={{ margin: 0 }}>{def.rule}</p>
 
@@ -192,7 +195,7 @@ export default function Tavern() {
           )}
         </section>
         )}
-        <p className="t-label" style={{ margin: 0, textAlign: "center" }}>WAGERS ARE COINS ONLY. NOTHING HERE COSTS OR PAYS REAL MONEY.</p>
+        <p className="t-label" style={{ margin: 0, textAlign: "center" }}>WAGERS ARE COINS ONLY. PRIZES ARE MARKS. NOTHING HERE COSTS OR PAYS REAL MONEY.</p>
       </div>
     </div>
   );

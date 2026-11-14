@@ -296,3 +296,17 @@ export const ASTRAL = {
   instead: 9,
   signs: ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"],
 };
+
+/* ─── raffles ─────────────────────────────────────────────────────────
+ * One draw a day for each metal, at drawUtcHour (10:00 UTC is 8 pm in
+ * Brisbane). A coin of the metal is a ticket worth entries[rarity]
+ * entries, and is gone once entered. One winner, picked by entries,
+ * takes the pot: base × the metal's base value, plus what every entered
+ * coin was worth (its sell price). So the pot grows as people enter,
+ * coins leave the game, and only the base is new marks. */
+export const RAFFLE = {
+  drawUtcHour: 10,
+  entries: [1, 2, 4, 8, 16, 32],
+  base: 3,
+  maxCoins: 50,          // in one go
+};

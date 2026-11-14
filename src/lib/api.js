@@ -75,5 +75,7 @@ export function apiClient(token, onUnauthorized) {
     removeFriend: (username)      => call("/api/friends",       "DELETE", { username }),
     getWar:       ()              => call("/api/war",           "GET"),
     war:          (op, payload)   => call("/api/war",           "POST",   { op, ...payload }),
+    getRaffle:    ()              => call("/api/raffle",        "GET"),
+    enterRaffle:  (coinIds)       => call("/api/raffle",        "POST",   { coinIds }),
   };
 }
