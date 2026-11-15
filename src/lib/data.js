@@ -112,6 +112,12 @@ export const BANNERS = {
   // Image-backed banners — bannerStyle() turns these into proper image properties
   stargazer:"image:/banners/stargazer.webp",
   archive:  "image:/banners/archive.webp",
+  // sold at the goblin's stall
+  night_market:"image:/banners/night_market.webp",
+  hoard:       "image:/banners/hoard.webp",
+  bazaar:      "image:/banners/bazaar.webp",
+  tunnel:      "image:/banners/tunnel.webp",
+  mint_below:  "image:/banners/mint_below.webp",
   wanderer: "image:/banners/wanderer.webp",
   astrarium:"image:/banners/astrarium.webp",
 };
@@ -126,6 +132,12 @@ export const FRAMES = {
   // shared/tuning.js). Keys must match BANNERS.
   stargazer:{ lbl:"Stargazer",    minLvl:15, accent:"#c8b878", premium:true, desc:"A lone scholar at the edge of the world" },
   archive:  { lbl:"The Archive",  minLvl:20, accent:"#d4a850", premium:true, desc:"Where every collected lore is bound in light" },
+  // sold at the goblin's stall
+  night_market:{ lbl:"The Night Market",  minLvl:1, accent:"#c89048", premium:true, stall:true, desc:"Stalls in a stone alley, one lantern lit" },
+  hoard:       { lbl:"The Goblin's Hoard", minLvl:1, accent:"#e0a040", premium:true, stall:true, desc:"A candle on a heap of other people's coins" },
+  bazaar:      { lbl:"Moonlit Bazaar",    minLvl:1, accent:"#b8b4d0", premium:true, stall:true, desc:"Tents asleep under a great pale moon" },
+  tunnel:      { lbl:"Smuggler's Tunnel", minLvl:1, accent:"#a08858", premium:true, stall:true, desc:"A boat moored where no boat should be" },
+  mint_below:  { lbl:"The Mint Below",    minLvl:1, accent:"#e07838", premium:true, stall:true, desc:"Where the coins are struck, deep down" },
   wanderer: { lbl:"The Wanderer", minLvl:25, accent:"#a89060", premium:true, desc:"Crowned spires beyond the wandering staff" },
   astrarium:{ lbl:"The Astrarium",minLvl:30, accent:"#b8a060", premium:true, desc:"Where the heavens are charted on stone" },
 };

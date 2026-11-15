@@ -318,11 +318,17 @@ export const STALL = {
   missingChance: 0.7,                     // a coin slot picks a kind missing from your journal
   featured: { coin: 40, chest: 35, oddity: 25, discount: 0.88, chestTier: [0, 0, 0, 70, 30], rarity: [0, 0, 0, 75, 25, 0] },
   // never a mythic: those are only ever found
-  oddities: [                             // shop-only cosmetics: titles in shared/../data.js PREMIUM_TITLES
+  oddities: [                             // shop-only cosmetics: titles in src/lib/data.js PREMIUM_TITLES
     { type: "title", id: "goblin_friend",  price: 1500 },
     { type: "title", id: "coin_monger",    price: 2500 },
     { type: "title", id: "night_buyer",    price: 4000 },
     { type: "title", id: "ill_gotten",     price: 6000 },
     { type: "title", id: "stall_favourite",price: 9000 },
+    // banners: frames in src/lib/data.js, painted in public/banners
+    { type: "frame", id: "night_market",  price: 3000 },
+    { type: "frame", id: "tunnel",        price: 4500 },
+    { type: "frame", id: "bazaar",        price: 6000 },
+    { type: "frame", id: "mint_below",    price: 8000 },
+    { type: "frame", id: "hoard",         price: 12000 },
   ],
 };

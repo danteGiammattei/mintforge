@@ -8,6 +8,7 @@ import { RARITIES, PREMIUM_TITLE_BY_ID, FRAMES } from "../lib/data.js";
 import { CHESTS } from "../../shared/tuning.js";
 import { loadChestArt, chestClosed } from "../lib/chestArt.js";
 import CoinCanvas from "./CoinCanvas.jsx";
+import PixelBanner from "./PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { TitleText } from "../screens/Friends.jsx";
 
@@ -77,8 +78,8 @@ function Ware({ w, onBuy, big }) {
     pic = <div style={{ padding: "14px 4px", textAlign: "center" }}><TitleText label={t?.label || w.id}/></div>;
     name = "A TITLE"; sub = "ONLY SOLD HERE";
   } else {
-    pic = <div className="t-title" style={{ padding: 12 }}>{FRAMES[w.id]?.lbl || w.id}</div>;
-    name = "A BANNER"; sub = "ONLY SOLD HERE";
+    pic = <div style={{ width: "100%", boxShadow: "0 0 0 2px #000" }}><PixelBanner frame={w.id} height={big ? 72 : 48}/></div>;
+    name = (FRAMES[w.id]?.lbl || w.id).toUpperCase(); sub = "A BANNER, ONLY SOLD HERE";
   }
   return (
     <button className="tile" disabled={w.sold} onClick={onBuy}
