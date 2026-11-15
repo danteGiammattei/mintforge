@@ -35,7 +35,9 @@ export function auraFrame(src, colour, level, f) {
   // is flame), its edge rippling slowly round it
   const dark = shade(colour, 0.7);
   const base = 1.6 + level * 0.5;
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  // level 0: no aura at all, just the same frame, so a plain sprite sits
+  // where its glowing neighbours do
+  if (level > 0) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const sx = x - PAD, sy = y - TOP;
     if (on(sx, sy)) continue;
     let best = 9;

@@ -239,7 +239,7 @@ export function rolledScroll(rarityColour, charged = false) {
  * the sigil somewhere to live. Each scroll grows its own mark from its
  * seed — the hook for showing what the player actually drew. */
 /* ─── the tied scroll: Dante's sprite, its ribbon in the rarity ────── */
-export const TIED = { w: 35, h: 32 };
+export const TIED = { w: 30, h: 27 };
 export function tiedScroll(colour) {
   return sprite(`tied:${colour}`, () => {
     const cv = document.createElement("canvas"); cv.width = TIED.w; cv.height = TIED.h;
@@ -249,7 +249,7 @@ export function tiedScroll(colour) {
       if (ch === ".") return;
       let [r, g, b] = SCROLL_PAL[L.indexOf(ch)];
       const lum = (r + g + b) / 3, grey = Math.max(r, g, b) - Math.min(r, g, b) < 22;
-      if (grey && lum > 60 && lum < 215 && x >= 12 && y >= 9) {          // the ribbon
+      if (grey && lum > 60 && lum < 215 && x >= 10 && y >= 7) {          // the ribbon
         const k = lum / 150;
         [r, g, b] = tint.map(v => Math.min(255, Math.round(v * k)));
       }

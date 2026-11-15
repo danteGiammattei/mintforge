@@ -128,9 +128,8 @@ export default function Satchel() {
               <div className="grid-4">
                 {g.scrolls.map(s => (
                   <div key={s.id} className="tile" style={{ borderTopColor: RARITY[s.rarity].c }} role="img" aria-label={`${RARITY[s.rarity].n} scroll`}>
-                    {s.rarity > 0
-                      ? <AuraSprite make={() => tiedScroll(RARITY[s.rarity].c)} dep={s.rarity} colour={RARITY[s.rarity].c} level={s.rarity >= 4 ? 3 : s.rarity >= 2 ? 2 : 1}/>
-                      : <Sprite make={() => tiedScroll(RARITY[s.rarity].c)} dep={s.rarity} scale={2}/>}
+                    <AuraSprite make={() => tiedScroll(RARITY[s.rarity].c)} dep={s.rarity} colour={RARITY[s.rarity].c}
+                                level={s.rarity >= 4 ? 3 : s.rarity >= 2 ? 2 : s.rarity}/>
                   </div>
                 ))}
               </div>
