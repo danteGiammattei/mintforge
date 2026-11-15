@@ -4,6 +4,7 @@ import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
 import Sprite from "../ui/Sprite.jsx";
+import AuraSprite from "../components/AuraSprite.jsx";
 import BrushReveal from "../components/BrushReveal.jsx";
 import RevealBanner from "../components/RevealBanner.jsx";
 import { openScroll, chest as chestSprite, dirtClod } from "../lib/forms.js";
@@ -127,7 +128,9 @@ export default function Satchel() {
               <div className="grid-4">
                 {g.scrolls.map(s => (
                   <div key={s.id} className="tile" style={{ borderTopColor: RARITY[s.rarity].c }} role="img" aria-label={`${RARITY[s.rarity].n} scroll`}>
-                    <Sprite make={() => openScroll(RARITY[s.rarity].c, s.seed, s.rarity >= 3)} dep={s.id} scale={2}/>
+                    {s.rarity > 0
+                      ? <AuraSprite make={() => openScroll(RARITY[s.rarity].c, s.seed, false)} dep={s.id} colour={RARITY[s.rarity].c} level={s.rarity >= 4 ? 3 : s.rarity >= 2 ? 2 : 1}/>
+                      : <Sprite make={() => openScroll(RARITY[s.rarity].c, s.seed, false)} dep={s.id} scale={2}/>}
                   </div>
                 ))}
               </div>
