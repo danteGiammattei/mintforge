@@ -23,7 +23,7 @@ const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), pars
 
 export default function RouletteWheel({ spinning, target, onLanded }) {
   const cvRef = useRef(null);
-  const st = useRef({ ang: 0, raf: 0, mode: "rest", from: 0, to: 0, t0: 0, landed: null });
+  const st = useRef({ ang: 0, raf: 0, mode: "rest", from: 0, to: 0, t0: 0, dur: 0, last: 0, landed: null });
 
   const secs = useMemo(() => {
     const tot = GAMBLE.roulette.reduce((s, v) => s + v.weight, 0);
@@ -67,24 +67,30 @@ export default function RouletteWheel({ spinning, target, onLanded }) {
     cancelAnimationFrame(s.raf);
     if (!spinning) { s.mode = "rest"; s.landed = null; return; }
 
+    // one steady speed while it waits for the server, then it slows from
+    // that same speed to a stop on the sector: never a burst of speed
+    // between. With an even slowing (k² ease-out) the spin takes
+    // 2 × distance / speed, so the extra turns are picked to make that
+    // about LAND ms.
+    const W = 0.009, LAND = 3000;                     // rad per ms; ms
     if (target != null && s.landed !== target) {
       const q = secs[target];
       const final = -Math.PI / 2 - (q.start + q.span / 2 + (Math.random() - 0.5) * q.span * 0.6);
       let delta = (((final - s.ang) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      delta += (calm ? 0 : 4) * Math.PI * 2;
+      if (!calm) delta += Math.max(0, Math.round((W * LAND / 2 - delta) / (Math.PI * 2))) * Math.PI * 2;
       s.mode = "land"; s.from = s.ang; s.to = s.ang + delta; s.t0 = performance.now(); s.landed = target;
-    } else if (target == null) s.mode = "free";
+      s.dur = calm ? 300 : (2 * delta) / W;
+    } else if (target == null) { s.mode = "free"; s.last = performance.now(); }
 
-    const dur = calm ? 300 : 3200;
     const tick = now => {
-      if (s.mode === "free") s.ang += 0.22;
+      if (s.mode === "free") { s.ang += W * (now - s.last); s.last = now; }
       else if (s.mode === "land") {
-        const k = Math.min(1, (now - s.t0) / dur);
-        s.ang = s.from + (s.to - s.from) * (1 - Math.pow(1 - k, 4));
+        const k = Math.min(1, (now - s.t0) / s.dur);
+        s.ang = s.from + (s.to - s.from) * (1 - Math.pow(1 - k, 2));
         if (k >= 1) { s.mode = "rest"; draw(s.ang); onLanded?.(); return; }
       } else return;
       draw(s.ang);
-      s.raf = requestAnimationFrame(tick);
+    s.raf = requestAnimationFrame(tick);
     };
     s.raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(s.raf);
