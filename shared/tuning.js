@@ -326,6 +326,7 @@ export const STALL = {
     { type: "title", id: "stall_favourite",price: 9000 },
     // banners: frames in src/lib/data.js, painted in public/banners
     { type: "frame", id: "night_market",  price: 3000 },
+    { type: "frame", id: "lantern_alley", price: 3500 },
     { type: "frame", id: "tunnel",        price: 4500 },
     { type: "frame", id: "bazaar",        price: 6000 },
     { type: "frame", id: "mint_below",    price: 8000 },
