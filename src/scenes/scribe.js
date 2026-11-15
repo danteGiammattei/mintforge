@@ -135,7 +135,7 @@ function drawChrome() {
   const crave = TRAITS[bus.craving()];
   if (crave) {
     ctx.textAlign = "left"; ctx.fillStyle = INK.warm;
-    ctx.fillText("TODAY HE CRAVES", 20, 56);
+    ctx.fillText("TODAY HE DESIRES", 20, 56);
     ctx.fillStyle = INK.warmHi;
     ctx.fillText(crave.want, 20, 64);
   }

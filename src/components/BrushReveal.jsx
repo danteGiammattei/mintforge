@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { drawCoin, RNG } from "../lib/coin.js";
-import { METALS, BA } from "../lib/data.js";
+import { RNG, coinRarity } from "../lib/coin.js";
+import { METALS, BA, RARITIES } from "../lib/data.js";
+import CoinCanvas from "./CoinCanvas.jsx";
 import { brush as brushSprite } from "../lib/forms.js";
 import Sprite from "../ui/Sprite.jsx";
 
@@ -42,14 +43,10 @@ export default function BrushReveal({ coin, brushAlpha = BA, onRevealed, onProgr
   const [cursor, setCursor] = useState({ x: -100, y: -100 });
   const [hovering, setHovering] = useState(false);
 
-  // Paint the coin once, with the same generator the vault uses, so the
-  // coin you brush is the coin you keep. Its shine waits for the reveal.
-  useEffect(() => {
-    const cv = coinRef.current;
-    if (!cv) return;
-    drawCoin(cv, { ...coin, shiny: false }, RS);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coin.seed, coin.metalIdx]);
+  // The coin under the dirt is the coin you keep, rarity and all: its
+  // aura is there to be uncovered, and its rarity's light leaks through
+  // the dirt as it thins (none for a common). Its shine waits for the end.
+  const rar = coinRarity(coin), rc = RARITIES[rar].color;
 
   // Paint the dirt overlay — pseudo-random rocks, particles, scratches
   useEffect(() => {
@@ -179,14 +176,20 @@ export default function BrushReveal({ coin, brushAlpha = BA, onRevealed, onProgr
 
   return (
     <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:16, userSelect:"none" }}>
-      <div style={{ position:"relative", width:RS, height:RS, borderRadius:"50%", overflow:"visible", flexShrink:0, cursor:"none", boxShadow:"0 0 0 4px #000, 0 0 0 6px var(--line-hi)" }}>
+      <div style={{ position:"relative", width:RS, height:RS, borderRadius:"50%", overflow:"visible", flexShrink:0, cursor:"none", boxShadow:`0 0 0 4px #000, 0 0 0 6px ${rar > 0 && pct > 0.2 ? rc : "var(--line-hi)"}`, transition:"box-shadow .4s steps(3)" }}>
         <div style={{ position:"absolute", inset:0, borderRadius:"50%", overflow:"hidden" }}>
-          <canvas ref={coinRef} aria-hidden style={{ imageRendering:"pixelated", position:"absolute", top:0, left:0, width:RS, height:RS }}/>
+          <div ref={coinRef} aria-hidden style={{ position:"absolute", inset:0, display:"grid", placeItems:"center", background:"#0c0a08" }}>
+            <CoinCanvas coin={{ ...coin, shiny: false }} size={128} auraMargin={12}/>
+          </div>
           <canvas ref={dirtRef} width={RS} height={RS} role="img" aria-label="A coin under a crust of dirt"
                   style={{ position:"absolute", top:0, left:0, touchAction:"none", imageRendering:"auto" }}
                   onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp} onMouseLeave={onUp}
                   onMouseEnter={() => setHovering(true)}
                   onTouchMove={onMove} onTouchStart={onDown} onTouchEnd={onUp}/>
+          {/* the rarity's light, coming through the dirt as it thins */}
+          {rar > 0 && <div aria-hidden style={{ position:"absolute", inset:0, pointerEvents:"none", mixBlendMode:"screen",
+                background:`radial-gradient(circle at 50% 50%, ${rc} 0%, ${rc}88 28%, transparent 70%)`,
+                opacity: Math.min(1, pct * (0.35 + rar * 0.13) * 1.6) }}/>}
           {gleam && <div style={{ position:"absolute", top:0, left:0, width:"60%", height:"100%", background:`linear-gradient(108deg,transparent,${m.hl}dd 50%,transparent)`, animation:"gleam .9s ease-out forwards", pointerEvents:"none" }}/>}
         </div>
         {/* The brush: positioned in canvas-local coords and drawn outside

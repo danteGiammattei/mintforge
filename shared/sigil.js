@@ -53,7 +53,7 @@ export const TRAITS = {
 /* the lifts that are not traits */
 export const LIFTS = {
   care:  { mark: "CARE" },                 // time spent drawing
-  crave: { mark: "CRAVED" },               // today's craving, lifting twice
+  crave: { mark: "DESIRED" },              // today's craving, lifting twice
 };
 export const TRAIT_KEYS = Object.keys(TRAITS);
 

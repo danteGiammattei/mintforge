@@ -90,7 +90,10 @@ export default function Satchel() {
               {g.chests.map(c => (
                 <button key={c.id} className="tile" style={{ borderTopColor: "var(--candle)" }} onClick={() => { feel("tap"); setOpening(c); }}
                         aria-label={`${CHESTS.names[c.tier]} chest. Open it.`}>
-                  <Sprite make={() => chestSprite(c.tier, "candle")} dep={c.tier} scale={2}/>
+                  {/* sheets differ in height: stand every chest on the same floor */}
+                  <div style={{ height: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                    <Sprite make={() => chestSprite(c.tier, "candle")} dep={c.tier} scale={2}/>
+                  </div>
                   <span aria-hidden>{CHESTS.names[c.tier]}</span>
                 </button>
               ))}
