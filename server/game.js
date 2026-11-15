@@ -505,10 +505,11 @@ export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, 
     if (opId) await db.prepare(`DELETE FROM action_log WHERE player_id = ?1 AND op_id = ?2`).bind(pid, opId).run();
     throw e;
   }
-  if (opId) {
-    await db.prepare(
-      `UPDATE action_log SET response = ?3 WHERE player_id = ?1 AND op_id = ?2`).bind(pid, opId, JSON.stringify(result)).run();
-    if (rand() < 0.02) await db.prepare(`DELETE FROM action_log WHERE created_at < ?1`).bind(now - 2 * 86400e3).run();
-  }
-  return { result, state: await loadState(db, pid, now, tz) };
+  // the receipt and the new state at once: one round trip, not three
+  const [state] = await Promise.all([
+    loadState(db, pid, now, tz),
+    opId && db.prepare(`UPDATE action_log SET response = ?3 WHERE player_id = ?1 AND op_id = ?2`).bind(pid, opId, JSON.stringify(result)).run(),
+    opId && rand() < 0.02 && db.prepare(`DELETE FROM action_log WHERE created_at < ?1`).bind(now - 2 * 86400e3).run(),
+  ]);
+  return { result, state };
 }

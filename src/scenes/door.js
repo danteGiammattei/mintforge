@@ -32,7 +32,7 @@
 import { RAMP } from "../lib/pixelform.js";
 import {
   goblinHand, goblinHandPoint, GOBLIN_HAND, playerHand, PLAYER_HAND,
-  rolledScroll, SCROLL, openScroll, INV_SCROLL, chest as chestSprite, pouch,
+  rolledScroll, SCROLL, tiedScroll, TIED, chest as chestSprite, pouch,
 } from "../lib/forms.js";
 import { RARITY } from "../../shared/sigil.js";
 import { stage, pointer, W, H, FONT, INK, lerp, ease, wrap, grainLayer, feather } from "./kit.js";
@@ -321,7 +321,7 @@ function drawDrawer() {
       ctx.fillStyle = g; ctx.fillRect(bx, by, c.w, c.h);
       ctx.globalAlpha = 1;
     }
-    ctx.drawImage(openScroll(col, s.seed || 0, s.rarity >= 3), Math.round(bx + (c.w - INV_SCROLL.w) / 2), Math.round(by + (c.h - INV_SCROLL.h) / 2));
+    ctx.drawImage(tiedScroll(col), Math.round(bx + (c.w - TIED.w) / 2), Math.round(by + (c.h - TIED.h) / 2));
   }
 
   // confirm, or the way to the desk

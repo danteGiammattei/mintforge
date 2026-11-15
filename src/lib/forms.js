@@ -24,6 +24,7 @@
  *  └──────────────────────────────────────────────────────────────────┘
  * ══════════════════════════════════════════════════════════════════════ */
 
+import { SCROLL_PAL, SCROLL_ROWS } from "./scrollArt.js";
 import { capsule, joint, box, digit, merge, place, raster, sprite, quantise, LIGHT, RAMP } from "./pixelform.js";
 import { chestClosed } from "./chestArt.js";
 
@@ -237,6 +238,27 @@ export function rolledScroll(rarityColour, charged = false) {
  * Hung between two knobbed rods and seen face on, because that gives
  * the sigil somewhere to live. Each scroll grows its own mark from its
  * seed — the hook for showing what the player actually drew. */
+/* ─── the tied scroll: Dante's sprite, its ribbon in the rarity ────── */
+export const TIED = { w: 35, h: 32 };
+export function tiedScroll(colour) {
+  return sprite(`tied:${colour}`, () => {
+    const cv = document.createElement("canvas"); cv.width = TIED.w; cv.height = TIED.h;
+    const c = cv.getContext("2d"), L = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const n = parseInt(colour.slice(1), 16), tint = [n >> 16, (n >> 8) & 255, n & 255];
+    SCROLL_ROWS.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (ch === ".") return;
+      let [r, g, b] = SCROLL_PAL[L.indexOf(ch)];
+      const lum = (r + g + b) / 3, grey = Math.max(r, g, b) - Math.min(r, g, b) < 22;
+      if (grey && lum > 60 && lum < 215 && x >= 12 && y >= 9) {          // the ribbon
+        const k = lum / 150;
+        [r, g, b] = tint.map(v => Math.min(255, Math.round(v * k)));
+      }
+      c.fillStyle = `rgb(${r},${g},${b})`; c.fillRect(x, y, 1, 1);
+    }));
+    return cv;
+  });
+}
+
 export const INV_SCROLL = { w: 22, h: 28 };
 const OPEN_PARCH = ["#1d1810", "#6f6246", "#90835d", "#b0a378"];
 const OPEN_ROD   = ["#1d1810", "#3c2b18", "#5e4526", "#7f6138"];

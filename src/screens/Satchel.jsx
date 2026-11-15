@@ -7,7 +7,7 @@ import Sprite from "../ui/Sprite.jsx";
 import AuraSprite from "../components/AuraSprite.jsx";
 import BrushReveal from "../components/BrushReveal.jsx";
 import RevealBanner from "../components/RevealBanner.jsx";
-import { openScroll, chest as chestSprite, dirtClod } from "../lib/forms.js";
+import { tiedScroll, chest as chestSprite, dirtClod } from "../lib/forms.js";
 import { mount as mountChest, SURROUND } from "../scenes/chest.js";
 import { RARITY } from "../../shared/sigil.js";
 import { CHESTS } from "../../shared/tuning.js";
@@ -129,8 +129,8 @@ export default function Satchel() {
                 {g.scrolls.map(s => (
                   <div key={s.id} className="tile" style={{ borderTopColor: RARITY[s.rarity].c }} role="img" aria-label={`${RARITY[s.rarity].n} scroll`}>
                     {s.rarity > 0
-                      ? <AuraSprite make={() => openScroll(RARITY[s.rarity].c, s.seed, false)} dep={s.id} colour={RARITY[s.rarity].c} level={s.rarity >= 4 ? 3 : s.rarity >= 2 ? 2 : 1}/>
-                      : <Sprite make={() => openScroll(RARITY[s.rarity].c, s.seed, false)} dep={s.id} scale={2}/>}
+                      ? <AuraSprite make={() => tiedScroll(RARITY[s.rarity].c)} dep={s.rarity} colour={RARITY[s.rarity].c} level={s.rarity >= 4 ? 3 : s.rarity >= 2 ? 2 : 1}/>
+                      : <Sprite make={() => tiedScroll(RARITY[s.rarity].c)} dep={s.rarity} scale={2}/>}
                   </div>
                 ))}
               </div>

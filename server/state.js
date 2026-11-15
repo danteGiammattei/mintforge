@@ -65,20 +65,20 @@ async function signOldAstrals(db, pid, rows) {
 }
 
 export async function loadState(db, pid, now = Date.now(), tz = 0) {
-  const ps = await db.prepare(
-    `SELECT players.username, s.xp, s.marks, s.brush_level, s.frame, s.bio, s.selected_title, s.pinned_ids,
-            s.owned_frames, s.owned_titles, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
-            s.journal, s.well_level
-       FROM player_state s JOIN players ON players.id = s.player_id
-      WHERE s.player_id = ?1`
-  ).bind(pid).first();
-  if (!ps) throw new Refusal("State missing — your account may need recreating", 500);
-
-  const [coins, scrolls, chests] = await Promise.all([
+  // every read at once: one round trip to the database, not two
+  const [ps, coins, scrolls, chests] = await Promise.all([
+    db.prepare(
+      `SELECT players.username, s.xp, s.marks, s.brush_level, s.frame, s.bio, s.selected_title, s.pinned_ids,
+              s.owned_frames, s.owned_titles, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
+              s.journal, s.well_level
+         FROM player_state s JOIN players ON players.id = s.player_id
+        WHERE s.player_id = ?1`
+    ).bind(pid).first(),
     db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material, sign FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
     db.prepare(`SELECT id, rarity, seed FROM scrolls WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
     db.prepare(`SELECT id, tier FROM chests WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
   ]);
+  if (!ps) throw new Refusal("State missing — your account may need recreating", 500);
   const all = coins.results || [];
   await signOldAstrals(db, pid, all);
   const stats = parseObj(ps.stats);
