@@ -18,6 +18,7 @@ import { createOutbox } from "../lib/outbox.js";
 import { coinRarity } from "../lib/coin.js";
 import { hydrate } from "../lib/coinview.js";
 import { FRAMES } from "../lib/data.js";
+import { LISTS, listHash } from "../../shared/listhash.js";
 
 export const MAX_PINS = 6;
 
@@ -49,8 +50,14 @@ export function useGameState() {
 
   const api = useMemo(() => apiClient(token, logout), [token, logout]);
 
+  // what we hold of each big list, by fingerprint: sent with every act so
+  // the server can leave out the ones that have not changed
+  const held = useRef({});
+  const remember = state => { for (const k of LISTS) if (k in state) held.current[k] = listHash(state[k]); };
   const apply = useCallback(state => {
-    setSnap(overlay(state, outboxRef.current?.pending()));
+    remember(state);
+    // a list left out is one we already have: keep ours
+    setSnap(prev => overlay(prev ? { ...prev, ...state } : state, outboxRef.current?.pending()));
   }, []);
 
   /* load on sign-in, and again on "retry" */
@@ -65,8 +72,9 @@ export function useGameState() {
         send: body => api.patch(body),
         storageKey: "mintforge:outbox:" + state.username.toLowerCase(),
         // the server said no: forget the choice and show what is really there
-        onRefused: () => api.getState().then(s => { if (!cancelled) setSnap(s); }).catch(() => {}),
+        onRefused: () => api.getState().then(s => { if (!cancelled) { remember(s); setSnap(s); } }).catch(() => {}),
       });
+      remember(state);
       setSnap(overlay(state, outboxRef.current.pending()));
       setBoot({ status: "ready", error: null });
     }).catch(err => {
@@ -87,7 +95,7 @@ export function useGameState() {
 
   /* ── value: ask the server, take its answer ── */
   const act = useCallback(async (action, payload) => {
-    const res = await api.act(action, payload);
+    const res = await api.act(action, { ...payload, have: { ...held.current } });
     if (res.state) apply(res.state);
     return res.result;
   }, [api, apply]);

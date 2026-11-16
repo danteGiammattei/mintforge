@@ -79,3 +79,17 @@ test("an oddity bought is owned, and the stall stops offering it", async () => {
   assert.ok(owned.includes(w.id));
   for (let k = 1; k < 30; k++) for (const x of (await go({ action: "stall" }, T0 + (d + k) * 86400e3)).result.wares) assert.notEqual(x.id, w.id);
 });
+
+test("an action leaves out the lists the client already has", async () => {
+  const { listHash, LISTS } = await import("../shared/listhash.js");
+  const { go } = await setup();
+  const full = (await go({ action: "stall" })).state;
+  for (const k of LISTS) assert.ok(k in full, k);
+  const have = Object.fromEntries(LISTS.map(k => [k, listHash(full[k])]));
+  const lean = (await go({ action: "stall", have })).state;
+  for (const k of LISTS) assert.ok(!(k in lean), `${k} left out`);
+  assert.equal(lean.marks, full.marks);
+  // buying a chest changes the chests: those come back, the rest stay out
+  const after = (await go({ action: "buy", slot: 0, day: (await go({ action: "stall" })).result.day, have })).state;
+  assert.ok("chests" in after); assert.ok(!("coins" in after));
+});

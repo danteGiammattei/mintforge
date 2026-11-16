@@ -34,6 +34,7 @@ import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
 import { loadState, parseList, parseObj, coinOut } from "./state.js";
 import { stall, buy } from "./stall.js";
+import { LISTS, listHash } from "../shared/listhash.js";
 
 const u32 = rand => Math.floor(rand() * 4294967296) >>> 0;
 const bump = key => `json_set(stats, '$.${key}', COALESCE(json_extract(stats, '$.${key}'), 0) + 1)`;
@@ -505,11 +506,15 @@ export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, 
     if (opId) await db.prepare(`DELETE FROM action_log WHERE player_id = ?1 AND op_id = ?2`).bind(pid, opId).run();
     throw e;
   }
-  // the receipt and the new state at once: one round trip, not three
+  // the receipt and the new state at once: one round trip, not three.
+  // Lists the client says it already has, unchanged, are left out (it
+  // keeps its own): a big vault is not sent back after every tap.
   const [state] = await Promise.all([
     loadState(db, pid, now, tz),
     opId && db.prepare(`UPDATE action_log SET response = ?3 WHERE player_id = ?1 AND op_id = ?2`).bind(pid, opId, JSON.stringify(result)).run(),
     opId && rand() < 0.02 && db.prepare(`DELETE FROM action_log WHERE created_at < ?1`).bind(now - 2 * 86400e3).run(),
   ]);
+  const have = body?.have && typeof body.have === "object" ? body.have : {};
+  for (const k of LISTS) if (typeof have[k] === "string" && have[k] === listHash(state[k])) delete state[k];
   return { result, state };
 }
