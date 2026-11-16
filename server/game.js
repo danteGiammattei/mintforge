@@ -74,12 +74,12 @@ async function seal(db, pid, body, { now, rand, tz }) {
   const a = analyse(strokes, SCRIBE.sheet);
   if (!a) throw new Refusal("Nothing to seal");
 
-  const ps = await db.prepare(
-    `SELECT last_seal_at, seal_nonce, seal_count, recent_sigs, well_level FROM player_state WHERE player_id = ?1`
-  ).bind(pid).first();
+  const [ps, held] = await Promise.all([
+    db.prepare(`SELECT last_seal_at, seal_nonce, seal_count, recent_sigs, well_level FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+    db.prepare(`SELECT COUNT(*) AS n FROM scrolls WHERE player_id = ?1`).bind(pid).first(),
+  ]);
   if (a.ink > inkFor(ps.well_level) * SCRIBE.inkSlack) throw new Refusal("More ink than your well holds");
   if (now - ps.last_seal_at < SCRIBE.cooldownMs) throw new Refusal("The wax is still warm", 429);
-  const held = await db.prepare(`SELECT COUNT(*) AS n FROM scrolls WHERE player_id = ?1`).bind(pid).first();
   if (held.n >= SCRIBE.scrollCap) throw new Refusal("Your satchel is full", 409);
 
   // claim the cooldown; a concurrent seal loses here and stops
@@ -288,10 +288,11 @@ export function journalStmt(db, pid, c) {
 
 async function open(db, pid, body, { now, rand }) {
   if (!idOk(body.chestId)) throw new Refusal("Which chest?");
-  const ch = await db.prepare(
-    `DELETE FROM chests WHERE id = ?1 AND player_id = ?2 RETURNING tier`).bind(body.chestId, pid).first();
+  const [ch, ps] = await Promise.all([
+    db.prepare(`DELETE FROM chests WHERE id = ?1 AND player_id = ?2 RETURNING tier`).bind(body.chestId, pid).first(),
+    db.prepare(`SELECT brush_level FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+  ]);
   if (!ch) throw new Refusal("That chest is gone", 404);
-  const ps = await db.prepare(`SELECT brush_level FROM player_state WHERE player_id = ?1`).bind(pid).first();
   const rolled = rollCoin(ch.tier, ps.brush_level || 0, rand);
   const id = "c_" + randomHex(8);
   // an astral coin takes a sign its owner lacks (and if two chests race
