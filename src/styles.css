@@ -47,6 +47,16 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 html { -webkit-text-size-adjust: 100%; }
+/* A game, not a page: holding a finger down (to open a chest, to brush,
+ * to hold a slider) must never select text or raise the copy/look-up
+ * menu or the image callout. Typing still works where there is typing. */
+html, body {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+input, textarea, [contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+canvas, img { -webkit-user-drag: none; }
 body {
   margin: 0; overflow: hidden; overscroll-behavior: none;
   background: var(--void); color: var(--bone);
