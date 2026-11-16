@@ -156,6 +156,11 @@ export const FORGE = {
   minCost: 120,          // so a copper is not shined for pocket change
 };
 
+/* Restriking a coin's face, also at the forge: a new face (and with it a
+ * new struck name), its metal, rarity, shape, shine and engraving kept.
+ * Priced from the coin's worth, so a fine coin costs more to restrike. */
+export const RESTRIKE = { costMul: 0.25, minCost: 60 };
+
 /* Engraving a name on a coin, also at the forge. Clearing one is free. */
 export const ENGRAVE = { cost: 250, maxLength: 14 };
 

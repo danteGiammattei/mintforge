@@ -11,7 +11,7 @@
 
 import {
   FAVOUR_PER_RARITY, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
-  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL, ASTRAL,
+  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL, ASTRAL, RESTRIKE,
 } from "./tuning.js";
 
 export const MAX_METAL = 10;
@@ -92,6 +92,7 @@ export const xpForBrush = coin =>
 /* ─── the forge ───────────────────────────────────────────────────── */
 
 /* What one strike costs, from the coin's sale value before any shine. */
+export const restrikeCost = plainValue => Math.max(RESTRIKE.minCost, Math.ceil(plainValue * RESTRIKE.costMul));
 export const forgeCost = plainValue => Math.max(FORGE.minCost, Math.round(plainValue * FORGE.costMul));
 
 /* ─── the tavern ──────────────────────────────────────────────────────

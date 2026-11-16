@@ -44,7 +44,7 @@ export function mount(cv, bus) {
   let painted = "";
   function paintCoin() {
     const c = bus.coin(); if (!c) return;
-    const key = c.id + ":" + (c.shiny ? 1 : 0);
+    const key = c.id + ":" + c.seed + ":" + (c.shiny ? 1 : 0);      // a restrike changes the seed
     if (key !== painted) { drawCoin(coinCv, c, COIN); painted = key; }
   }
 

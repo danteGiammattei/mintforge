@@ -25,7 +25,7 @@ import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL } from "../shared/
 import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
-  resolveToss, resolveCrucible, resolveRoulette, resolvePlinko, forgeCost,
+  resolveToss, resolveCrucible, resolveRoulette, resolvePlinko, forgeCost, restrikeCost,
   inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz, placeAstral,
 } from "../shared/economy.js";
 import { heldSigns } from "./signs.js";
@@ -392,6 +392,37 @@ async function forge(db, pid, body, { rand }) {
 
 /* A name cut into the coin. Costs marks; clearing one is free. The name
  * goes wherever the coin goes. */
+/* a new face for a coin: a new seed, the same shape (the seed decides
+ * that too, so seeds are drawn until one keeps it), and its rarity written
+ * down if it was only ever derived from the old seed. Astral coins bear
+ * their sign, not a face. */
+async function restrike(db, pid, body, { rand }) {
+  if (!idOk(body.coinId)) throw new Refusal("Which coin?");
+  const c = await db.prepare(
+    `SELECT id, seed, metal_idx, shiny, rarity, material FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
+  ).bind(body.coinId, pid).first();
+  if (!c) throw new Refusal("That coin is gone", 404);
+  if (c.metal_idx === ASTRAL.metal) throw new Refusal("An astral coin bears its sign, not a face", 409);
+  const old = c.seed >>> 0, rarity = c.rarity ?? deriveRarity(old);
+  const shape = mkCoin(old, 1, c.metal_idx).shape;
+  let seed = old;
+  for (let i = 0; i < 200 && (seed === old || mkCoin(seed, 1, c.metal_idx).shape !== shape); i++) seed = Math.floor(rand() * 4294967296) >>> 0;
+  if (seed === old) throw new Refusal("The die slipped. Try again", 409);
+
+  const cost = restrikeCost(coinValue(hydrate({ ...c, shiny: 0 })));
+  const paid = await db.prepare(
+    `UPDATE player_state SET marks = marks - ?2 WHERE player_id = ?1 AND marks >= ?2`).bind(pid, cost).run();
+  if (!paid.meta.changes) throw new Refusal("Not enough marks", 402);
+  const set = await db.prepare(
+    `UPDATE coins SET seed = ?3, rarity = ?4 WHERE id = ?1 AND player_id = ?2 AND seed = ?5 AND dusty = 0`
+  ).bind(c.id, pid, seed, rarity, c.seed).run();
+  if (!set.meta.changes) {
+    await db.prepare(`UPDATE player_state SET marks = marks + ?2 WHERE player_id = ?1`).bind(pid, cost).run();
+    throw new Refusal("That coin is gone", 409);
+  }
+  return { cost, seed };
+}
+
 async function engrave(db, pid, body) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const name = cleanName(body.name);
@@ -480,7 +511,7 @@ async function gamble(db, pid, body, { now, rand }) {
 
 /* ─── dispatch ────────────────────────────────────────────────────── */
 
-const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, engrave, well, stall, buy };
+const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, well, stall, buy };
 
 export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, tz = 0 } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;

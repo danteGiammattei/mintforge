@@ -4,8 +4,8 @@ import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
 import { coinValue, coinRarity } from "../lib/coin.js";
 import { RARITIES } from "../lib/data.js";
-import { forgeCost } from "../../shared/economy.js";
-import { FORGE, ENGRAVE } from "../../shared/tuning.js";
+import { forgeCost, restrikeCost } from "../../shared/economy.js";
+import { FORGE, ENGRAVE, ASTRAL } from "../../shared/tuning.js";
 import { coinName, matterOf } from "../lib/coinview.js";
 import { mount, SURROUND } from "../scenes/forge.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
@@ -16,9 +16,10 @@ import PixelIcon from "../ui/PixelIcon.jsx";
  * never at risk, which is what separates this from the Tavern. The price
  * and the odds are shown; the server takes the marks and makes the roll.
  *
- * The second bench is the engraver's: a name of your own cut into the
- * coin, for marks. It shows wherever the coin does, to you and to anyone
- * looking in your cabinet. */
+ * The second bench restrikes the face: ground smooth and struck anew, the
+ * metal, rarity, shape, shine and any engraving kept. The third is the
+ * engraver's: a name of your own cut into the coin, for marks. It shows
+ * wherever the coin does, to you and to anyone looking in your cabinet. */
 export default function Forge({ coinId, onClose }) {
   const g = useGame(), ui = useUi();
   const ref = useRef(null), scene = useRef(null), live = useRef(g);
@@ -53,6 +54,20 @@ export default function Forge({ coinId, onClose }) {
     p.catch(() => {}).finally(() => setTimeout(() => setBusy(false), 1100));
   };
 
+  const reCost = restrikeCost(coinValue({ ...coin, shiny: false }));
+  const keep = ["METAL", "RARITY", "SHAPE", coin.shiny && "SHINE", coin.nick && "NAME"].filter(Boolean);
+  const kept = keep.slice(0, -1).join(", ") + " AND " + keep[keep.length - 1];
+  const restrike = async () => {
+    if (busy || g.marks < reCost) return;
+    setBusy(true);
+    try {
+      await g.act("restrike", { coinId });
+      feel("strike");
+      ui.toast("A NEW FACE.");
+    } catch (e) { ui.toast(e.message, "bad"); feel("error"); }
+    setBusy(false);
+  };
+
   const typed = name.replace(/\s+/g, " ").trim().toUpperCase();
   const engrave = async clear => {
     if (busy) return;
@@ -80,6 +95,7 @@ export default function Forge({ coinId, onClose }) {
         </div>
         <div className="seg" role="tablist" aria-label="Bench">
           <button role="tab" aria-selected={bench === "strike"} disabled={busy} onClick={() => setBench("strike")}><PixelIcon name="spark" size={11}/>SHINE</button>
+          <button role="tab" aria-selected={bench === "face"} disabled={busy} onClick={() => setBench("face")}><PixelIcon name="face" size={11}/>FACE</button>
           <button role="tab" aria-selected={bench === "name"} disabled={busy} onClick={() => setBench("name")}><PixelIcon name="quill" size={11}/>NAME</button>
         </div>
 
@@ -94,6 +110,20 @@ export default function Forge({ coinId, onClose }) {
               {busy ? "…" : <><PixelIcon name="mark" size={11}/>STRIKE FOR {cost.toLocaleString()}</>}
             </button>
             {short && <p className="t-blood" role="status" style={{ margin: 0, textAlign: "center" }}>YOU NEED {(cost - g.marks).toLocaleString()} MORE MARKS.</p>}
+          </>
+        ))}
+
+        {bench === "face" && (coin.metalIdx === ASTRAL.metal ? (
+          <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>AN ASTRAL COIN BEARS ITS SIGN, NOT A FACE. THERE IS NOTHING TO RESTRIKE.</p>
+        ) : (
+          <>
+            <p className="t-dim" style={{ margin: 0 }}>
+              THE FACE IS GROUND SMOOTH AND STRUCK ANEW. ITS {kept} STAY. THE OLD FACE IS GONE FOR GOOD.
+            </p>
+            <button className="btn btn-gold btn-block" disabled={busy || g.marks < reCost} onClick={restrike}>
+              {busy ? "…" : <><PixelIcon name="mark" size={11}/>RESTRIKE FOR {reCost.toLocaleString()}</>}
+            </button>
+            {g.marks < reCost && <p className="t-blood" role="status" style={{ margin: 0, textAlign: "center" }}>YOU NEED {(reCost - g.marks).toLocaleString()} MORE MARKS.</p>}
           </>
         ))}
 

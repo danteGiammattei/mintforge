@@ -93,3 +93,21 @@ test("an action leaves out the lists the client already has", async () => {
   const after = (await go({ action: "buy", slot: 0, day: (await go({ action: "stall" })).result.day, have })).state;
   assert.ok("chests" in after); assert.ok(!("coins" in after));
 });
+
+test("restrike: a new face for marks; metal, rarity, shape, shine and name stay", async () => {
+  const { restrikeCost } = await import("../shared/economy.js");
+  const { db, pid, go, marksOf } = await setup();
+  const seed = 123456789;
+  await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, nickname) VALUES ('rc', ?1, ?2, 3, 1, 0, NULL, 1, 0, 'OLD SOL')`).bind(pid, seed).run();
+  const { deriveRarity } = await import("../src/lib/coin.js");
+  const before = await marksOf();
+  const r = (await go({ action: "restrike", coinId: "rc" })).result;
+  const c = await db.prepare(`SELECT seed, metal_idx, shiny, rarity, nickname FROM coins WHERE id = 'rc'`).first();
+  assert.notEqual(c.seed >>> 0, seed);
+  assert.equal(mkCoin(c.seed >>> 0, 1, 3).shape, mkCoin(seed, 1, 3).shape);
+  assert.deepEqual([c.metal_idx, c.shiny, c.rarity, c.nickname], [3, 1, deriveRarity(seed), "OLD SOL"]);
+  assert.equal(await marksOf(), before - r.cost);
+  assert.equal(r.cost, restrikeCost(coinValue(Object.assign(mkCoin(seed, 1, 3, undefined, deriveRarity(seed)), { shiny: false }))));
+  await db.prepare(`UPDATE coins SET metal_idx = 10 WHERE id = 'rc'`).run();
+  await assert.rejects(go({ action: "restrike", coinId: "rc" }), /sign/);
+});
