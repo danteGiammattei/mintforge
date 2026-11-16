@@ -10,14 +10,15 @@
  * the wrist the arm is carried on from one whole cross-section of it
  * (row ARM.from), along the arm's own slant and widening a little as it
  * comes nearer the eye, long enough to reach off the screen from any
- * height the hand rises to, darkening as it goes, away from the light. */
+ * height the hand rises to, darkening as it goes, away from the light,
+ * until a little below the wrist it is lost in the dark. */
 import { RAMP } from "./pixelform.js";
 
 export const HAND_ART = {
   src: "/sprites/hands/player.png",
   palm: { x: 16, y: 18 },          // the hollow of the palm, where a scroll lies
 };
-const ARM = { from: 47, left: 20, right: 43, dl: 0.25, dr: 0.67, more: 150, wrist: 30, fade: 14 };
+const ARM = { from: 47, left: 20, right: 43, dl: 0.25, dr: 0.67, more: 150, wrist: 30, fade: 7, end: 24 };
 
 let tones = null, W = 0, H = 0, loading = null;
 const kept = {};
@@ -48,9 +49,14 @@ export function loadPlayerHand() {
       // us: a tone darker every `fade` pixels measured along the arm, each
       // step broken in a checker so it reads as a falloff, not a band
       const ax = Math.hypot(1, (ARM.dl + ARM.dr) / 2), ux = (ARM.dl + ARM.dr) / 2 / ax, uy = 1 / ax;
+      // and `end` pixels along it, it is gone into the dark, dissolving
+      // over a few pixels in the same checker
       for (let y = ARM.wrist; y < rows; y++) for (let xx = 0; xx < W; xx++) {
-        const i = y * W + xx; if (tones[i] < 2) continue;
-        const along = (y - ARM.wrist) * uy + (xx - ARM.left) * ux, drop = Math.floor((along + ((xx + y) & 1 ? ARM.fade / 2 : 0)) / ARM.fade);
+        const i = y * W + xx; if (!tones[i]) continue;
+        const along = (y - ARM.wrist) * uy + (xx - ARM.left) * ux, odd = (xx + y) & 1;
+        if (along > ARM.end + (odd ? 3 : 0)) { tones[i] = 0; continue; }
+        if (tones[i] < 2) continue;
+        const drop = Math.floor((along + (odd ? ARM.fade / 2 : 0)) / ARM.fade);
         if (drop > 0) tones[i] = Math.max(2, tones[i] - drop);
       }
       ok(true);
