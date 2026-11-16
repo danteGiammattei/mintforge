@@ -191,8 +191,8 @@ const rgbCss = c => `rgb(${c[0]},${c[1]},${c[2]})`;
 const METAL_LOOK = {
   // ice and lava take their colours from the reference textures
   [METAL.ice]:  { tex: "ice",  ramp: ["#1a5a8a", "#2a86c8", "#46a8e8", "#5cbef6", "#6acefc", "#aaebfb", "#f4fdff"] },
-  [METAL.lava]: { tex: "lava", ramp: ["#1e0802", "#3c1204", "#501703", "#5b1e05", "#6a2206", "#782007", "#94320c"],
-                  glows: ["#ffd23a", "#f78f0d", "#f65111", "#cd1605"] },
+  [METAL.lava]: { tex: "lava", ramp: ["#160602", "#280c02", "#3e1004", "#581a04", "#702204", "#9c4416", "#c8682c"],
+                  glows: ["#ffd646", "#f89204", "#f6480a", "#c81002"] },
   // fire: a coin of living flame, white-gold at the bottom through orange
   // and red to ember at the top, the bands licking upward as it burns
   [METAL.fire]: { tex: "fire", ramp: ["#1a0402", "#3a0c04", "#6a1808", "#a02a0c", "#d04a14", "#f07a24", "#ffd060"],
@@ -237,6 +237,42 @@ export function inShape(shape, x, y, r) {
   }
 }
 
+/* the lava tile: 0–3 rock, darkest to lightest; 4 red, 5 red-orange,
+ * 6 orange, 7 yellow. From a texture Dante made with Gemini. */
+const LAVA_TILE = [
+  "52222223266542333331454123333214",
+  "42222222246443322223154232223331",
+  "44222121145423222223242322222232",
+  "14232311445413122222242322222213",
+  "36511114465411322222242322222233",
+  "26444144466441322222241332222222",
+  "26542445546411111233254133322121",
+  "46644665122244441112154411211114",
+  "66666650322325544144445544541144",
+  "55555211322222454433240566654455",
+  "30633321332322254322225644455542",
+  "24433332123311464232256433305522",
+  "24232232411004641402254232331422",
+  "41232223145555542444542223332144",
+  "55132222104444423256603222333322",
+  "15112221154332223324651112222233",
+  "45413331452322222324664411222221",
+  "45644114552222222232462441121111",
+  "46611445623222222121461240111114",
+  "66232215623222221111466555555666",
+  "66522066623221211114562244446555",
+  "44544555661121111144523333244444",
+  "24443330564111114445233222232422",
+  "24233222165654554550332222223312",
+  "22331222256544222152322222212242",
+  "22323222265433333255111222222341",
+  "12133221154333222325441122222151",
+  "56501111544322222331644122211165",
+  "44555554443222222211564111112552",
+  "20422115011122233112165444445622",
+  "24433325504111111144666541114523",
+  "52233332664454444414565412222544"
+];
 const hashPx = (x, y, s) => ((Math.imul((x * 73856093) ^ (y * 19349663) ^ s, 2654435761) >>> 0) % 1000) / 1000;
 /* a material's grain: (x, y, tone) → tone; 7, 8, 9 mean its glows */
 const GRAIN = {
@@ -252,25 +288,19 @@ const GRAIN = {
     if ((x - y + 64) % 7 === 0 && h2 > 0.55) v = 6;
     return v;
   },
-  // lava: plates of dark mottled rock round scattered points (a jittered
-  // 3 × 3 grid, so they stay even), each lit on its top-left, split by
-  // thick cracks: yellow at the heart, then amber, orange, red
-  lava: s => {
-    const pts = Array.from({ length: 9 }, (_, i) => [((i % 3) + 0.2 + 0.6 * hashPx(i, 1, s)) * 64 / 3, (Math.floor(i / 3) + 0.2 + 0.6 * hashPx(i, 2, s)) * 64 / 3]);
+  // lava: Dante's Gemini lava tile, 32 × 32 (LAVA_TILE below), each coin
+  // cut from it at its own offset. Rock 0–3 is the ramp, cracks 4–7 the
+  // glows; `phase` runs a slow wave of heat along the cracks, a step
+  // brighter where it passes and a step dimmer in its trough
+  lava: (s, phase = 0) => {
+    const ox = s % 32, oy = (s * 7) % 32, turn = (phase / SPACE_LOOP) * Math.PI * 2;
     return (x, y) => {
-      let d1 = 1e9, d2 = 1e9, near = null;
-      for (const [px, py] of pts) for (const ox of [-64, 0, 64]) for (const oy of [-64, 0, 64]) {
-        const d = Math.hypot(x + 0.5 - px - ox, y + 0.5 - py - oy);
-        if (d < d1) { d2 = d1; d1 = d; near = [px + ox, py + oy]; } else if (d < d2) d2 = d;
-      }
-      const gap = d2 - d1;
-      if (gap < 1.2) return 7;
-      if (gap < 2.3) return 8;
-      if (gap < 3.3) return 9;
-      if (gap < 4.4) return 10;
-      const lit = (x - near[0]) + (y - near[1]);
-      const mottle = hashPx(x >> 1, y >> 1, s) < 0.3 ? -1 : 0;
-      return (lit < -5 ? 5 : lit < 3 ? 4 : 3) + mottle;
+      const k = LAVA_TILE[(y + oy) & 31].charCodeAt((x + ox) & 31) - 48;
+      if (k < 4) return k + 1;
+      let t = 14 - k;                                             // 4 red … 7 yellow → glows 10 … 7
+      const w = Math.sin((x + y) * 0.32 - turn) + 0.5 * Math.sin((x - y) * 0.21 + s + turn);
+      if (w > 1.05) t--; else if (w < -1.1) t++;
+      return Math.max(7, Math.min(10, t));
     };
   },
   // void: night sky. Nebula in checker-dithered diagonal drifts, single

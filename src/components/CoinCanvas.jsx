@@ -7,11 +7,11 @@ import { onAuraFrame, auraStill } from "../lib/aura.js";
 /* A coin, painted by the one generator in lib/coin.js. Pass a `size`
  * that is a multiple of 64 (the generator's own canvas) wherever the
  * layout allows, so its pixels land whole. A void coin's night sky and a
- * fire coin's flames drift, on the shared clock, while on screen. */
+ * fire coin's flames and a lava coin's cracks drift, on the shared clock, while on screen. */
 export default function CoinCanvas({ coin, size, hideShine = false, aura = true, auraMargin = 8, still = false }) {
   const canvasRef = useRef();
   const shiny = coin.shiny && !hideShine;
-  const drifts = !still && (coin.metalIdx === METAL.void || coin.metalIdx === METAL.fire) && !coin.material;
+  const drifts = !still && (coin.metalIdx === METAL.void || coin.metalIdx === METAL.fire || coin.metalIdx === METAL.lava) && !coin.material;
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -36,8 +36,6 @@ export default function CoinCanvas({ coin, size, hideShine = false, aura = true,
   return (
     <div style={{ position: "relative", width: size, height: size, display: "inline-block", flexShrink: 0 }}>
       {aura && coin.metalIdx === METAL.eldritch && <Aura coin={coin} size={size} margin={auraMargin + 16} rare layer="behind" shine={false}/>}
-      {/* a fire coin's great flame stands behind it, taller than the usual margin */}
-      {aura && coin.metalIdx === METAL.fire && <Aura coin={coin} size={size} margin={auraMargin + 26} rare layer="behind" shine={false}/>}
       <canvas ref={canvasRef} aria-hidden style={{ position: "relative", imageRendering: "pixelated", display: "block", width: size, height: size }}/>
       {(aura || shiny) && <Aura coin={coin} size={size} margin={auraMargin} shine={shiny} rare={aura}/>}
     </div>

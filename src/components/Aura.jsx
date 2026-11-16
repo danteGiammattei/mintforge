@@ -12,7 +12,9 @@ export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rar
   const rarity = rare ? coinRarity(coin) : 0, k = Math.max(1, Math.round(size / 64));
   const tendrils = rare && coin.metalIdx === METAL.eldritch;
   const moon = rare && coin.metalIdx === METAL.astral && layer === "front";
-  const flames = rare && coin.metalIdx === METAL.fire;
+  // the great flame round a fire coin is retired (Nov 2026): its fire
+  // burns inside it now. paintAura still knows how, should it come back
+  const flames = false;
   const G = 64 + 2 * margin;
 
   useEffect(() => {
