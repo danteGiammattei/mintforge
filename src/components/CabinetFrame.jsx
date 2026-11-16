@@ -91,7 +91,7 @@ function fx(base, kind, f) {
  * and here and there the carving in the band glimmers green. */
 const TENT_LIT = [76, 120, 118], GLOW = [[46, 96, 64], [78, 160, 100], [122, 216, 136]];
 function writhe(base, d, f) {
-  const w = base.width, h = base.height, src = base.data, M = 5, ph = (f / 16) * Math.PI * 2;
+  const w = base.width, h = base.height, src = base.data, ph = (f / 16) * Math.PI * 2;
   const put = (x, y, c, a = 255) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const j = (y * w + x) * 4; d[j] = c[0]; d[j + 1] = c[1]; d[j + 2] = c[2]; d[j + 3] = a; };
   // each corner's sway this frame: a step of at most a pixel
   const sway = [0, 1, 2, 3].map(k => [Math.round(Math.sin(ph + k * 1.7) * 0.7), Math.round(Math.cos(ph * 0.5 + k * 2.3) * 0.7)]);
