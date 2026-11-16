@@ -7,13 +7,13 @@ import { tomeCover } from "../lib/tomeArt.js";
 /* ─── the shelf of tomes ──────────────────────────────────────────────
  * Every tome there is: the ones you have, to open on the desk, and the
  * ones still to find, locked, with where they turn up. */
-function Cover({ tome, owned }) {
+export function TomeCover({ tome, owned = true, scale = 3 }) {
   const ref = useRef(null);
   useEffect(() => {
     const c = ref.current, art = tomeCover(tome, owned), x = c.getContext("2d");
     x.clearRect(0, 0, c.width, c.height); x.drawImage(art, 0, 0);
   }, [tome, owned]);
-  return <canvas ref={ref} width={24} height={30} aria-hidden style={{ width: 72, height: 90, imageRendering: "pixelated" }}/>;
+  return <canvas ref={ref} width={24} height={30} aria-hidden style={{ width: 24 * scale, height: 30 * scale, imageRendering: "pixelated" }}/>;
 }
 
 export default function TomeShelf({ owned, open, onPick, onClose }) {
@@ -31,7 +31,7 @@ export default function TomeShelf({ owned, open, onPick, onClose }) {
               <button key={t.id} className="tile" disabled={!has} aria-pressed={open === t.id} onClick={() => onPick(t.id)}
                       style={{ padding: 8, gap: 6, minHeight: 168, justifyContent: "flex-start" }}
                       aria-label={has ? `${t.name}, ${t.pages.length} pages` : `A tome not yet found. ${CHESTS.names[t.tier]} chests and rarer hold it.`}>
-                <Cover tome={t} owned={has}/>
+                <TomeCover tome={t} owned={has}/>
                 <span style={{ textAlign: "center", lineHeight: 1.3 }}>{has ? t.name : "NOT YET FOUND"}</span>
                 {has
                   ? <span className="t-label">{t.pages.length} PAGES · UP TO <span style={{ color: RARITY[top].c }}>{RARITY[top].n}</span></span>

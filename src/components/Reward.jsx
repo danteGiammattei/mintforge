@@ -2,7 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { useGame } from "../lib/GameContext.js";
 import { feel } from "../lib/feel.js";
 import { BRUSH_UPS, BA, FRAMES, PREMIUM_TITLES } from "../lib/data.js";
-import { SCRIBE, DAILY, CHESTS } from "../../shared/tuning.js";
+import { SCRIBE, DAILY, CHESTS, ASTRAL } from "../../shared/tuning.js";
+import { TOME_BY_ID } from "../../shared/tomes.js";
+import { RARITY } from "../../shared/sigil.js";
+import CoinCanvas from "./CoinCanvas.jsx";
+import { TomeCover } from "./TomeShelf.jsx";
 import PixelBanner from "./PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { TitleText } from "../screens/Friends.jsx";
@@ -23,6 +27,8 @@ import { TitleText } from "../screens/Friends.jsx";
  *    celebrate({ kind: "level", level: 10, titles: [...], frames: [...] });
  *    celebrate({ kind: "well", level: 1 });
  *    celebrate({ kind: "marks", n: 40 });
+ *    celebrate({ kind: "signs", signs: [{ sign: 3, marks: 10000 }] });
+ *    celebrate({ kind: "tome", id: "hedge" });
  *
  *  The goblin's own gifts never say why they came. Neither does this.
  * ══════════════════════════════════════════════════════════════════════ */
@@ -155,6 +161,33 @@ function Body({ r }) {
       </>
     );
   }
+  if (r.kind === "signs") {
+    const total = r.signs.reduce((a, b) => a + b.marks, 0);
+    return (
+      <>
+        <div className="row" style={{ justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+          {r.signs.slice(0, 12).map(b => <CoinCanvas key={b.sign} coin={{ seed: 1, metalIdx: ASTRAL.metal, sign: b.sign, shape: "hexagonal", rarity: 0 }} size={r.signs.length > 2 ? 64 : 128} aura={false}/>)}
+        </div>
+        <p className="t-title" style={{ margin: 0, textAlign: "center" }}>{r.signs.map(b => ASTRAL.signs[b.sign].toUpperCase()).join(" · ")}</p>
+        <div className="t-big t-gold row" style={{ justifyContent: "center", gap: 10 }}><PixelIcon name="mark" size={22}/>{total.toLocaleString()}</div>
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>{r.signs.length > 1 ? "FOR EACH SIGN, THE FIRST TIME YOU HOLD IT." : "FOR HOLDING THIS SIGN FOR THE FIRST TIME."}</p>
+      </>
+    );
+  }
+  if (r.kind === "tome") {
+    const t = TOME_BY_ID[r.id];
+    if (!t) return null;
+    const top = Math.max(...t.pages.map(p => p.tier));
+    return (
+      <>
+        <div style={{ display: "grid", placeItems: "center" }}><TomeCover tome={t} scale={4}/></div>
+        <p className="t-title" style={{ margin: 0, textAlign: "center" }}>{t.name}</p>
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>
+          {t.pages.length} PAGES TO COPY, UP TO <span style={{ color: RARITY[top].c }}>{RARITY[top].n}</span>.<br/>OPEN IT AT THE SCRIBE'S DESK.
+        </p>
+      </>
+    );
+  }
   if (r.kind === "marks") {
     return (
       <>
@@ -174,8 +207,10 @@ const HEADS = {
   level: ["LEVEL UP", ""],
   marks: ["A POUCH OF MARKS", "HE PUSHED IT THROUGH THE GAP"],
   daily: ["TODAY'S GIFT", ""],
+  signs: ["A NEW STAR SIGN", "THE SKY PAYS ITS DUES"],
+  tome:  ["A NEW TOME", "IT WAS IN THE CHEST"],
 };
-const COLOUR = { brush: "#e0b860", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4" };
+const COLOUR = { brush: "#e0b860", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", tome: "#c080ff" };
 
 function Card({ r, onClose }) {
   const g = useGame();
@@ -187,8 +222,9 @@ function Card({ r, onClose }) {
     return () => window.removeEventListener("keydown", key);
   }, [onClose]);
 
-  const [head0, sub] = HEADS[r.kind];
-  const head = r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : head0;
+  const [head0, sub0] = HEADS[r.kind];
+  const sub = r.kind === "signs" && r.signs.length > 1 ? "THE SKY PAYS WHAT IT OWES" : sub0;
+  const head = r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
   const subline = r.from === "level" ? "" : sub;
   // something wearable can be put on from here
   const wear = r.kind === "title" ? { on: g.selectedTitle === r.label, go: () => g.setSelectedTitle(r.label) }

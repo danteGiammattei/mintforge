@@ -3,16 +3,20 @@ import CabinetFrame from "./CabinetFrame.jsx";
 import SignBadges from "./SignBadges.jsx";
 import { CoinTile } from "../screens/Vault.jsx";
 import { TitleText } from "../screens/Friends.jsx";
-import { METALS, MAX_RARITY, RARITIES } from "../lib/data.js";
+import { METALS, MAX_RARITY, RARITIES, BRUSH_UPS } from "../lib/data.js";
+import { TOMES } from "../../shared/tomes.js";
+import { TomeCover } from "./TomeShelf.jsx";
 
 /* ─── a profile as other players see it ───────────────────────────────────
- * Banner, name, level and title, bio, three counts, the star signs held
+ * Banner, name, level and title, bio, three counts, their brush and
+ * tomes, the star signs held
  * (as badges, once there is one) and the cabinet in its
  * frame (its score on the frame's plaque). The same card on your own Profile and on anyone's you look up,
  * so what you see of yourself is what they see. */
 export const KINDS_TOTAL = METALS.length * (MAX_RARITY + 1);
 
-export default function PublicProfile({ frame, username, level, title, bio, coins, kinds, shiny, signs = [], cabinet, showcase, onCoin, empty, children }) {
+export default function PublicProfile({ frame, username, level, title, bio, coins, kinds, shiny, signs = [], brush = 0, tomes = ["primer"], cabinet, showcase, onCoin, empty, children }) {
+  const b = BRUSH_UPS[Math.max(0, Math.min(BRUSH_UPS.length - 1, brush))];
   return (
     <>
       <PixelBanner frame={frame} height={96}/>
@@ -29,6 +33,20 @@ export default function PublicProfile({ frame, username, level, title, bio, coin
             </div>
           ))}
         </dl>
+        {/* the brush they brush with, and the tomes they copy from */}
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.4fr)", gap: 8 }}>
+          <div className="panel" style={{ padding: 8, textAlign: "center", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+            <span className="t-title" style={{ fontSize: "inherit" }}>{b.label.toUpperCase()}</span>
+            <span className="t-label">BRUSH · TIER {brush + 1}</span>
+          </div>
+          <div className="panel" style={{ padding: 8, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center" }} role="img"
+                 aria-label={`Tomes: ${TOMES.filter(t => tomes.includes(t.id)).map(t => t.name.toLowerCase()).join(", ")}`}>
+              {TOMES.map(t => <TomeCover key={t.id} tome={t} owned={tomes.includes(t.id)} scale={1}/>)}
+            </div>
+            <span className="t-label">TOMES {TOMES.filter(t => tomes.includes(t.id)).length} / {TOMES.length}</span>
+          </div>
+        </div>
         {signs.length > 0 && <SignBadges signs={signs}/>}
         {showcase.length > 0 ? (
           <CabinetFrame rank={cabinet?.rank || 0} score={cabinet?.score} pad={6}>

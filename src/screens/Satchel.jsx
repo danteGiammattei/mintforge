@@ -10,10 +10,10 @@ import RevealBanner from "../components/RevealBanner.jsx";
 import { tiedScroll, chest as chestSprite, dirtClod } from "../lib/forms.js";
 import { mount as mountChest, SURROUND } from "../scenes/chest.js";
 import { RARITY } from "../../shared/sigil.js";
-import { CHESTS, ASTRAL } from "../../shared/tuning.js";
+import { CHESTS } from "../../shared/tuning.js";
 import { BRUSH_UPS, RARITIES } from "../lib/data.js";
 import { coinRarity } from "../lib/coin.js";
-import { TOME_BY_ID } from "../../shared/tomes.js";
+import { useCelebrate } from "../components/Reward.jsx";
 
 /* ─── SATCHEL ─────────────────────────────────────────────────────────────
  * Everything in transit: scrolls waiting to be offered, chests waiting to
@@ -21,7 +21,7 @@ import { TOME_BY_ID } from "../../shared/tomes.js";
  * thing that fills it comes from, which is most of the tutorial. */
 
 function Ceremony({ chest, onDone, onClose }) {
-  const g = useGame(), ui = useUi();
+  const g = useGame(), ui = useUi(), celebrate = useCelebrate();
   const ref = useRef(null), live = useRef(g), found = useRef(null);
   live.current = g;
   useEffect(() => mountChest(ref.current, {
@@ -29,7 +29,7 @@ function Ceremony({ chest, onDone, onClose }) {
     done: raw => {
       onDone(live.current.dusty.find(c => c.id === raw?.id) || null);
       // a tome tucked in with the coin
-      if (found.current) ui.toast(`A TOME WAS IN THE CHEST: ${TOME_BY_ID[found.current]?.name || "A TOME"}. OPEN IT AT THE DESK.`, "magic");
+      if (found.current) celebrate({ kind: "tome", id: found.current });
     }, say: ui.say, feel,
   }, { tier: chest.tier }), [chest.id]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -73,7 +73,6 @@ export default function Satchel() {
       const r = await g.act("brush", { coinId: coin.id });
       feel("reveal");
       setFound({ coin, xp: r.xp, isNew });
-      if (r.signBonus) ui.toast(`${ASTRAL.signs[r.signBonus.sign].toUpperCase()}, FOUND FOR THE FIRST TIME: +${r.signBonus.marks.toLocaleString()} MARKS`, "magic");
       ui.say(`${RARITIES[coinRarity(coin)].name} ${matterOf(coin).name} coin${coin.shiny ? ", shiny" : ""}.`);
     } catch (e) {
       // it is still dusty on the server, so it is still here to brush

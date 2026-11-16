@@ -60,6 +60,13 @@ function LevelWatch({ level }) {
   return null;
 }
 
+/* Star signs found for the first time, and paid for: one card for them all. */
+function SignWatch({ news }) {
+  const celebrate = useCelebrate();
+  useEffect(() => { if (news?.signs?.length) celebrate({ kind: "signs", signs: news.signs }); }, [news, celebrate]);
+  return null;
+}
+
 /* Once a session, if today's gift is waiting and the player is elsewhere, say so. */
 function DailyNudge({ ready, onDoor }) {
   const ui = useUi(), said = useRef(false);
@@ -111,6 +118,7 @@ function Game({ game }) {
     <GameContext.Provider value={ctx}>
       <RewardHost>
       <LevelWatch level={game.level}/>
+      <SignWatch news={game.news}/>
       <DailyNudge ready={game.dailyReady} onDoor={tab === "door"}/>
       <WarNudge invites={war.invites} inTavern={tab === "tavern"}/>
       <div className="app">
