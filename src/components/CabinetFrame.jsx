@@ -26,6 +26,7 @@ function sheet(src) {
   if (!sheets.has(src)) sheets.set(src, new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }));
   return sheets.get(src);
 }
+export const preloadFrames = () => Promise.all(ART.map(a => sheet(a.src)));
 // the frame at w × h, from its nine-slice: corners as drawn, sides repeated
 function lay(im, k, w, h) {
   const c = document.createElement("canvas"); c.width = w; c.height = h;

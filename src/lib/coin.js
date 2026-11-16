@@ -423,6 +423,10 @@ function paintAstral(coin, back) {
 
 const painted = new Map();
 export const SPACE_LOOP = 16;                 // frames in the void's loop
+// paint a coin into the cache ahead of time (lib/preload.js), so the
+// first time it is drawn costs nothing
+export const warmCoin = coin => { try { paintCoin(coin); } catch { /* drawn later instead */ } };
+
 function paintCoin(coin, back = false, phase = 0) {
   const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.sign ?? ""}:${coin.shiny ? 1 : 0}:${back ? 1 : 0}:${phase}`;
   if (painted.has(key)) return painted.get(key);
