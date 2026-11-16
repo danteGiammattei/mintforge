@@ -8,7 +8,8 @@
  *  tome no rarer than its chest.
  *
  *  Pages are plain data so the server judges against exactly what the
- *  client shows. Ids are stored, so never rename one; add to the end.
+ *  client shows. Ids are stored once live, so after this rename none;
+ *  add to the end.
  * ══════════════════════════════════════════════════════════════════════ */
 
 const TAU = Math.PI * 2;
@@ -31,30 +32,37 @@ const points = (cx, cy, R, r, k, turn = -Math.PI / 2) =>
 const rays = (cx, cy, r0, r1, k, turn = -Math.PI / 2) =>
   Array.from({ length: k }, (_, i) => { const a = turn + TAU * i / k; return [[cx + Math.cos(a) * r0, cy + Math.sin(a) * r0], [cx + Math.cos(a) * r1, cy + Math.sin(a) * r1]]; });
 
+// an arrow's head at (x, y), pointing along angle `a`, as one stroke
+const head = (x, y, a, l = 0.12) => [[x - Math.cos(a - 0.6) * l, y - Math.sin(a - 0.6) * l], [x, y], [x - Math.cos(a + 0.6) * l, y - Math.sin(a + 0.6) * l]];
+
 /* ─── the tomes ───────────────────────────────────────────────────────
  * tier: how rare the tome is (the chest tier it first drops from).
- * look: its cover, for the pixel art (lib/tomeArt.js). */
+ * look: its cover, for the pixel art (lib/tomeArt.js).
+ * The primer and the hedge book are the old alchemists' signs, two or
+ * three lines each; the star chart, signs of the heavens; the last two,
+ * small circles of binding. Every one is meant to be drawn with a finger. */
+const UP = -Math.PI / 2, DOWN = Math.PI / 2;
 export const TOMES = [
   {
     id: "primer", name: "THE PRIMER", tier: 0,
     look: { leather: "#5a3a22", trim: "#b08a4a", emblem: "eye" },
     pages: [
-      { id: "eye",     name: "THE EYE",     tier: 2, strokes: [ring(0.5, 0.5, 0.42), ring(0.5, 0.5, 0.12, 16)] },
-      { id: "ward",    name: "THE WARD",    tier: 2, strokes: [poly(0.5, 0.54, 0.44, 3), line([0.5, 0.2], [0.5, 0.86])] },
-      { id: "tide",    name: "THE TIDE",    tier: 2, strokes: [wave(0.08, 0.92, 0.36, 0.1, 2), wave(0.08, 0.92, 0.64, 0.1, 2)] },
-      { id: "coil",    name: "THE COIL",    tier: 2, strokes: [spiral(0.5, 0.5, 0.44, 2.5)] },
-      { id: "star",    name: "THE STAR",    tier: 2, strokes: [poly(0.5, 0.54, 0.46, 5, 2)] },
+      { id: "salt",     name: "SALT",      tier: 2, strokes: [ring(0.5, 0.5, 0.42), line([0.08, 0.5], [0.92, 0.5])] },
+      { id: "sulphur",  name: "SULPHUR",   tier: 2, strokes: [poly(0.5, 0.36, 0.28, 3), line([0.5, 0.5], [0.5, 0.96]), line([0.3, 0.78], [0.7, 0.78])] },
+      { id: "earth",    name: "EARTH",     tier: 2, strokes: [ring(0.5, 0.5, 0.42), line([0.5, 0.08], [0.5, 0.92]), line([0.08, 0.5], [0.92, 0.5])] },
+      { id: "iron",     name: "IRON",      tier: 2, strokes: [ring(0.4, 0.6, 0.3), line([0.61, 0.39], [0.92, 0.08]), head(0.92, 0.08, -Math.PI / 4, 0.22)] },
+      { id: "mercury",  name: "MERCURY",   tier: 2, strokes: [arc(0.5, 0.1, 0.18, 0, Math.PI, 16), ring(0.5, 0.48, 0.18, 24), line([0.5, 0.66], [0.5, 0.96]), line([0.34, 0.83], [0.66, 0.83])] },
     ],
   },
   {
     id: "hedge", name: "THE HEDGE BOOK", tier: 1,
     look: { leather: "#2e4a2a", trim: "#8ab060", emblem: "leaf" },
     pages: [
-      { id: "sun",     name: "THE SUN",       tier: 2, strokes: [ring(0.5, 0.5, 0.22, 24), ...rays(0.5, 0.5, 0.3, 0.46, 8)] },
-      { id: "moon",    name: "THE MOON",      tier: 2, strokes: [[...arc(0.5, 0.5, 0.42, Math.PI * 0.35, Math.PI * 1.65), ...arc(0.66, 0.5, 0.34, Math.PI * 1.45, Math.PI * 0.55, 20)]] },
-      { id: "thorn",   name: "THE THORN",     tier: 3, strokes: [line([0.5, 0.06], [0.5, 0.94]), line([0.5, 0.3], [0.24, 0.14]), line([0.5, 0.3], [0.76, 0.14]), line([0.5, 0.56], [0.2, 0.42]), line([0.5, 0.56], [0.8, 0.42])] },
-      { id: "knot",    name: "THE KNOT",      tier: 3, strokes: [Array.from({ length: 49 }, (_, i) => { const a = TAU * i / 48; return [0.5 + Math.sin(a) * 0.42, 0.5 + Math.sin(a * 2) * 0.24]; })] },
-      { id: "trident", name: "THE TRIDENT",   tier: 3, strokes: [line([0.5, 0.94], [0.5, 0.06]), [[0.8, 0.06], ...arc(0.5, 0.3, 0.3, 0, Math.PI, 18), [0.2, 0.06]]] },
+      { id: "copper",  name: "COPPER",       tier: 2, strokes: [ring(0.5, 0.32, 0.26, 28), line([0.5, 0.58], [0.5, 0.96]), line([0.3, 0.78], [0.7, 0.78])] },
+      { id: "moon",    name: "THE MOON",     tier: 3, strokes: [[...arc(0.44, 0.5, 0.4, Math.PI * 0.35, Math.PI * 1.65), ...arc(0.6, 0.5, 0.32, Math.PI * 1.45, Math.PI * 0.55, 20)], line([0.84, 0.36], [0.84, 0.64]), line([0.7, 0.5], [0.98, 0.5])] },
+      { id: "arrow",   name: "THE ARROW",    tier: 3, strokes: [line([0.08, 0.92], [0.92, 0.08]), head(0.92, 0.08, -Math.PI / 4, 0.26), line([0.12, 0.66], [0.34, 0.88]), line([0.24, 0.54], [0.46, 0.76])] },
+      { id: "trident", name: "THE TRIDENT",  tier: 3, strokes: [line([0.5, 0.74], [0.5, 0.06]), [[0.8, 0.06], ...arc(0.5, 0.3, 0.3, 0, Math.PI, 18), [0.2, 0.06]], ring(0.5, 0.86, 0.1, 16)] },
+      { id: "knot",    name: "THE KNOT",     tier: 3, strokes: [Array.from({ length: 49 }, (_, i) => { const a = TAU * i / 48; return [0.5 + Math.sin(a) * 0.44, 0.5 + Math.sin(a * 2) * 0.24]; }), line([0.5, 0.08], [0.5, 0.92])] },
     ],
   },
   {
@@ -62,20 +70,20 @@ export const TOMES = [
     look: { leather: "#1e2a4a", trim: "#7aa0e0", emblem: "star" },
     pages: [
       { id: "pentacle", name: "THE PENTACLE", tier: 3, strokes: [ring(0.5, 0.5, 0.46), poly(0.5, 0.5, 0.44, 5, 2)] },
-      { id: "seal",     name: "THE SEAL",     tier: 3, strokes: [poly(0.5, 0.5, 0.46, 3), poly(0.5, 0.5, 0.46, 3, 1, Math.PI / 2)] },
-      { id: "compass",  name: "THE COMPASS",  tier: 4, strokes: [ring(0.5, 0.5, 0.28), points(0.5, 0.5, 0.48, 0.1, 4)] },
+      { id: "seal",     name: "THE SEAL",     tier: 3, strokes: [poly(0.5, 0.5, 0.46, 3), poly(0.5, 0.5, 0.46, 3, 1, DOWN)] },
+      { id: "compass",  name: "THE COMPASS",  tier: 4, strokes: [line([0.5, 0.04], [0.5, 0.96]), line([0.04, 0.5], [0.96, 0.5]), head(0.5, 0.04, UP), head(0.5, 0.96, DOWN), head(0.04, 0.5, Math.PI), head(0.96, 0.5, 0), ring(0.5, 0.5, 0.16, 20)] },
       { id: "watcher",  name: "THE WATCHER",  tier: 4, strokes: [poly(0.5, 0.56, 0.46, 3), [...arc(0.5, 0.62, 0.2, Math.PI, TAU, 14, 0.1), ...arc(0.5, 0.62, 0.2, 0, Math.PI, 14, 0.1)], ring(0.5, 0.62, 0.05, 10)] },
-      { id: "orbit",    name: "THE ORBIT",    tier: 4, strokes: [ring(0.5, 0.5, 0.14, 18), arc(0.5, 0.5, 0.46, 0, TAU, 40, 0.2), arc(0.5, 0.5, 0.2, 0, TAU, 32, 0.46)] },
+      { id: "vitriol",  name: "VITRIOL",      tier: 4, strokes: [ring(0.26, 0.5, 0.2, 24), ring(0.74, 0.5, 0.2, 24), line([0.04, 0.5], [0.96, 0.5]), line([0.26, 0.3], [0.26, 0.7]), line([0.74, 0.3], [0.74, 0.7])] },
     ],
   },
   {
     id: "ember", name: "THE EMBER CODEX", tier: 3,
     look: { leather: "#5a1a14", trim: "#e0703a", emblem: "flame" },
     pages: [
-      { id: "flame",   name: "THE FLAME",     tier: 4, strokes: [[[0.5, 0.94], ...arc(0.5, 0.66, 0.28, Math.PI / 2, Math.PI * 1.1, 10), [0.3, 0.32], [0.42, 0.44], [0.5, 0.06], [0.6, 0.4], [0.7, 0.3], ...arc(0.5, 0.66, 0.28, -Math.PI * 0.1, Math.PI / 2, 10)]] },
-      { id: "athanor", name: "THE ATHANOR",   tier: 4, strokes: [poly(0.5, 0.5, 0.46, 3), line([0.18, 0.62], [0.82, 0.62]), ring(0.5, 0.48, 0.12, 14)] },
-      { id: "salamander", name: "THE SALAMANDER", tier: 4, strokes: [spiral(0.5, 0.5, 0.4, 1.75), line([0.3, 0.3], [0.14, 0.18]), line([0.7, 0.3], [0.86, 0.18]), line([0.3, 0.7], [0.14, 0.82]), line([0.7, 0.7], [0.86, 0.82])] },
-      { id: "brand",   name: "THE BRAND",     tier: 5, strokes: [ring(0.5, 0.5, 0.46), poly(0.5, 0.5, 0.46, 6, 1, -Math.PI / 2), poly(0.5, 0.5, 0.26, 3), poly(0.5, 0.5, 0.26, 3, 1, Math.PI / 2)] },
+      { id: "kindling", name: "KINDLING",     tier: 4, strokes: [ring(0.5, 0.5, 0.46), poly(0.5, 0.56, 0.4, 3), poly(0.5, 0.62, 0.14, 3, 1, DOWN)] },
+      { id: "crucible", name: "THE CRUCIBLE", tier: 4, strokes: [ring(0.5, 0.5, 0.46), poly(0.5, 0.5, 0.46, 4, 1, -Math.PI / 4), poly(0.5, 0.54, 0.28, 3)] },
+      { id: "phoenix",  name: "THE PHOENIX",  tier: 4, strokes: [line([0.5, 0.06], [0.5, 0.94]), head(0.5, 0.06, UP, 0.14), line([0.1, 0.42], [0.9, 0.42]), arc(0.1, 0.42, 0.14, UP, DOWN, 12), arc(0.9, 0.42, 0.14, DOWN, Math.PI * 1.5, 12), ring(0.5, 0.74, 0.12, 16)] },
+      { id: "brand",    name: "THE BRAND",    tier: 5, strokes: [ring(0.5, 0.5, 0.46), poly(0.5, 0.5, 0.46, 6, 1, UP), poly(0.5, 0.5, 0.26, 3), poly(0.5, 0.5, 0.26, 3, 1, DOWN)] },
     ],
   },
   {
@@ -83,9 +91,9 @@ export const TOMES = [
     look: { leather: "#1a1424", trim: "#7ad888", emblem: "maw" },
     pages: [
       { id: "elder",   name: "THE ELDER SIGN", tier: 4, strokes: [poly(0.5, 0.52, 0.46, 5, 2), line([0.5, 0.8], [0.5, 0.36]), line([0.5, 0.52], [0.36, 0.36]), line([0.5, 0.52], [0.64, 0.36]), line([0.5, 0.36], [0.44, 0.24]), line([0.5, 0.36], [0.56, 0.24])] },
-      { id: "deep",    name: "THE DEEP",       tier: 5, strokes: [spiral(0.5, 0.5, 0.44, 3), ...rays(0.5, 0.5, 0.2, 0.46, 3, -Math.PI / 6)] },
+      { id: "deep",    name: "THE DEEP",       tier: 5, strokes: [ring(0.5, 0.5, 0.46), ring(0.5, 0.5, 0.36), spiral(0.5, 0.5, 0.28, 2)] },
       { id: "maw",     name: "THE MAW",        tier: 5, strokes: [ring(0.5, 0.5, 0.46), ...Array.from({ length: 6 }, (_, i) => { const a = TAU * i / 6; return [[0.5 + Math.cos(a) * 0.46, 0.5 + Math.sin(a) * 0.46], [0.5 + Math.cos(a + 0.6) * 0.2, 0.5 + Math.sin(a + 0.6) * 0.2]]; }), ring(0.5, 0.5, 0.1, 12)] },
-      { id: "gate",    name: "THE GATE",       tier: 5, strokes: [poly(0.5, 0.5, 0.46, 4, 1, -Math.PI / 4), poly(0.5, 0.5, 0.46, 4, 1, 0), poly(0.5, 0.5, 0.2, 4, 1, -Math.PI / 4), line([0.5, 0.04], [0.5, 0.96])] },
+      { id: "binding", name: "THE BINDING",    tier: 5, strokes: [ring(0.5, 0.5, 0.46), poly(0.5, 0.5, 0.46, 5, 2), ring(0.5, 0.5, 0.16, 20), ...rays(0.5, 0.5, 0.16, 0.24, 5, DOWN)] },
     ],
   },
 ];

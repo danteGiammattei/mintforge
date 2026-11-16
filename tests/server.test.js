@@ -110,7 +110,7 @@ test("sessions expire when idle and at their maximum age", async () => {
 test("sealing judges the strokes on the server and stores a scroll", async () => {
   const { db, pid } = await world();
   const go = driver(db, pid, seeded(7));
-  const { result, state } = await go("seal", { tome: "primer", page: "eye", strokes: circle() });
+  const { result, state } = await go("seal", { tome: "primer", page: "salt", strokes: circle() });
   assert.ok(result.scroll.rarity >= 0 && result.scroll.rarity <= 5);
   assert.equal(state.scrolls.length, 1);
   assert.deepEqual(Object.keys(state.scrolls[0]).sort(), ["id", "rarity", "seed"], "no hint or trait leaves the server");
@@ -121,34 +121,34 @@ test("sealing judges the strokes on the server and stores a scroll", async () =>
 test("the client cannot name its own rarity", async () => {
   const { db, pid } = await world();
   const go = driver(db, pid, seeded(7));
-  const a = await go("seal", { tome: "primer", page: "eye", strokes: circle(), rarity: 5, seed: 1, hint: "symmetric" });
+  const a = await go("seal", { tome: "primer", page: "salt", strokes: circle(), rarity: 5, seed: 1, hint: "symmetric" });
   const row = db.raw.prepare(`SELECT rarity FROM scrolls`).get();
   assert.equal(row.rarity, a.result.scroll.rarity);
   // same strokes, same player: the salt has moved, so the seed has too
-  const b = await go("seal", { tome: "primer", page: "eye", strokes: circle(80, 90, 30) });
+  const b = await go("seal", { tome: "primer", page: "salt", strokes: circle(80, 90, 30) });
   assert.notEqual(a.result.scroll.seed, b.result.scroll.seed);
 });
 
 test("sealing is refused: too soon, malformed, off the sheet, too much ink, satchel full", async () => {
   const { db, pid } = await world();
   const rand = seeded(3);
-  await act(db, pid, { action: "seal", tome: "primer", page: "eye", strokes: circle() }, { now: 1e7, rand });
-  await refuses(act(db, pid, { action: "seal", tome: "primer", page: "eye", strokes: circle() }, { now: 1e7 + SCRIBE.cooldownMs - 1, rand }), 429);
+  await act(db, pid, { action: "seal", tome: "primer", page: "salt", strokes: circle() }, { now: 1e7, rand });
+  await refuses(act(db, pid, { action: "seal", tome: "primer", page: "salt", strokes: circle() }, { now: 1e7 + SCRIBE.cooldownMs - 1, rand }), 429);
   const go = driver(db, pid, rand);
-  await refuses(go("seal", { tome: "primer", page: "eye", strokes: [] }), 400);
-  await refuses(go("seal", { tome: "primer", page: "eye", strokes: [[{ x: 1, y: 1 }]] }), 400);
-  await refuses(go("seal", { tome: "primer", page: "eye", strokes: line(0, 0, 400, 10) }), 400);
+  await refuses(go("seal", { tome: "primer", page: "salt", strokes: [] }), 400);
+  await refuses(go("seal", { tome: "primer", page: "salt", strokes: [[{ x: 1, y: 1 }]] }), 400);
+  await refuses(go("seal", { tome: "primer", page: "salt", strokes: line(0, 0, 400, 10) }), 400);
   const fat = Array.from({ length: 6 }, (_, i) => line(2, 10 + i * 30, 152, 10 + i * 30)[0]);   // 900px of ink
-  await refuses(go("seal", { tome: "primer", page: "eye", strokes: fat }), 400);
-  for (let i = 1; i < SCRIBE.scrollCap; i++) await go("seal", { tome: "primer", page: "eye", strokes: scribble(rand) });
-  await refuses(go("seal", { tome: "primer", page: "eye", strokes: scribble(rand) }), 409);
+  await refuses(go("seal", { tome: "primer", page: "salt", strokes: fat }), 400);
+  for (let i = 1; i < SCRIBE.scrollCap; i++) await go("seal", { tome: "primer", page: "salt", strokes: scribble(rand) });
+  await refuses(go("seal", { tome: "primer", page: "salt", strokes: scribble(rand) }), 409);
   assert.equal((await loadState(db, pid)).scrolls.length, SCRIBE.scrollCap);
 });
 
 test("a page copied again and again is never 'familiar'", async () => {
   const { db, pid } = await world();
   const go = driver(db, pid, seeded(11));
-  for (let i = 0; i < 6; i++) assert.equal((await go("seal", { tome: "primer", page: "eye", strokes: circle() })).result.familiar, false);
+  for (let i = 0; i < 6; i++) assert.equal((await go("seal", { tome: "primer", page: "salt", strokes: circle() })).result.familiar, false);
 });
 
 test("a seal must name a page of a tome the player has", async () => {
@@ -509,13 +509,13 @@ test("a deeper inkwell is bought with marks, in order, and lets a sheet take mor
   const { db, pid } = await world();
   const go = driver(db, pid, seeded(3));
   const long = Array.from({ length: 4 }, (_, i) => line(4, 20 + i * 40, 150, 20 + i * 40, 30, i * 3000)[0]);   // 584px of ink
-  await refuses(go("seal", { tome: "primer", page: "eye", strokes: long }), 400);
+  await refuses(go("seal", { tome: "primer", page: "salt", strokes: long }), 400);
   await refuses(go("well"), 402);
   db.raw.prepare(`UPDATE player_state SET marks = ? WHERE player_id = ?`).run(SCRIBE.wells[1].cost + SCRIBE.wells[2].cost - 1, pid);
   const w = await go("well");
   assert.deepEqual([w.result.level, w.state.inkMax, w.state.marks], [1, SCRIBE.wells[1].ink, SCRIBE.wells[2].cost - 1]);
   await refuses(go("well"), 402);                                   // one mark short of the next
-  assert.equal((await go("seal", { tome: "primer", page: "eye", strokes: long })).state.scrolls.length, 1);
+  assert.equal((await go("seal", { tome: "primer", page: "salt", strokes: long })).state.scrolls.length, 1);
   db.raw.prepare(`UPDATE player_state SET marks = 1e9, well_level = ? WHERE player_id = ?`).run(SCRIBE.wells.length - 1, pid);
   await refuses(go("well"), 409);
 });
@@ -586,7 +586,7 @@ test("plinko follows the path it reports, and its odds are the board's", async (
 
 test("each seal leaves a row of numbers for tuning, and never the drawing", async () => {
   const { db, pid } = await world();
-  await driver(db, pid, seeded(2))("seal", { tome: "primer", page: "eye", strokes: circle() });
+  await driver(db, pid, seeded(2))("seal", { tome: "primer", page: "salt", strokes: circle() });
   const row = db.raw.prepare(`SELECT * FROM seal_log`).get();
   const m = JSON.parse(row.m);
   for (const k of ["symmetry", "enclosed", "crossings", "filled", "span", "pace", "ink", "strokes"]) assert.ok(k in m, k);

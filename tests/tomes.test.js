@@ -42,15 +42,15 @@ test("likeness: a close copy scores high, a shaky one lower, the wrong page or a
     assert.ok(good >= SIGIL.copy.close, `${p.id} good ${good}`);
     assert.ok(shaky < good, `${p.id} shaky ${shaky} < ${good}`);
   }
-  const eye = TOME_BY_ID.primer.pages[0], tide = TOME_BY_ID.primer.pages[2];
-  assert.ok(likeness(copy(tide, 0.02), eye) < SIGIL.copy.fair, "the tide is not the eye");
+  const eye = TOME_BY_ID.primer.pages[0], tide = TOME_BY_ID.primer.pages[3];
+  assert.ok(likeness(copy(tide, 0.02), eye) < SIGIL.copy.fair, "iron is not salt");
   // size and place on the sheet do not matter
   const small = likeness(copy(eye, 0.02, 1, { x: 60, y: 90, k: 50 }), eye);
   assert.ok(small >= SIGIL.copy.close, `small ${small}`);
 });
 
 test("the roll: a copy lifts by its likeness, held to the page's tier; a poor one is nothing", () => {
-  const star = TOME_BY_ID.primer.pages.find(p => p.id === "star");           // tier 2
+  const star = TOME_BY_ID.primer.pages.find(p => p.id === "mercury");        // tier 2
   const a = analyse(copy(star, 0.02), SCRIBE.sheet);
   const tops = new Set();
   for (let salt = 0; salt < 200; salt++) {
@@ -73,7 +73,7 @@ test("chests: tomes no rarer than the chest, never one you have, never from wood
   }
   assert.equal(tomeFromChest(4, TOMES.map(t => t.id), always, r), null);
   assert.equal(tomeFromChest(4, ["primer"], CHESTS.tomeChance.map(() => 0), r), null);
-  assert.equal(pageOf("hedge", "sun", ["primer"]), null);
+  assert.equal(pageOf("hedge", "copper", ["primer"]), null);
 });
 
 test("a chest's tome is kept, once, and the seal can use it", async () => {
@@ -89,7 +89,7 @@ test("a chest's tome is kept, once, and the seal can use it", async () => {
     assert.equal(two.result.tome, undefined, "an iron chest has nothing left to give");
     assert.deepEqual(two.state.tomes, ["primer", "hedge"]);
     const sun = TOME_BY_ID.hedge.pages[0];
-    const s = await go("seal", { tome: "hedge", page: "sun", strokes: copy(sun, 0.02).map(st => st.slice(0, 40)) });
+    const s = await go("seal", { tome: "hedge", page: "copper", strokes: copy(sun, 0.02).map(st => st.slice(0, 40)) });
     assert.ok(s.result.likeness > 0);
   } finally { CHESTS.tomeChance.splice(0, 5, 0, 0.06, 0.1, 0.16, 0.25); }
 });
