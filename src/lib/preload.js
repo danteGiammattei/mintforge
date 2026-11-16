@@ -1,5 +1,5 @@
 /* ─── what the game needs before it opens, and what it can warm after ────
- * preloadFirst(onStep)  the chests, the cabinet frames and the pixel font:
+ * preloadFirst(onStep)  the chests, the cabinet frames, our painted hand and the pixel font:
  *                       small, and drawn the moment you look. The loading
  *                       screen waits for these (or for them to fail).
  * preloadBanner(frame)  your own banner, the first thing on your profile.
@@ -10,13 +10,14 @@ import { loadChestArt } from "./chestArt.js";
 import { preloadFrames } from "../components/CabinetFrame.jsx";
 import { BANNERS } from "./data.js";
 import { warmCoin } from "./coin.js";
+import { loadPlayerHand } from "./playerHandArt.js";
 
 const image = src => new Promise(ok => { const im = new Image(); im.onload = im.onerror = () => ok(); im.src = src; });
 const font = () => (document.fonts?.load ? document.fonts.load("16px Silkscreen").then(() => {}, () => {}) : Promise.resolve());
 const bannerSrc = id => { const b = BANNERS[id]; return typeof b === "string" && b.startsWith("image:") ? b.slice(6) : null; };
 
 export function preloadFirst(onStep) {
-  const jobs = [loadChestArt(), preloadFrames(), font()];
+  const jobs = [loadChestArt(), preloadFrames(), font(), loadPlayerHand()];
   let done = 0;
   return Promise.all(jobs.map(j => Promise.resolve(j).catch(() => {}).then(() => onStep(++done, jobs.length))));
 }

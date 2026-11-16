@@ -34,6 +34,7 @@ import {
   goblinHand, goblinHandPoint, GOBLIN_HAND, playerHand, PLAYER_HAND,
   tiedScroll, TIED, chest as chestSprite, pouch,
 } from "../lib/forms.js";
+import { playerHandArt, loadPlayerHand, HAND_ART } from "../lib/playerHandArt.js";
 import { RARITY } from "../../shared/sigil.js";
 import { stage, pointer, W, H, FONT, INK, lerp, ease, wrap, grainLayer, feather } from "./kit.js";
 
@@ -41,6 +42,7 @@ import { stage, pointer, W, H, FONT, INK, lerp, ease, wrap, grainLayer, feather 
 export const SURROUND = [4, 5, 7];
 
 export function mount(cv, bus) {
+  loadPlayerHand();                    // usually already in hand from the loading screen
 
 const P = {
   wall:"#050609", jamb:"#0d0f15", cloak:"#040507",
@@ -243,6 +245,21 @@ function drawOurHand(k, holding, rarity) {
   const gx = Math.round(lerp(126, 114, ease(k)));
   const gy = Math.round(lerp(H + 56, 340, ease(k)));
   const T = RAMP.player;
+
+  // the painted hand, once it has loaded: the drawing carries its own
+  // forearm off the bottom of the frame
+  const art = playerHandArt(false);
+  if (art) {
+    const ax = gx - HAND_ART.palm.x, ay = gy - HAND_ART.palm.y;
+    ctx.drawImage(art, ax, ay);
+    if (S.glow > 0.01) {                    // his light reaches across onto us
+      ctx.globalAlpha = Math.min(1, S.glow) * 0.8;
+      ctx.drawImage(playerHandArt(true), ax, ay);
+      ctx.globalAlpha = 1;
+    }
+    if (holding) drawScroll(gx - 1, Math.round(gy + 2), rarity || 0, false);
+    return { x: gx, y: Math.round(gy + 2) };
+  }
 
   const ox = Math.round(gx - OA.palm.x * OK), oy = Math.round(gy - OA.palm.y * OK);
 
