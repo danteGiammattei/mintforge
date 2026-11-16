@@ -32,7 +32,7 @@
 import { RAMP } from "../lib/pixelform.js";
 import {
   goblinHand, goblinHandPoint, GOBLIN_HAND, playerHand, PLAYER_HAND,
-  rolledScroll, SCROLL, tiedScroll, TIED, chest as chestSprite, pouch,
+  tiedScroll, TIED, chest as chestSprite, pouch,
 } from "../lib/forms.js";
 import { RARITY } from "../../shared/sigil.js";
 import { stage, pointer, W, H, FONT, INK, lerp, ease, wrap, grainLayer, feather } from "./kit.js";
@@ -57,7 +57,6 @@ const DRAWER_H = 146;
 const HK = GOBLIN_HAND.scale, HT = GOBLIN_HAND.frame;
 const OK = PLAYER_HAND.scale, OA = PLAYER_HAND.art;
 const OS = { w: Math.round(OA.w * OK), h: Math.round(OA.h * OK) };
-const SS = Math.round(SCROLL.art * SCROLL.scale);
 const PALM = goblinHandPoint(GOBLIN_HAND.art.palm);
 const SHOULDER = goblinHandPoint(GOBLIN_HAND.art.shoulder);
 const colourOf = r => (RARITY[r] || RARITY[0]).c;
@@ -272,8 +271,8 @@ function drawOurHand(k, holding, rarity) {
   return { x: gx, y: Math.round(gy + 2) };
 }
 
-function drawScroll(x, y, r, charged) {
-  ctx.drawImage(rolledScroll(colourOf(r), !!charged), Math.round(x - SS / 2), Math.round(y - SS / 2));
+function drawScroll(x, y, r) {
+  ctx.drawImage(tiedScroll(colourOf(r)), Math.round(x - TIED.w / 2), Math.round(y - TIED.h / 2));
 }
 
 /* ── the inventory drawer ────────────────────────────────── */

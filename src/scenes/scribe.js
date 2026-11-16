@@ -24,7 +24,7 @@
  *  while they draw, and the desk says what he craves today.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { rolledScroll } from "../lib/forms.js";
+import { tiedScroll } from "../lib/forms.js";
 import { RARITY, TRAITS, LIFTS, careOf } from "../../shared/sigil.js";
 import { SCRIBE } from "../../shared/tuning.js";
 import { stage, pointer, W, H, FONT, INK, rnd, wrap, feather } from "./kit.js";
@@ -194,7 +194,7 @@ function drawSeal() {
   plot(0, 0, W, H, `rgb(${SURROUND})`);       // the desk falls away into the room
   ctx.globalAlpha = 1;
 
-  const sp = rolledScroll(col, false);
+  const sp = tiedScroll(col);
   const cx = W / 2, cy = 176 - e * 8;
   const sc = e > 0.6 ? 3 : 2;            // integer only — never resample pixels
   ctx.drawImage(sp, Math.round(cx - sp.width * sc / 2), Math.round(cy - sp.height * sc / 2), sp.width * sc, sp.height * sc);
