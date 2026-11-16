@@ -278,6 +278,7 @@ export const CABINET_SCORE = {
     [500,   "A FEW CURIOS"],
     [2000,  "A FINE CABINET"],
     [6250,  "A COLLECTOR'S CABINET"],
+    [11000, "AN OBSIDIAN VAULT"],
     [17500, "A LEGENDARY HOARD"],
     [40000, "A MYTHIC HOARD"],
   ],

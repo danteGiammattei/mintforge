@@ -1,9 +1,9 @@
 import PixelBanner from "./PixelBanner.jsx";
-import CabinetFrame from "./CabinetFrame.jsx";
+import CabinetFrame, { gradeInk } from "./CabinetFrame.jsx";
 import SignBadges from "./SignBadges.jsx";
 import { CoinTile } from "../screens/Vault.jsx";
 import { TitleText } from "../screens/Friends.jsx";
-import { METALS, MAX_RARITY, RARITIES, BRUSH_UPS } from "../lib/data.js";
+import { METALS, MAX_RARITY, BRUSH_UPS } from "../lib/data.js";
 import { TOMES } from "../../shared/tomes.js";
 import { TomeCover } from "./TomeShelf.jsx";
 
@@ -53,7 +53,7 @@ export default function PublicProfile({ frame, username, level, title, bio, coin
             <div>
               <div className="between" style={{ marginBottom: 8, gap: 8 }}>
                 <span className="t-label">CABINET</span>
-                {cabinet && <span className="t-label" style={{ color: RARITIES[Math.min(cabinet.rank, RARITIES.length - 1)].color, textAlign: "right" }}>{cabinet.grade}</span>}
+                {cabinet && <span className="t-label" style={{ color: gradeInk(cabinet.rank), textAlign: "right" }}>{cabinet.grade}</span>}
               </div>
               <div className="grid-3">
                 {showcase.map(c => <CoinTile key={c.id} coin={c} onClick={() => onCoin?.(c)}/>)}

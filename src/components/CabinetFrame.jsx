@@ -3,14 +3,21 @@ import { onAuraFrame, auraStill } from "../lib/aura.js";
 
 /* ─── the cabinet's frame ─────────────────────────────────────────────
  * A frame round the cabinet that grows finer with its grade (shared/
- * economy.js cabinetScore, rank 0–5), after the coin tiers:
- *   0  an empty shelf / a few curios … wood
+ * economy.js cabinetScore, rank 0–6), after the coin tiers:
+ *   0  an empty shelf …………………… wood
  *   1  a few curios ………………………… stone
  *   2  a fine cabinet ……………………… gold, with a glint of light crossing it
  *   3  a collector's cabinet …………… void, its stars twinkling
- *   4  a legendary hoard ………………… eldritch, its tentacles writhing, spores
- *                                   drifting off, green glimmering in the carving
- *   5  a mythic hoard ……………………… (astral, to come: drawn in code for now)
+ *   4  an obsidian vault ………………… dark stone, small tentacles stirring at
+ *                                   the corners, spores, green in the carving
+ *   5  a legendary hoard ………………… eldritch: great tentacles swaying, their
+ *                                   suckers pulsing, runes lit in turn, spores
+ *   6  a mythic hoard ……………………… astral: stars twinkling, light running
+ *                                   along the filament, planets turning, rays
+ *                                   of a halo pulsing out from the corners
+ * A frame can reach past its box (`bleed`, its own ornament; `room`, empty
+ * pixels for effects to draw into). Up to 12 screen pixels of that may
+ * spill over its surroundings' padding; any more, it makes room for.
  * The painted frames are Gemini's, rebuilt as nine-slices by tools/frames
  * (corners K × K, the sides one repeating run). Everything is drawn at
  * half size and shown at twice that, so it sits on the pixel grid at any
@@ -23,8 +30,18 @@ const ART = [
   { src: "/sprites/frames/void.png",  k: 10, band: 9,  plaque: { lo: [18, 22, 44], mid: [30, 38, 70], hi: [150, 160, 190], ink: [214, 222, 246] }, fx: "twinkle" },
   // the tentacles reach `bleed` pixels past the frame proper, so the frame
   // is drawn that much outside the box and only the band pads its contents
-  { src: "/sprites/frames/eldritch.png", k: 12, band: 12, bleed: 5, plaque: { lo: [14, 22, 24], mid: [34, 54, 58], hi: [70, 110, 112], ink: [122, 216, 136] }, fx: "writhe" },
+  { src: "/sprites/frames/obsidian.png", k: 12, band: 12, bleed: 5, plaque: { lo: [14, 22, 24], mid: [34, 54, 58], hi: [70, 110, 112], ink: [122, 216, 136] }, fx: "writhe" },
+  // the next two were drawn finer (a 95 pixel image), so their corners are
+  // bigger; flat, so their parts keep the colours the effects look for
+  { src: "/sprites/frames/eldritch.png", k: 34, band: 22, bleed: 10, plaque: { lo: [16, 26, 26], mid: [48, 64, 64], hi: [84, 104, 104], ink: [112, 216, 136] }, fx: "grasp" },
+  { src: "/sprites/frames/astral.png",   k: 21, band: 12, bleed: 6, room: 5, plaque: { lo: [176, 150, 104], mid: [242, 232, 204], hi: [255, 250, 236], ink: [58, 52, 84] }, fx: "halo" },
 ];
+const SPILL = 12;                                // screen pixels a frame may reach past its box for free
+
+/* the colour a grade's name is written in: the coin rarities', with
+ * obsidian's own violet slipped in at 4 */
+const GRADE_INK = ["#a8a8a8", "#5fd48a", "#5aa8f0", "#b070f0", "#9a8ccc", "#f0a040", "#ff5a5a"];
+export const gradeInk = rank => GRADE_INK[Math.max(0, Math.min(GRADE_INK.length - 1, rank))];
 const sheets = new Map();
 function sheet(src) {
   if (!sheets.has(src)) sheets.set(src, new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }));
@@ -82,8 +99,143 @@ function fx(base, kind, f) {
     }
   }
   else if (kind === "writhe") writhe(base, d, f);
+  else if (kind === "grasp") grasp(base, d, f);
+  else if (kind === "halo") halo(base, d, f);
   return img;
 }
+
+/* ─── parts picked out by colour ─────────────────────────────────────
+ * Done once per laid frame and kept on it: which pixels are which part,
+ * by the flat colours Gemini was asked to paint them in. */
+function partsOf(base, kind) {
+  if (base.parts) return base.parts;
+  const w = base.width, h = base.height, s = base.data, cx = (w - 1) / 2, cy = (h - 1) / 2;
+  const P = { w, h, list: {} }, add = (k, x, y) => (P.list[k] ||= []).push([x, y]);
+  // how far round the frame a pixel is, 0…1, clockwise from the top
+  P.round = (x, y) => (Math.atan2(x - cx, cy - y) / (Math.PI * 2) + 1) % 1;
+  const at = (x, y) => (y * w + x) * 4;
+  const white = (x, y) => { if (x < 0 || y < 0 || x >= w || y >= h) return false; const i = at(x, y); return s[i + 3] && s[i] > 225 && s[i + 1] > 225 && s[i + 2] > 225; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = at(x, y); if (!s[i + 3]) continue;
+    const r = s[i], g = s[i + 1], b = s[i + 2];
+    if (kind === "grasp") {
+      if (g > 180 && g - r > 60 && b < 170) add("spore", x, y);
+      else if (g > 150 && b > 130 && r < 150) add("sucker", x, y);
+      else if (g - r > 18 && g - b > 8 && r + g + b < 150) add("rune", x, y);
+    } else if (kind === "halo") {
+      if (white(x, y)) {
+        const n = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => white(x + dx, y + dy)).length;
+        add(n === 0 ? "mote" : n >= 3 ? "star" : "arm", x, y);
+      }
+      else if (b > 215 && g > 200 && r < 200) add("filament", x, y);
+      else if (r > 200 && g < 180 && b > 140 && b < 205) add("planet", x, y);
+    }
+  }
+  // planets as blobs, each with its middle, for the turning light
+  if (P.list.planet) {
+    const left = new Set(P.list.planet.map(([x, y]) => y * w + x)), blobs = [];
+    for (const [x0, y0] of P.list.planet) {
+      if (!left.has(y0 * w + x0)) continue;
+      const q = [[x0, y0]], px = []; left.delete(y0 * w + x0);
+      while (q.length) {
+        const [x, y] = q.pop(); px.push([x, y]);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k = (y + dy) * w + x + dx; if (left.has(k)) { left.delete(k); q.push([x + dx, y + dy]); } }
+      }
+      const mx = px.reduce((a, p) => a + p[0], 0) / px.length, my = px.reduce((a, p) => a + p[1], 0) / px.length;
+      blobs.push({ px, mx, my, r: Math.sqrt(px.length / Math.PI) });
+    }
+    P.planets = blobs;
+  }
+  base.parts = P;
+  return P;
+}
+const mix = (c, to, k) => [0, 1, 2].map(i => Math.round(c[i] + (to[i] - c[i]) * k));
+const seedOf = (x, y) => h32((x >> 2) * 73856093 ^ (y >> 2) * 19349663);
+const ring = (u, p) => { const d = Math.abs(u - p); return Math.min(d, 1 - d); };      // distance round the frame
+
+/* The new eldritch frame, a legendary hoard: the great tentacles' outer
+ * reach sways as one per corner, the suckers pulse in a wave, a glow runs
+ * round the runes, and the spores rise a little and fade, over and over. */
+function grasp(base, d, f) {
+  const P = partsOf(base, "grasp"), { w, h } = P, src = base.data, ph = (f / 16) * Math.PI * 2;
+  const put = (x, y, c, a = 255) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const j = (y * w + x) * 4; d[j] = c[0]; d[j + 1] = c[1]; d[j + 2] = c[2]; d[j + 3] = a; };
+  const get = (x, y) => { const i = (y * w + x) * 4; return [src[i], src[i + 1], src[i + 2]]; };
+  const spore = new Set((P.list.spore || []).map(([x, y]) => y * w + x));
+  // the tentacles' outer reach, swaying a pixel
+  const M = 5, sway = [0, 1, 2, 3].map(k => [Math.round(Math.sin(ph + k * 1.7) * 0.7), Math.round(Math.cos(ph * 0.5 + k * 2.3) * 0.7)]);
+  const tip = (x, y) => Math.min(x, y, w - 1 - x, h - 1 - y) < M;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (tip(x, y) || spore.has(y * w + x)) d[(y * w + x) * 4 + 3] = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    if (!tip(x, y) || !src[i + 3] || spore.has(y * w + x)) continue;
+    const [dx, dy] = sway[(x < w / 2 ? 0 : 1) + (y < h / 2 ? 0 : 2)];
+    put(x + dx, y + dy, get(x, y));
+  }
+  // suckers, pulsing in a wave round the frame
+  for (const [x, y] of P.list.sucker || []) {
+    if (tip(x, y)) continue;
+    const k = (Math.sin(ph * 2 - P.round(x, y) * 40) + 1) / 2;
+    put(x, y, mix(get(x, y), [200, 255, 236], k * 0.55));
+  }
+  // a glow going round the runes
+  const at = (f % 64) / 64;
+  for (const [x, y] of P.list.rune || []) {
+    const r = ring(P.round(x, y), at);
+    if (r < 0.03) put(x, y, [122, 216, 136]); else if (r < 0.07) put(x, y, [78, 160, 100]); else if (r < 0.11) put(x, y, [46, 112, 70]);
+  }
+  // the spores: each rises up to three pixels and fades, then again
+  for (const [x, y] of P.list.spore || []) {
+    const u = (f / 32 + seedOf(x, y)) % 1;
+    put(x, y - Math.floor(u * 4), get(x, y), Math.round(255 * (1 - u * u)));
+  }
+}
+
+/* The astral frame, a mythic hoard: each star twinkles on its own beat,
+ * two lights run along the filament, a highlight turns on each planet,
+ * the rays of a halo pulse out from the corners, and the motes drift up
+ * and fade. */
+function halo(base, d, f) {
+  const P = partsOf(base, "halo"), { w, h } = P, src = base.data, ph = (f / 16) * Math.PI * 2;
+  const put = (x, y, c, a = 255) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const j = (y * w + x) * 4; d[j] = c[0]; d[j + 1] = c[1]; d[j + 2] = c[2]; d[j + 3] = a; };
+  const empty = (x, y) => x >= 0 && y >= 0 && x < w && y < h && !d[(y * w + x) * 4 + 3];
+  // stars: dim, bright, and at their brightest a longer cross
+  for (const [x, y] of P.list.star || []) {
+    const b = Math.sin(ph * (0.5 + seedOf(x * 3, y * 3) * 0.7) + seedOf(x, y) * 9);
+    const arms = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    if (b < -0.3) { put(x, y, [200, 200, 226]); for (const [dx, dy] of arms) if (!empty(x + dx, y + dy)) put(x + dx, y + dy, [150, 150, 190]); }
+    else if (b > 0.75) for (const [dx, dy] of arms) if (empty(x + dx * 2, y + dy * 2)) put(x + dx * 2, y + dy * 2, [230, 236, 255], 200);
+  }
+  // two lights along the filament, half a frame apart
+  const at = (f % 96) / 96;
+  for (const [x, y] of P.list.filament || []) {
+    const r = Math.min(ring(P.round(x, y), at), ring(P.round(x, y), (at + 0.5) % 1));
+    if (r < 0.012) put(x, y, [244, 255, 255]); else if (r < 0.035) put(x, y, [204, 246, 255]);
+  }
+  // a highlight turning on each planet
+  (P.planets || []).forEach((p, k) => {
+    if (p.px.length < 3) return;
+    const a = ph * 0.5 + k * 1.3, x = Math.round(p.mx + Math.cos(a) * p.r * 0.55), y = Math.round(p.my + Math.sin(a) * p.r * 0.55);
+    if (p.px.some(([px, py]) => px === x && py === y)) put(x, y, [255, 226, 236]);
+  });
+  // the halo: three rays out of each corner, their length breathing
+  const o = (base.room || 0) + 2;
+  [[o, o, -1, -1], [w - 1 - o, o, 1, -1], [o, h - 1 - o, -1, 1], [w - 1 - o, h - 1 - o, 1, 1]].forEach(([cx, cy, sx, sy], k) => {
+    [-0.42, 0, 0.42].forEach((spread, j) => {
+      const ang = Math.atan2(sy, sx) + spread, len = 4 + Math.round(2.5 * (Math.sin(ph + k + j * 1.1) + 1));
+      for (let t = 3; t < len + 3; t++) {
+        const x = Math.round(cx + Math.cos(ang) * t), y = Math.round(cy + Math.sin(ang) * t);
+        if (empty(x, y)) put(x, y, [255, 224, 138], Math.round(230 * (1 - (t - 3) / (len + 1))));
+      }
+    });
+  });
+  // motes: up two pixels and gone, then again
+  for (const [x, y] of P.list.mote || []) {
+    const u = (f / 24 + seedOf(x * 5, y * 5)) % 1, i = (y * w + x) * 4;
+    d[i + 3] = 0;
+    put(x, y - Math.floor(u * 3), [src[i], src[i + 1], src[i + 2]], Math.round(255 * (1 - u)));
+  }
+}
+
 
 /* The eldritch frame: in the outer ring only the corner tentacles reach.
  * Their outer part sways as one, a pixel at a time, each corner on its
@@ -227,11 +379,20 @@ export default function CabinetFrame({ rank = 0, score = null, children, pad = 0
       c.getContext("2d").putImageData(art.fx && f != null ? fx(base, art.fx, f) : base, 0, 0);
     };
     const size = async () => {
-      const b = art?.bleed || 0;
-      w = Math.floor(el.clientWidth / S) + 2 * b; h = Math.floor(el.clientHeight / S) + 2 * b;
+      const b = art?.bleed || 0, r = art?.room || 0, out = b + r;
+      w = Math.floor(el.clientWidth / S) + 2 * out; h = Math.floor(el.clientHeight / S) + 2 * out;
       c.width = w; c.height = h; c.style.width = w * S + "px"; c.style.height = h * S + "px";
-      c.style.left = c.style.top = -b * S + "px";
-      if (art) { const im = await sheet(art.src); if (!live || !im) return; base = lay(im, art.k, w, h); }
+      c.style.left = c.style.top = -out * S + "px";
+      if (art) {
+        const im = await sheet(art.src); if (!live || !im) return;
+        const laid = lay(im, art.k, w - 2 * r, h - 2 * r);
+        if (!r) base = laid;
+        else {                                   // the frame inside an empty margin, for effects to draw into
+          base = new ImageData(w, h);
+          for (let y = 0; y < laid.height; y++) base.data.set(laid.data.subarray(y * laid.width * 4, (y + 1) * laid.width * 4), ((y + r) * w + r) * 4);
+        }
+        base.room = r;
+      }
       draw(still ? null : 0);
     };
     const ro = new ResizeObserver(size); ro.observe(el); size();
@@ -239,8 +400,9 @@ export default function CabinetFrame({ rank = 0, score = null, children, pad = 0
     return () => { live = false; ro.disconnect(); off?.(); };
   }, [rank, art]);
   const P = (art ? art.band - (art.bleed || 0) : FRAME_THICK[rank]) * S + pad, m = art ? art.plaque : PLAQUE[rank];
+  const reach = art ? ((art.bleed || 0) + (art.room || 0)) * S : 0, spare = Math.max(0, reach - SPILL);
   return (
-    <div style={{ paddingBottom: score != null ? 12 : 0 }}>
+    <div style={{ paddingBottom: score != null ? 12 : 0, margin: spare ? `${spare}px ${spare}px ${Math.max(0, spare - 12)}px` : 0 }}>
       <div ref={box} style={{ position: "relative", padding: P }}>
         <canvas ref={cv} aria-hidden style={{ position: "absolute", left: 0, top: 0, imageRendering: "pixelated", pointerEvents: "none", zIndex: 1 }}/>
         {children}

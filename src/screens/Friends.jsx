@@ -4,7 +4,8 @@ import { useUi } from "../ui/Overlay.jsx";
 import { useSocial } from "../state/useSocial.js";
 import { lvl } from "../lib/coin.js";
 import { hydrate } from "../lib/coinview.js";
-import { FRAMES, PREMIUM_TITLES, RARITIES } from "../lib/data.js";
+import { FRAMES, PREMIUM_TITLES } from "../lib/data.js";
+import { gradeInk } from "../components/CabinetFrame.jsx";
 import CoinModal from "../components/CoinModal.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import PublicProfile from "../components/PublicProfile.jsx";
@@ -124,7 +125,7 @@ export default function Friends() {
 /* A cabinet's score and grade (shared/economy.js cabinetScore), the grade
  * in the colour of the rarity it takes to reach it. */
 export function CabinetScore({ cab, small = false }) {
-  const col = RARITIES[Math.min(cab.rank, RARITIES.length - 1)].color;
+  const col = gradeInk(cab.rank);
   if (small) return <span className="t-label" style={{ color: col }}>{cab.score.toLocaleString()} · {cab.grade}</span>;
   const prev = cab.next == null ? 1 : (cab.score - (cab.from || 0)) / (cab.next - (cab.from || 0));
   return (
