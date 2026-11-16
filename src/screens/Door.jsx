@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
@@ -6,7 +6,7 @@ import { mount, SURROUND } from "../scenes/door.js";
 import { useCelebrate, giftToReward } from "../components/Reward.jsx";
 import { RARITY } from "../../shared/sigil.js";
 import { CHESTS } from "../../shared/tuning.js";
-import Stall from "../components/Stall.jsx";
+const Stall = lazy(() => import("../components/Stall.jsx"));
 
 /* The goblin at the door. There is no menu, price or tooltip on this
  * screen and none may be added: the only chrome is the scene itself.
@@ -60,7 +60,7 @@ export default function Door() {
     <section className="scene" style={{ background: `rgb(${SURROUND})`, position: "relative" }} aria-label="The door">
       <canvas ref={ref} role="img" aria-label="A door standing ajar. Something small waits in the gap with one hand held out, palm up."
               style={{ touchAction: "none", display: "block" }}/>
-      {stall && <Stall onClose={() => { setStall(false); scene.current?.back(); }}/>}
+      {stall && <Suspense fallback={null}><Stall onClose={() => { setStall(false); scene.current?.back(); }}/></Suspense>}
       <div className="sr-only">
         {!stall && <button onClick={() => scene.current?.toStall()}>Follow him to his stall</button>}
         {g.scrolls.length === 0 && <button onClick={() => g.setTab("scribe")}>You have no scrolls. Go to the desk.</button>}

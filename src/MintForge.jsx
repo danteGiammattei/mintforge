@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameContext } from "./lib/GameContext.js";
 import { useGameState } from "./state/useGameState.js";
 import { OverlayProvider, useUi } from "./ui/Overlay.jsx";
@@ -15,7 +15,10 @@ import Scribe from "./screens/Scribe.jsx";
 import Door from "./screens/Door.jsx";
 import Satchel from "./screens/Satchel.jsx";
 import Vault from "./screens/Vault.jsx";
-import Tavern from "./screens/Tavern.jsx";
+// the tavern (its games and war) loads when first visited, and warm in
+// idle time after launch, so the app opens on less
+const loadTavern = () => import("./screens/Tavern.jsx");
+const Tavern = lazy(loadTavern);
 import Profile from "./screens/Profile.jsx";
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -115,7 +118,7 @@ function Game({ game }) {
         {!BARE.has(tab) && <TopBar marks={game.marks} level={game.level} xp={game.xp} onRetry={game.retrySaves}
                                    daily={game.dailyReady} onDaily={() => setTab("door")}/>}
         <main id="main" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: BARE.has(tab) ? "env(safe-area-inset-top, 0px)" : 0 }}>
-          <Screen key={tab}/>
+          <Suspense key={tab} fallback={<div className="page"><p className="t-dim blink" style={{ padding: 24, textAlign: "center" }}>…</p></div>}><Screen/></Suspense>
         </main>
         <BottomNav tab={tab} setTab={setTab} badges={{ satchel: waiting, door: game.dailyReady && tab !== "door" ? "!" : 0, tavern: tab !== "tavern" ? warBadge : 0 }}/>
       </div>
@@ -137,7 +140,7 @@ export default function MintForge() {
   useEffect(() => { if (frame !== undefined && !banner) preloadBanner(frame).then(() => setBanner(true)); }, [frame, banner]);
   const warmed = useRef(false);
   const open = boot.status === "ready" && !!game.snap && art.ready && banner;
-  useEffect(() => { if (open && !warmed.current) { warmed.current = true; warmAfter(game.coins); } }, [open, game.coins]);
+  useEffect(() => { if (open && !warmed.current) { warmed.current = true; warmAfter(game.coins); setTimeout(() => loadTavern().catch(() => {}), 4000); } }, [open, game.coins]);
 
   let body;
   if (boot.status === "anon") body = <AuthScreen onAuthed={game.onAuthed}/>;
