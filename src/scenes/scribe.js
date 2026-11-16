@@ -32,7 +32,6 @@
  *  while they draw, and the desk says what he craves today.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { tiedScroll } from "../lib/forms.js";
 import { pageSigil } from "../lib/tomeArt.js";
 import { RARITY, TRAITS, LIFTS, careOf } from "../../shared/sigil.js";
 import { SCRIBE } from "../../shared/tuning.js";
@@ -49,7 +48,7 @@ const inkMax = () => bus.inkMax();          // the well on the desk decides
 const WELL = [W - 96, 14, 80, 34];           // the ink meter is a button: a deeper well
 
 const P = { room:"#080705", deskA:"#17120c", deskEdge:"#2f2518", ink:"#17140d" };
-const STEP = 18;                             // frames between each lift on the seal
+const STEP = 28;                             // frames between each lift on the seal: time to see each colour
 const markOf = why => (TRAITS[why] || LIFTS[why] || { mark: why }).mark;
 const BTN = { undo:[20,304,48,30], clear:[74,304,48,30], seal:[128,304,47,30] };
 const BOOK = [20, 342, 155, 72];             // the open tome, under the buttons
@@ -229,50 +228,124 @@ function btn([x, y, w, h], label, on) {
  * (a trait, care, the craving), naming each as it lands. */
 const shownSteps = () => (S.result ? Math.max(0, Math.min(S.result.steps.length, Math.floor((S.sealT - 40) / (view.calm ? 1 : STEP)) + 1)) : 0);
 const sealDone = () => S.phase === "sealed" && S.sealT > 58 + (view.calm ? 0 : STEP * (S.result?.steps.length || 0));
+/* ─── the reveal: the ink itself lights up ───────────────────────────
+ * As the wax sets the desk falls dark round the sheet and the lines warm.
+ * When the verdict lands they glow in the scroll's colour; each lift
+ * flashes them white and settles them into the next colour, the glow
+ * wider the rarer (none for common, four pixels for mythic), sparks
+ * rising off the lines from epic up. The ink's pixels are found once, and
+ * each tier's glow drawn once and kept. */
+const GLOW_R = [0, 1, 1, 2, 3, 4];
+function inkMask() {
+  if (S.mask) return S.mask;
+  const m = document.createElement("canvas"); m.width = W; m.height = H;
+  const c = m.getContext("2d"); c.fillStyle = "#fff";
+  const px = new Set();
+  const dot = (x, y) => { x = Math.round(x); y = Math.round(y); for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) px.add((y + dy) * W + x + dx); };
+  for (const st of S.strokes) for (let i = 0; i < st.length; i++) {
+    if (!i) { dot(st[0].x, st[0].y); continue; }
+    const a = st[i - 1], b = st[i], n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y));
+    for (let k = 0; k <= n; k++) dot(a.x + (b.x - a.x) * k / n, a.y + (b.y - a.y) * k / n);
+  }
+  for (const i of px) c.fillRect(i % W, (i / W) | 0, 1, 1);
+  S.mask = m; S.inkPx = [...px]; S.glows = {};
+  return m;
+}
+function tinted(mask, col) {
+  const t = document.createElement("canvas"); t.width = W; t.height = H;
+  const c = t.getContext("2d"); c.drawImage(mask, 0, 0);
+  c.globalCompositeOperation = "source-in"; c.fillStyle = col; c.fillRect(0, 0, W, H);
+  return t;
+}
+const lighten = (hex, k) => { const n = parseInt(hex.slice(1), 16); return "#" + [16, 8, 0].map(sh => Math.round(((n >> sh) & 255) + (255 - ((n >> sh) & 255)) * k).toString(16).padStart(2, "0")).join(""); };
+function glowOf(tier) {
+  inkMask();
+  if (S.glows[tier]) return S.glows[tier];
+  const g = document.createElement("canvas"); g.width = W; g.height = H;
+  const c = g.getContext("2d"), col = RARITY[tier].c, halo = tinted(S.mask, col), R = GLOW_R[tier];
+  // the halo: the ink spread a pixel at a time, fainter as it goes out
+  for (let r = R; r >= 1; r--) {
+    c.globalAlpha = 0.16 + 0.1 * (R - r);
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && dx * dx + dy * dy <= r * r + r) c.drawImage(halo, dx, dy);
+  }
+  c.globalAlpha = 1;
+  c.drawImage(tinted(S.mask, tier ? lighten(col, 0.35) : "#a89c84"), 0, 0);     // the line itself, lit
+  return (S.glows[tier] = g);
+}
+let flashOf = null;
 function drawSeal() {
   const waiting = S.phase === "sealing";
   const k = waiting ? Math.min(0.5, S.sealT / 58) : Math.min(1, S.sealT / 58);
   const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
   const r = S.result;
   const n = shownSteps();
-  if (r && n > S.lifted) { S.lifted = n; bus.feel("rarity" + r.steps[n - 1].to); }
+  if (r && n > S.lifted) { S.lifted = n; S.flashAt = S.sealT; bus.feel("rarity" + r.steps[n - 1].to); }
   const tier = r ? (n ? r.steps[n - 1].to : r.base) : 0;
-  const col = r ? RARITY[tier].c : "#3a3226";           // no ribbon colour until the verdict is in
 
-  ctx.globalAlpha = 0.94 * Math.min(1, e * 2);
-  plot(0, 0, W, H, `rgb(${SURROUND})`);       // the desk falls away into the room
+  // the desk falls away into the dark round the sheet; the sheet dims too,
+  // so the ink can shine
+  const dark = Math.min(1, e * 2);
+  ctx.globalAlpha = 0.92 * dark;
+  plot(0, 0, W, SHEET.y, `rgb(${SURROUND})`); plot(0, SHEET.y + SHEET.h, W, H, `rgb(${SURROUND})`);
+  plot(0, SHEET.y, SHEET.x, SHEET.h, `rgb(${SURROUND})`); plot(SHEET.x + SHEET.w, SHEET.y, W, SHEET.h, `rgb(${SURROUND})`);
+  ctx.globalAlpha = 0.55 * dark; plot(SHEET.x, SHEET.y, SHEET.w, SHEET.h, "#050403");
   ctx.globalAlpha = 1;
 
-  const sp = tiedScroll(col);
-  const cx = W / 2, cy = 176 - e * 8;
-  const sc = e > 0.6 ? 3 : 2;            // integer only — never resample pixels
-  ctx.drawImage(sp, Math.round(cx - sp.width * sc / 2), Math.round(cy - sp.height * sc / 2), sp.width * sc, sp.height * sc);
-
-  ctx.font = FONT; ctx.textAlign = "center";
-  if (waiting) {
-    if (S.sealT > 40) { ctx.fillStyle = INK.warm; ctx.fillText("THE WAX IS SETTING" + ".".repeat(1 + ((S.t / 24) | 0) % 3), W / 2, 246); }
+  if (waiting || !r) {
+    // the wax setting: the lines warm and breathe, no colour yet
+    ctx.globalAlpha = 0.35 + 0.35 * Math.min(1, S.sealT / 40) * (view.calm ? 1 : 0.7 + 0.3 * Math.sin(S.t * 0.15));
+    ctx.drawImage(glowOf(0), 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.font = FONT; ctx.textAlign = "center";
+    if (S.sealT > 40) { ctx.fillStyle = INK.warm; ctx.fillText("THE WAX IS SETTING" + ".".repeat(1 + ((S.t / 24) | 0) % 3), W / 2, 318); }
     return;
   }
-  if (k > 0.55) {
-    ctx.globalAlpha = Math.min(1, (k - 0.55) / 0.3);
-    if (r.likeness != null) {
-      ctx.fillStyle = r.poor ? INK.warn : INK.warmHi;
-      ctx.fillText(r.poor ? "NOTHING LIKE THE PAGE" : `LIKENESS ${Math.round(r.likeness * 100)}%`, W / 2, 232);
-    }
-    ctx.fillStyle = col;
-    ctx.fillText(RARITY[tier].n, W / 2, 246);
-    ctx.fillStyle = INK.warm;
-    if (r.familiar) ctx.fillText("HE HAS SEEN THIS ONE BEFORE", W / 2, 262);
-    else if (!r.steps.length) ctx.fillText("SEALED", W / 2, 262);
-    // each lift, as it lands
-    for (let i = 0; i < n; i++) {
-      const st = r.steps[i], fresh = i === n - 1 && S.sealT - 40 - i * STEP < 8 && !view.calm;
-      ctx.fillStyle = fresh ? "#fff0c8" : RARITY[st.to].c;
-      ctx.fillText("+ " + markOf(st.why), W / 2, 262 + i * 11);
+
+  // the glow, breathing; a white flash as each lift lands
+  const since = S.sealT - (S.flashAt ?? -99), flash = !view.calm && since < 10 ? 1 - since / 10 : 0;
+  ctx.globalAlpha = Math.min(1, e * 1.4) * (view.calm ? 1 : 0.85 + 0.15 * Math.sin(S.t * 0.08));
+  ctx.drawImage(glowOf(tier), 0, 0);
+  if (flash > 0) {
+    if (!flashOf || flashOf.mask !== S.mask) flashOf = { mask: S.mask, img: tinted(S.mask, "#fff8e8") };
+    ctx.globalAlpha = flash; ctx.drawImage(flashOf.img, 0, 0);
+    if (GLOW_R[tier]) { ctx.globalAlpha = flash * 0.5; ctx.drawImage(glowOf(tier), -1, 0); ctx.drawImage(glowOf(tier), 1, 0); }
+  }
+  ctx.globalAlpha = 1;
+  // sparks off the lines, from epic up
+  if (tier >= 3 && !view.calm && S.inkPx.length) {
+    const many = (tier - 2) * 6;
+    for (let i = 0; i < many; i++) {
+      const life = 50 + (i * 17) % 30, u = ((S.t + i * 23) % life) / life;
+      const at = S.inkPx[(i * 7919 + Math.floor((S.t + i * 23) / life) * 104729) % S.inkPx.length];
+      const x = at % W + Math.round(Math.sin(u * 6 + i) * 2), y = ((at / W) | 0) - Math.round(u * 14);
+      ctx.globalAlpha = 1 - u; plot(x, y, 1, 1, u < 0.3 ? "#fff8e8" : RARITY[tier].c);
     }
     ctx.globalAlpha = 1;
   }
-  if (sealDone()) { ctx.fillStyle = INK.warm; ctx.fillText("TAP TO BEGIN ANOTHER", W / 2, 330); }
+
+  // the verdict, under the sheet
+  ctx.font = FONT; ctx.textAlign = "center";
+  if (k > 0.55) {
+    ctx.globalAlpha = Math.min(1, (k - 0.55) / 0.3);
+    const y0 = SHEET.y + SHEET.h + 16;
+    if (r.likeness != null) {
+      ctx.fillStyle = r.poor ? INK.warn : INK.warmHi;
+      ctx.fillText(r.poor ? "NOTHING LIKE THE PAGE" : `LIKENESS ${Math.round(r.likeness * 100)}%`, W / 2, y0);
+    }
+    ctx.fillStyle = RARITY[tier].c;
+    ctx.fillText(RARITY[tier].n, W / 2, y0 + 13);
+    ctx.fillStyle = INK.warm;
+    if (r.familiar) ctx.fillText("HE HAS SEEN THIS ONE BEFORE", W / 2, y0 + 27);
+    else if (!r.steps.length) ctx.fillText("SEALED INTO YOUR SATCHEL", W / 2, y0 + 27);
+    // each lift, as it lands
+    for (let i = 0; i < n; i++) {
+      const st = r.steps[i], fresh = i === n - 1 && since < 8 && !view.calm;
+      ctx.fillStyle = fresh ? "#fff0c8" : RARITY[st.to].c;
+      ctx.fillText("+ " + markOf(st.why), W / 2, y0 + 27 + i * 11);
+    }
+    ctx.globalAlpha = 1;
+  }
+  if (sealDone()) { ctx.fillStyle = INK.warm; ctx.fillText("TAP TO BEGIN ANOTHER", W / 2, H - 12); }
 }
 
 /* ─── loop ────────────────────────────────────────────────────────── */
@@ -362,6 +435,7 @@ function seal() {
     .filter(s => s.length);
   if (rel.reduce((n, s) => n + s.length, 0) < 4) { note("TOO FAINT TO SEAL. DRAW A LITTLE MORE."); return; }
   S.phase = "sealing"; S.sealT = 0; S.result = null; S.cur = null;
+  S.mask = null; S.flashAt = null;                 // the ink to light, found afresh
   bus.feel("seal");
   bus.seal(rel).then(res => {
     if (!alive) return;
@@ -383,6 +457,7 @@ function seal() {
 }
 function newSheet() {
   S.strokes = []; S.ink = 0; S.cur = null; S.phase = "draw"; S.result = null;
+  S.mask = null; S.inkPx = null; S.glows = null; S.flashAt = null;
 }
 
 const teardown = () => {
