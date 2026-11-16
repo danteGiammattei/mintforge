@@ -129,21 +129,35 @@ export function mount(cv, bus) {
     for (const [x, y, w, h] of [[2, 350, 22, 12], [10, 340, 14, 10], [W - 26, 356, 24, 14], [W - 18, 344, 12, 12], [30, 392, 16, 9], [W - 44, 404, 18, 8]]) {
       p(x, y, w, h, ST[3]); p(x, y, w, 1, ST[5]); p(x, y + h - 1, w, 1, ST[0]); p(x + 2, y, Math.floor(w / 2), 1, MOSS[2]);
     }
-    // the plinth: a weathered marble block, its top lit, moss in its cracks
+    // the plinth: a weathered marble block, its top lit, moss in its cracks.
+    // Below the horizon, so its tops are seen, running back toward the
+    // floor's vanishing point: each top face narrows as it goes back.
     const px0 = 66, pw = 63;
-    p(px0 - 6, 350, pw + 12, 8, MARBLE[3]); p(px0 - 6, 350, pw + 12, 1, MARBLE[1]); p(px0 - 6, 357, pw + 12, 1, MARBLE[4]);
-    p(px0 - 3, 342, pw + 6, 8, MARBLE[2]); p(px0 - 3, 342, pw + 6, 1, MARBLE[0]);
-    for (let y = PLINTH_Y + 8; y < 342; y++) for (let x = px0; x < px0 + pw; x++) {
+    const top = (x0, x1, front, depth, fill, back) => {
+      for (let y = front - depth; y < front; y++) {
+        const f = (y - VY) / (front - VY), a = VX + (x0 - VX) * f, b = VX + (x1 - VX) * f;
+        p(Math.round(a), y, Math.round(b) - Math.round(a), 1, y === front - depth ? back : fill);
+      }
+    };
+    top(px0 - 6, px0 + pw + 6, 352, 4, MARBLE[1], MARBLE[3]);
+    p(px0 - 6, 352, pw + 12, 6, MARBLE[3]); p(px0 - 6, 357, pw + 12, 1, MARBLE[4]);
+    top(px0 - 3, px0 + pw + 3, 345, 4, MARBLE[0], MARBLE[2]);
+    p(px0 - 3, 345, pw + 6, 7, MARBLE[2]);
+    for (let y = PLINTH_Y + 8; y < 341; y++) for (let x = px0; x < px0 + pw; x++) {
       const lit = x < px0 + 22, panel = x > px0 + 8 && x < px0 + pw - 8 && y > PLINTH_Y + 18 && y < 332;
       p(x, y, 1, 1, panel ? (lit ? MARBLE[2] : MARBLE[3]) : lit ? MARBLE[1] : MARBLE[2]);
     }
     for (let y = PLINTH_Y + 18; y < 332; y++) { p(px0 + 8, y, 1, 1, MARBLE[4]); p(px0 + pw - 9, y, 1, 1, MARBLE[0]); }
-    p(px0 - 4, PLINTH_Y, pw + 8, 8, MARBLE[1]); p(px0 - 4, PLINTH_Y, pw + 8, 2, MARBLE[0]); p(px0 - 4, PLINTH_Y + 7, pw + 8, 1, MARBLE[4]);
+    // the slab on top: its top face, then its front edge
+    top(px0 - 4, px0 + pw + 4, PLINTH_Y, 11, MARBLE[0], MARBLE[2]);
+    p(px0 - 4, PLINTH_Y, pw + 8, 8, MARBLE[1]); p(px0 - 4, PLINTH_Y, pw + 8, 1, MARBLE[0]); p(px0 - 4, PLINTH_Y + 7, pw + 8, 1, MARBLE[4]);
+    for (let i = 0; i < 9; i++) p(px0 + 2 + Math.floor(rng() * (pw - 4)), PLINTH_Y - 1 - Math.floor(rng() * 9), 2, 1, MOSS[1]);
     for (let i = 0; i < 40; i++) {                                     // age: moss, stains, cracks
       const x = px0 + Math.floor(rng() * pw), y = PLINTH_Y + 8 + Math.floor(rng() * 80);
       p(x, y, 1, 1 + Math.floor(rng() * 4), rng() < 0.6 ? MOSS[1] : MARBLE[4]);
     }
     p(px0 - 4, PLINTH_Y + 2, 12, 2, MOSS[2]); p(px0 + pw - 10, PLINTH_Y + 1, 9, 2, MOSS[1]);
+    p(px0 - 3, PLINTH_Y - 1, 6, 1, MOSS[2]);
   }
 
   // a soft glow round a rectangle, in stepped rings, kept per size and colour
@@ -166,7 +180,7 @@ export function mount(cv, bus) {
   /* ─── the book ────────────────────────────────────────────────────── */
   function drawClosed() {
     const t = tome(), own = has(), cover = tomeCover(t, own);
-    const x = Math.round(W / 2 - CLOSED.w / 2), y = own ? BOOK_Y - CLOSED.h + bob() : PLINTH_Y - CLOSED.h + 2;
+    const x = Math.round(W / 2 - CLOSED.w / 2), y = own ? BOOK_Y - CLOSED.h + bob() : PLINTH_Y - CLOSED.h - 4;
     if (own) ctx.drawImage(halo(CLOSED.w, CLOSED.h, t.look.trim, 12), x - 12, y - 12);
     ctx.drawImage(cover, x, y, CLOSED.w, CLOSED.h);
     if (!own) {                                                            // chained shut
@@ -235,8 +249,14 @@ export function mount(cv, bus) {
   function drawLight() {
     if (!has()) return;
     const col = tome().look.trim;
-    ctx.globalAlpha = 0.22 + (view.calm ? 0 : 0.06 * Math.sin(S.t * 0.045));
-    plot(62, PLINTH_Y, 71, 2, col); ctx.globalAlpha *= 0.5; plot(66, PLINTH_Y + 2, 63, 6, col);
+    // a pool of its light on the plinth's top face, brightest under it
+    const pulse = view.calm ? 0 : 0.06 * Math.sin(S.t * 0.045);
+    for (let y = PLINTH_Y - 10; y < PLINTH_Y; y++) {
+      const f = (y - VY) / (PLINTH_Y - VY), half = 40 * f;
+      ctx.globalAlpha = 0.16 + pulse; plot(W / 2 - half, y, half * 2, 1, col);
+      ctx.globalAlpha = 0.14 + pulse; plot(W / 2 - half * 0.5, y, half, 1, col);
+    }
+    ctx.globalAlpha = 0.12; plot(62, PLINTH_Y, 71, 1, col);
     ctx.globalAlpha = 1;
     if (view.calm) return;
     for (let i = 0; i < 12; i++) {

@@ -230,25 +230,40 @@ const shownSteps = () => (S.result ? Math.max(0, Math.min(S.result.steps.length,
 const sealDone = () => S.phase === "sealed" && S.sealT > 58 + (view.calm ? 0 : STEP * (S.result?.steps.length || 0));
 /* ─── the reveal: the ink itself lights up ───────────────────────────
  * As the wax sets the desk falls dark round the sheet and the lines warm.
- * When the verdict lands they glow in the scroll's colour; each lift
- * flashes them white and settles them into the next colour, the glow
- * wider the rarer (none for common, four pixels for mythic), sparks
- * rising off the lines from epic up. The ink's pixels are found once, and
- * each tier's glow drawn once and kept. */
-const GLOW_R = [0, 1, 1, 2, 3, 4];
+ * When the verdict lands they light in the scroll's colour, in layers so
+ * the drawing keeps its detail: a soft field of colour behind it, a faint
+ * halo hugging the lines, the line in its colour, and down its middle a
+ * near-white core one pixel wide. The rarer, the more of the soft layers
+ * (never thicker lines): twinkling stars in a second colour from
+ * uncommon, sparks rising from epic, a turning ring of light round it all
+ * from legendary. Each lift flashes the lines white and settles them into
+ * the next colour. The ink's pixels are found once, each tier drawn once
+ * and kept. */
+const HALO_R = [0, 1, 1, 2, 2, 3];
+const ACCENT = ["#c9b98f", "#e2ffc0", "#d0f4ff", "#ffc8f4", "#fff2b8", "#8ccaff"];   // the twinkles' colour per tier
 function inkMask() {
   if (S.mask) return S.mask;
   const m = document.createElement("canvas"); m.width = W; m.height = H;
   const c = m.getContext("2d"); c.fillStyle = "#fff";
-  const px = new Set();
-  const dot = (x, y) => { x = Math.round(x); y = Math.round(y); for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) px.add((y + dy) * W + x + dx); };
+  const px = new Set(), core = new Set();
+  const dot = (x, y) => {
+    x = Math.round(x); y = Math.round(y); core.add(y * W + x);
+    for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) px.add((y + dy) * W + x + dx);
+  };
   for (const st of S.strokes) for (let i = 0; i < st.length; i++) {
     if (!i) { dot(st[0].x, st[0].y); continue; }
     const a = st[i - 1], b = st[i], n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y));
     for (let k = 0; k <= n; k++) dot(a.x + (b.x - a.x) * k / n, a.y + (b.y - a.y) * k / n);
   }
   for (const i of px) c.fillRect(i % W, (i / W) | 0, 1, 1);
-  S.mask = m; S.inkPx = [...px]; S.glows = {};
+  const cm = document.createElement("canvas"); cm.width = W; cm.height = H;
+  const cc = cm.getContext("2d"); cc.fillStyle = "#fff";
+  for (const i of core) cc.fillRect(i % W, (i / W) | 0, 1, 1);
+  // where the drawing sits, for the field behind it and the ring round it
+  let x0 = W, y0 = H, x1 = 0, y1 = 0;
+  for (const i of px) { const x = i % W, y = (i / W) | 0; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  S.mask = m; S.coreMask = cm; S.inkPx = [...px]; S.glows = {};
+  S.inkBox = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, r: Math.max(x1 - x0, y1 - y0) / 2 };
   return m;
 }
 function tinted(mask, col) {
@@ -258,18 +273,32 @@ function tinted(mask, col) {
   return t;
 }
 const lighten = (hex, k) => { const n = parseInt(hex.slice(1), 16); return "#" + [16, 8, 0].map(sh => Math.round(((n >> sh) & 255) + (255 - ((n >> sh) & 255)) * k).toString(16).padStart(2, "0")).join(""); };
+const darken = (hex, k) => { const n = parseInt(hex.slice(1), 16); return "#" + [16, 8, 0].map(sh => Math.round(((n >> sh) & 255) * k).toString(16).padStart(2, "0")).join(""); };
 function glowOf(tier) {
   inkMask();
   if (S.glows[tier]) return S.glows[tier];
   const g = document.createElement("canvas"); g.width = W; g.height = H;
-  const c = g.getContext("2d"), col = RARITY[tier].c, halo = tinted(S.mask, col), R = GLOW_R[tier];
-  // the halo: the ink spread a pixel at a time, fainter as it goes out
+  const c = g.getContext("2d"), col = tier ? RARITY[tier].c : "#a89c84", R = HALO_R[tier];
+  // the field: a soft disc of the colour behind the drawing, in steps
+  if (tier) {
+    const { cx, cy, r } = S.inkBox, rings = 2 + tier, step = r * 0.14 + 3, out = r * 0.5 + rings * step;
+    c.fillStyle = darken(col, 0.55);
+    for (let y = Math.floor(cy - out); y <= cy + out; y++) for (let x = Math.floor(cx - out); x <= cx + out; x++) {
+      const d = Math.hypot(x - cx, y - cy), inside = Math.min(rings, Math.ceil((out - d) / step));
+      if (inside <= 0) continue;
+      c.globalAlpha = 0.045 * inside; c.fillRect(x, y, 1, 1);
+    }
+  }
+  // the halo: the ink spread out a pixel at a time, faint
+  const halo = tinted(S.mask, col);
   for (let r = R; r >= 1; r--) {
-    c.globalAlpha = 0.16 + 0.1 * (R - r);
+    c.globalAlpha = 0.09 + 0.05 * (R - r);
     for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && dx * dx + dy * dy <= r * r + r) c.drawImage(halo, dx, dy);
   }
+  // the line in its colour, and its bright core
   c.globalAlpha = 1;
-  c.drawImage(tinted(S.mask, tier ? lighten(col, 0.35) : "#a89c84"), 0, 0);     // the line itself, lit
+  c.drawImage(tinted(S.mask, tier ? col : "#8a7f68"), 0, 0);
+  c.drawImage(tinted(S.coreMask, tier ? lighten(col, 0.72) : "#c9b98f"), 0, 0);
   return (S.glows[tier] = g);
 }
 let flashOf = null;
@@ -288,7 +317,7 @@ function drawSeal() {
   ctx.globalAlpha = 0.92 * dark;
   plot(0, 0, W, SHEET.y, `rgb(${SURROUND})`); plot(0, SHEET.y + SHEET.h, W, H, `rgb(${SURROUND})`);
   plot(0, SHEET.y, SHEET.x, SHEET.h, `rgb(${SURROUND})`); plot(SHEET.x + SHEET.w, SHEET.y, W, SHEET.h, `rgb(${SURROUND})`);
-  ctx.globalAlpha = 0.55 * dark; plot(SHEET.x, SHEET.y, SHEET.w, SHEET.h, "#050403");
+  ctx.globalAlpha = 0.6 * dark; plot(SHEET.x, SHEET.y, SHEET.w, SHEET.h, "#050403");
   ctx.globalAlpha = 1;
 
   if (waiting || !r) {
@@ -303,22 +332,53 @@ function drawSeal() {
 
   // the glow, breathing; a white flash as each lift lands
   const since = S.sealT - (S.flashAt ?? -99), flash = !view.calm && since < 10 ? 1 - since / 10 : 0;
-  ctx.globalAlpha = Math.min(1, e * 1.4) * (view.calm ? 1 : 0.85 + 0.15 * Math.sin(S.t * 0.08));
+  const shown = Math.min(1, e * 1.4);
+  ctx.globalAlpha = shown * (view.calm ? 1 : 0.88 + 0.12 * Math.sin(S.t * 0.08));
   ctx.drawImage(glowOf(tier), 0, 0);
   if (flash > 0) {
     if (!flashOf || flashOf.mask !== S.mask) flashOf = { mask: S.mask, img: tinted(S.mask, "#fff8e8") };
-    ctx.globalAlpha = flash; ctx.drawImage(flashOf.img, 0, 0);
-    if (GLOW_R[tier]) { ctx.globalAlpha = flash * 0.5; ctx.drawImage(glowOf(tier), -1, 0); ctx.drawImage(glowOf(tier), 1, 0); }
+    ctx.globalAlpha = flash * 0.85; ctx.drawImage(flashOf.img, 0, 0);
   }
   ctx.globalAlpha = 1;
-  // sparks off the lines, from epic up
+  const col = RARITY[tier].c, acc = ACCENT[tier], { cx, cy, r: rr } = S.inkBox;
+  // a ring of light round it all, its dashes turning, from legendary
+  if (tier >= 4) {
+    const R = Math.round(rr + 10), turn = view.calm ? 0 : S.t * 0.006, dashes = 36;
+    for (let i = 0; i < dashes * 4; i++) {
+      const a = turn + (i / (dashes * 4)) * Math.PI * 2, on = Math.floor(i / 2) % 2 === 0;
+      if (!on) continue;
+      ctx.globalAlpha = shown * 0.55;
+      plot(Math.round(cx + Math.cos(a) * R), Math.round(cy + Math.sin(a) * R), 1, 1, i % 8 === 0 ? acc : col);
+    }
+    if (tier >= 5) {
+      ctx.globalAlpha = shown * 0.3;
+      for (let i = 0; i < 160; i++) { const a = -turn * 1.6 + (i / 160) * Math.PI * 2; plot(Math.round(cx + Math.cos(a) * (R + 4)), Math.round(cy + Math.sin(a) * (R + 4)), 1, 1, col); }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // twinkles: four-pointed stars near the lines, each on its own beat
+  if (tier >= 1 && S.inkPx.length) {
+    const many = tier * 3;
+    for (let i = 0; i < many; i++) {
+      const life = 70 + (i * 29) % 50, cycle = Math.floor((S.t + i * 41) / life), u = ((S.t + i * 41) % life) / life;
+      const at = S.inkPx[(i * 7919 + cycle * 104729) % S.inkPx.length];
+      const x = at % W + ((i * 13 + cycle * 7) % 17) - 8, y = ((at / W) | 0) + ((i * 11 + cycle * 5) % 17) - 8;
+      const b = view.calm ? 0.6 : Math.sin(u * Math.PI);
+      ctx.globalAlpha = shown * b;
+      plot(x, y, 1, 1, "#ffffff");
+      if (b > 0.45) { plot(x - 1, y, 1, 1, acc); plot(x + 1, y, 1, 1, acc); plot(x, y - 1, 1, 1, acc); plot(x, y + 1, 1, 1, acc); }
+      if (b > 0.8 && tier >= 3) { plot(x - 2, y, 1, 1, acc); plot(x + 2, y, 1, 1, acc); plot(x, y - 2, 1, 1, acc); plot(x, y + 2, 1, 1, acc); }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // sparks rising off the lines, from epic up
   if (tier >= 3 && !view.calm && S.inkPx.length) {
-    const many = (tier - 2) * 6;
+    const many = (tier - 2) * 5;
     for (let i = 0; i < many; i++) {
       const life = 50 + (i * 17) % 30, u = ((S.t + i * 23) % life) / life;
       const at = S.inkPx[(i * 7919 + Math.floor((S.t + i * 23) / life) * 104729) % S.inkPx.length];
       const x = at % W + Math.round(Math.sin(u * 6 + i) * 2), y = ((at / W) | 0) - Math.round(u * 14);
-      ctx.globalAlpha = 1 - u; plot(x, y, 1, 1, u < 0.3 ? "#fff8e8" : RARITY[tier].c);
+      ctx.globalAlpha = 1 - u; plot(x, y, 1, 1, u < 0.3 ? "#fff8e8" : acc);
     }
     ctx.globalAlpha = 1;
   }
@@ -457,7 +517,7 @@ function seal() {
 }
 function newSheet() {
   S.strokes = []; S.ink = 0; S.cur = null; S.phase = "draw"; S.result = null;
-  S.mask = null; S.inkPx = null; S.glows = null; S.flashAt = null;
+  S.mask = null; S.coreMask = null; S.inkPx = null; S.inkBox = null; S.glows = null; S.flashAt = null;
 }
 
 const teardown = () => {
