@@ -17,8 +17,13 @@ export function TomeCover({ tome, owned = true, scale = 3 }) {
 }
 
 export default function TomeShelf({ owned, open, onPick, onClose }) {
+  // the desk opens this on the touch going down; on a phone the click that
+  // follows the touch lifting would land on the backdrop and close it
+  // again at once, so the backdrop ignores taps for a moment
+  const born = useRef(performance.now());
+  const backdrop = () => { if (performance.now() - born.current > 450) onClose(); };
   return (
-    <div className="veil appear" style={{ zIndex: 440 }} onClick={onClose}>
+    <div className="veil appear" style={{ zIndex: 440 }} onClick={backdrop}>
       <div className="panel panel-hi sheet rise" role="dialog" aria-modal="true" aria-label="Your tomes" style={{ padding: 12 }} onClick={e => e.stopPropagation()}>
         <div className="between" style={{ marginBottom: 12 }}>
           <h2 className="t-title" style={{ margin: 0 }}>TOMES</h2>
