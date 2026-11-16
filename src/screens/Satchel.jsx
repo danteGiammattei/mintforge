@@ -10,7 +10,7 @@ import RevealBanner from "../components/RevealBanner.jsx";
 import { tiedScroll, chest as chestSprite, dirtClod } from "../lib/forms.js";
 import { mount as mountChest, SURROUND } from "../scenes/chest.js";
 import { RARITY } from "../../shared/sigil.js";
-import { CHESTS } from "../../shared/tuning.js";
+import { CHESTS, ASTRAL } from "../../shared/tuning.js";
 import { BRUSH_UPS, RARITIES } from "../lib/data.js";
 import { coinRarity } from "../lib/coin.js";
 
@@ -68,6 +68,7 @@ export default function Satchel() {
       const r = await g.act("brush", { coinId: coin.id });
       feel("reveal");
       setFound({ coin, xp: r.xp, isNew });
+      if (r.signBonus) ui.toast(`${ASTRAL.signs[r.signBonus.sign].toUpperCase()}, FOUND FOR THE FIRST TIME: +${r.signBonus.marks.toLocaleString()} MARKS`, "magic");
       ui.say(`${RARITIES[coinRarity(coin)].name} ${matterOf(coin).name} coin${coin.shiny ? ", shiny" : ""}.`);
     } catch (e) {
       // it is still dusty on the server, so it is still here to brush

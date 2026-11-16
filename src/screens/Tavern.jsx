@@ -5,7 +5,7 @@ import { feel } from "../lib/feel.js";
 import { coinRarity } from "../lib/coin.js";
 import { hydrate, matterOf } from "../lib/coinview.js";
 import { METALS, RARITIES, MAX_TIER } from "../lib/data.js";
-import { GAMBLE } from "../../shared/tuning.js";
+import { GAMBLE, ASTRAL } from "../../shared/tuning.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
 import RouletteWheel, { SECTOR_COLOURS } from "../components/RouletteWheel.jsx";
 import Plinko from "../components/Plinko.jsx";
@@ -90,6 +90,7 @@ export default function Tavern() {
     setPhase("result");
     feel(out.won ? "win" : "lose");
     ui.say(`${OUTCOME_LINE[out.outcome] || (out.won ? "YOU WON" : "YOU LOST")}.`);
+    for (const b of out.signBonus || []) ui.toast(`${ASTRAL.signs[b.sign].toUpperCase()}, FOUND FOR THE FIRST TIME: +${b.marks.toLocaleString()} MARKS`, "magic");
   };
 
   return (

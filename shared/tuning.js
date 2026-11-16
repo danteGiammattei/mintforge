@@ -308,6 +308,7 @@ export const MATERIAL = {
 export const ASTRAL = {
   metal: 10,
   instead: 9,
+  firstBonus: 10000,            // marks, the first time a player ever finds each sign
   signs: ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"],
 };
 

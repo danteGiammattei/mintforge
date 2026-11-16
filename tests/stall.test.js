@@ -111,3 +111,36 @@ test("restrike: a new face for marks; metal, rarity, shape, shine and name stay"
   await db.prepare(`UPDATE coins SET metal_idx = 10 WHERE id = 'rc'`).run();
   await assert.rejects(go({ action: "restrike", coinId: "rc" }), /sign/);
 });
+
+test("a star sign found for the first time pays 10,000 marks, once ever", async () => {
+  const { db, pid, go, marksOf } = await setup(0);
+  const dusty = (id, sign) => db.prepare(
+    `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES (?1, ?2, 77, 10, 0, 0, 2, 0, 1, ?3)`
+  ).bind(id, pid, sign).run();
+  await dusty("c_aries001", 0);
+  const r1 = (await go({ action: "brush", coinId: "c_aries001" })).result;
+  assert.deepEqual(r1.signBonus, { sign: 0, marks: 10000 });
+  assert.equal(await marksOf(), 10000);
+  // let it go, find Aries again: nothing
+  await db.prepare(`DELETE FROM coins WHERE id = 'c_aries001'`).run();
+  await dusty("c_aries002", 0);
+  const r2 = (await go({ action: "brush", coinId: "c_aries002" })).result;
+  assert.equal(r2.signBonus, undefined);
+  assert.equal(await marksOf(), 10000);
+  // a different sign pays again
+  await dusty("c_leo00001", 4);
+  assert.equal((await go({ action: "brush", coinId: "c_leo00001" })).result.signBonus.marks, 10000);
+  assert.equal(await marksOf(), 20000);
+});
+
+test("migration 019 marks held signs as found, without paying", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { db, pid, go, marksOf } = await setup(0);
+  await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES ('c_virgo001', ?1, 77, 10, 0, 0, 2, 0, 1, 5)`).bind(pid).run();
+  db.raw.exec(readFileSync(new URL("../migrations/019_sign_bonus.sql", import.meta.url), "utf8"));
+  db.raw.exec(readFileSync(new URL("../migrations/019_sign_bonus.sql", import.meta.url), "utf8"));   // twice is fine
+  const j = JSON.parse((await db.prepare(`SELECT journal FROM player_state WHERE player_id = ?1`).bind(pid).first()).journal);
+  assert.equal(j.signs, 1 << 5);
+  assert.equal((await go({ action: "brush", coinId: "c_virgo001" })).result.signBonus, undefined);
+  assert.equal(await marksOf(), 0);
+});
