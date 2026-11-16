@@ -53,7 +53,14 @@ export function useGameState() {
   // what we hold of each big list, by fingerprint: sent with every act so
   // the server can leave out the ones that have not changed
   const held = useRef({});
-  const remember = state => { for (const k of LISTS) if (k in state) held.current[k] = listHash(state[k]); };
+  // star signs just paid for come once, with whichever state carried
+  // them; they are taken out of the snapshot and handed on as news
+  const [news, setNews] = useState(null);
+  const remember = state => {
+    for (const k of LISTS) if (k in state) held.current[k] = listHash(state[k]);
+    if (state.signBonus?.length) { const signs = state.signBonus; setNews(n => ({ signs, n: (n?.n || 0) + 1 })); }
+    delete state.signBonus;
+  };
   const apply = useCallback(state => {
     remember(state);
     // a list left out is one we already have: keep ours
@@ -124,19 +131,24 @@ export function useGameState() {
   const coins = useMemo(() => (snap?.coins || []).map(hydrate), [snap?.coins]);
   const dusty = useMemo(() => (snap?.dusty || []).map(hydrate), [snap?.dusty]);
 
-  const autoTop = useMemo(() => [...coins].sort((a, b) =>
-    coinRarity(b) - coinRarity(a) || b.metalIdx - a.metalIdx || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0)).slice(0, MAX_PINS), [coins]);
-  // Slot order is the order of pinnedIds; a null is an empty slot.
+  const ranked = useMemo(() => [...coins].sort((a, b) =>
+    coinRarity(b) - coinRarity(a) || b.metalIdx - a.metalIdx || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0)), [coins]);
+  const autoTop = useMemo(() => ranked.slice(0, MAX_PINS), [ranked]);
+  // Slot order is the order of pinnedIds; a null is a slot left empty on
+  // purpose. A pinned coin that has gone (sold, lost at war: a coin keeps
+  // its id when it changes hands) gives its slot to the best coin not
+  // already shown, rather than leaving a hole only a reset would mend.
   const showcase = useMemo(() => {
     const ids = snap?.pinnedIds;
     if (!ids) return autoTop;
     const byId = new Map(coins.map(c => [c.id, c]));
-    return ids.slice(0, MAX_PINS).map(id => (id ? byId.get(id) || null : null));
-  }, [snap?.pinnedIds, coins, autoTop]);
+    const spare = ranked.filter(c => !ids.includes(c.id));
+    return ids.slice(0, MAX_PINS).map(id => (id ? byId.get(id) || spare.shift() || null : null));
+  }, [snap?.pinnedIds, coins, ranked, autoTop]);
 
   const pinToSlot = useCallback((slot, coinId) => {
-    setPinnedIds(prev => {
-      let next = prev == null ? showcase.map(c => c?.id || null) : [...prev];
+    setPinnedIds(() => {
+      let next = showcase.map(c => c?.id || null);      // what is shown, so a gone coin is dropped
       const at = next.indexOf(coinId);
       if (at >= 0) next[at] = null;
       while (next.length <= slot) next.push(null);
@@ -146,16 +158,16 @@ export function useGameState() {
     });
   }, [setPinnedIds, showcase]);
   const clearPinSlot = useCallback(slot => {
-    setPinnedIds(prev => {
-      const next = prev == null ? showcase.map(c => c?.id || null) : [...prev];
+    setPinnedIds(() => {
+      const next = showcase.map(c => c?.id || null);
       if (slot < next.length) next[slot] = null;
       while (next.length && next[next.length - 1] == null) next.pop();
       return next;
     });
   }, [setPinnedIds, showcase]);
   const togglePin = useCallback(id => {
-    setPinnedIds(prev => {
-      const base = prev == null ? showcase.map(c => c?.id || null) : [...prev];
+    setPinnedIds(() => {
+      const base = showcase.map(c => c?.id || null);
       const at = base.indexOf(id);
       if (at >= 0) { base[at] = null; while (base.length && base[base.length - 1] == null) base.pop(); return base; }
       const free = base.indexOf(null);
@@ -193,6 +205,6 @@ export function useGameState() {
     pinnedIds: snap?.pinnedIds ?? null,
     ownedFrames: snap?.ownedFrames || [], ownedTitles: snap?.ownedTitles || [],
     setFrame, setSelectedTitle, setBio, setPinnedIds, toggleLock,
-    autoTop, showcase, pinToSlot, clearPinSlot, togglePin, maxPins: MAX_PINS,
+    autoTop, showcase, pinToSlot, clearPinSlot, togglePin, maxPins: MAX_PINS, news,
   };
 }

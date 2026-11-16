@@ -1,6 +1,6 @@
 import { json, bad, getAuth } from "../_utils.js";
 import { currentTitle } from "../../../src/lib/data.js";
-import { journalOut } from "../../../server/state.js";
+import { journalOut, tomesOf } from "../../../server/state.js";
 import { journalCounts, cabinetScore } from "../../../shared/economy.js";
 import { deriveRarity } from "../../../src/lib/coin.js";
 
@@ -22,7 +22,8 @@ export async function onRequestGet({ request, env, params }) {
             COALESCE(player_state.frame, 'stone') AS frame,
             COALESCE(player_state.bio, '') AS bio,
             player_state.selected_title AS title,
-            player_state.pinned_ids, player_state.journal
+            player_state.pinned_ids, player_state.journal,
+            COALESCE(player_state.brush_level, 0) AS brush_level, player_state.tomes
        FROM players
        LEFT JOIN player_state ON player_state.player_id = players.id
       WHERE players.username = ?1 COLLATE NOCASE`
@@ -34,19 +35,20 @@ export async function onRequestGet({ request, env, params }) {
   ).bind(player.id).all();
   const allCoins = r.results || [];
 
+  const ranked = [...allCoins]
+    .sort((a, b) => (b.rarity ?? 0) - (a.rarity ?? 0) || b.metal_idx - a.metal_idx || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0));
   let showcase = [];
   if (player.pinned_ids) {
     try {
-      const ids = JSON.parse(player.pinned_ids);
+      // a pinned coin that has gone (sold, lost at war) leaves its slot to
+      // the best coin not already shown, as the player's own view does
+      const ids = JSON.parse(player.pinned_ids).slice(0, 8);
       const byId = new Map(allCoins.map(c => [c.id, c]));
-      showcase = ids.map(id => byId.get(id)).filter(Boolean).slice(0, 8);
+      const spare = ranked.filter(c => !ids.includes(c.id));
+      showcase = ids.map(id => (id == null ? null : byId.get(id) || spare.shift() || null)).filter(Boolean);
     } catch { showcase = []; }
   }
-  if (!showcase.length) {
-    showcase = [...allCoins]
-      .sort((a, b) => (b.rarity ?? 0) - (a.rarity ?? 0) || b.metal_idx - a.metal_idx || (b.shiny ? 1 : 0) - (a.shiny ? 1 : 0))
-      .slice(0, 6);
-  }
+  if (!showcase.length) showcase = ranked.slice(0, 6);
 
   const kinds = journalCounts(journalOut(player.journal, allCoins)).kinds;
 
@@ -67,6 +69,8 @@ export async function onRequestGet({ request, env, params }) {
     coinCount: allCoins.length,
     shinyCount: allCoins.filter(c => c.shiny).length,
     kinds,
+    brushLevel: player.brush_level,
+    tomes: tomesOf(player.tomes),
     // the star signs they hold, one astral coin each
     signs: [...new Set(allCoins.filter(c => c.sign != null).map(c => c.sign))].sort((a, b) => a - b),
     cabinet: cabinetScore(showcase.map(c => ({ metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity ?? deriveRarity(c.seed >>> 0) }))),
