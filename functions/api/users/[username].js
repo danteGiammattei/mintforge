@@ -67,6 +67,8 @@ export async function onRequestGet({ request, env, params }) {
     coinCount: allCoins.length,
     shinyCount: allCoins.filter(c => c.shiny).length,
     kinds,
+    // the star signs they hold, one astral coin each
+    signs: [...new Set(allCoins.filter(c => c.sign != null).map(c => c.sign))].sort((a, b) => a - b),
     cabinet: cabinetScore(showcase.map(c => ({ metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity ?? deriveRarity(c.seed >>> 0) }))),
     showcase: showcase.map(c => ({
       id: c.id, seed: c.seed >>> 0, metalIdx: c.metal_idx, shiny: !!c.shiny,

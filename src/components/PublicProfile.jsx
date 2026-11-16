@@ -1,16 +1,18 @@
 import PixelBanner from "./PixelBanner.jsx";
 import CabinetFrame from "./CabinetFrame.jsx";
+import SignBadges from "./SignBadges.jsx";
 import { CoinTile } from "../screens/Vault.jsx";
 import { TitleText } from "../screens/Friends.jsx";
 import { METALS, MAX_RARITY, RARITIES } from "../lib/data.js";
 
 /* ─── a profile as other players see it ───────────────────────────────────
- * Banner, name, level and title, bio, three counts and the cabinet in its
+ * Banner, name, level and title, bio, three counts, the star signs held
+ * (as badges, once there is one) and the cabinet in its
  * frame (its score on the frame's plaque). The same card on your own Profile and on anyone's you look up,
  * so what you see of yourself is what they see. */
 export const KINDS_TOTAL = METALS.length * (MAX_RARITY + 1);
 
-export default function PublicProfile({ frame, username, level, title, bio, coins, kinds, shiny, cabinet, showcase, onCoin, empty, children }) {
+export default function PublicProfile({ frame, username, level, title, bio, coins, kinds, shiny, signs = [], cabinet, showcase, onCoin, empty, children }) {
   return (
     <>
       <PixelBanner frame={frame} height={96}/>
@@ -27,6 +29,7 @@ export default function PublicProfile({ frame, username, level, title, bio, coin
             </div>
           ))}
         </dl>
+        {signs.length > 0 && <SignBadges signs={signs}/>}
         {showcase.length > 0 ? (
           <CabinetFrame rank={cabinet?.rank || 0} score={cabinet?.score} pad={6}>
             <div>

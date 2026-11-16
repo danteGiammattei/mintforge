@@ -50,7 +50,7 @@ function ProfileCard({ soc }) {
         {v.error && <p className="t-blood" style={{ padding: 16, margin: 0 }} role="alert">{v.error}</p>}
         {d && (
           <PublicProfile frame={d.frame} username={d.username} level={lvl(d.xp)} title={d.title} bio={d.bio}
-                         coins={d.coinCount} kinds={d.kinds} shiny={d.shinyCount} cabinet={d.cabinet}
+                         coins={d.coinCount} kinds={d.kinds} shiny={d.shinyCount} signs={d.signs || []} cabinet={d.cabinet}
                          showcase={d.showcase.map(hydrate)} onCoin={setCoin}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {!d.isSelf && <button className={`btn ${d.isFriend ? "" : "btn-gold"}`} style={{ flex: 1 }} disabled={busy} onClick={toggle}>{d.isFriend ? "REMOVE FRIEND" : "ADD FRIEND"}</button>}

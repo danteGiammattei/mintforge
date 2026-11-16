@@ -322,7 +322,7 @@ export const shapeOf = coin => (coin.metalIdx === METAL.astral && coin.sign != n
  * bands, the sign's glyph above, its constellation large in the middle,
  * and its name lettered along the bottom. No face: the sign is the
  * figure. The back is the field and the glyph, large. */
-const ZODIAC = [
+export const ZODIAC = [
   [".##.##.", "#..#..#", "#..#..#", "...#...", "...#...", "...#...", "...#..."],   // Aries
   ["#.....#", ".#...#.", "..###..", ".#...#.", ".#...#.", ".#...#.", "..###.."],   // Taurus
   ["#######", ".#...#.", ".#...#.", ".#...#.", ".#...#.", ".#...#.", "#######"],   // Gemini
@@ -345,7 +345,7 @@ const LETTERS = {
   R: ["##.", "#.#", "##.", "#.#", "#.#"], S: [".##", "#..", ".#.", "..#", "##."], T: ["###", ".#.", ".#.", ".#.", ".#."],
   U: ["#.#", "#.#", "#.#", "#.#", "###"], V: ["#.#", "#.#", "#.#", "#.#", ".#."],
 };
-const SKY = {
+export const SKY = {
   out: [11, 28, 38], frame: [251, 246, 210], frameMid: [226, 216, 160], frameDark: [176, 160, 108],
   bands: [[7, 30, 40], [12, 46, 60], [19, 66, 80], [29, 90, 106], [43, 117, 134], [69, 147, 166], [106, 178, 196]],
   rose: [[255, 216, 230], [244, 160, 192], [212, 120, 152], [138, 68, 98]], roseCut: [90, 42, 64],
