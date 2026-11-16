@@ -68,6 +68,11 @@ export const SIGIL = {
   },
   effortInk: 150,        // ink at which a drawing counts as a real attempt
   faintChance: 0.85,     // with no ink or time at all, how often the roll comes to nothing
+  // copying a tome page (shared/tomes.js): likeness 1 at `perfect`
+  // distance or closer, 0 at `none`. A copy at `fair` or better lifts one
+  // tier, at `close` two, at `true` three; below `poor` it is nothing,
+  // like a hurried scrap. The page's tier caps it all.
+  copy: { perfect: 0.02, none: 0.09, poor: 0.3, fair: 0.55, close: 0.72, true: 0.86, bump: 0.4 },
   familiar: 0.86,        // signature similarity that counts as a repeat
   familiarPenalty: 2,    // tiers lost for a repeat
 };
@@ -91,6 +96,9 @@ export const FAVOUR_PER_RARITY = [1, 2, 4, 9, 20, 50];
  * player more chests. It is the long game. */
 export const CHESTS = {
   names: ["WOODEN", "IRON", "GILDED", "OBSIDIAN", "VOID"],
+  // the chance a chest also holds a tome the player lacks, no rarer than
+  // the chest (shared/tomes.js tomeFromChest). A wooden one never does.
+  tomeChance: [0, 0.06, 0.1, 0.16, 0.25],
   cost:  [10, 26, 60, 120, 240],
   early: [70, 22, 6, 1.7, 0.3],
   late:  [42, 31, 16, 8, 3],

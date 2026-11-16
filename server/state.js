@@ -14,6 +14,7 @@ import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay } 
 import { cravingOn } from "../shared/sigil.js";
 import { SCRIBE, ASTRAL } from "../shared/tuning.js";
 import { heldSigns } from "./signs.js";
+import { STARTER } from "../shared/tomes.js";
 import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
 
@@ -64,13 +65,16 @@ async function signOldAstrals(db, pid, rows) {
   catch { for (const r of bare) r.sign = null; }               // a race: try again next load
 }
 
+/* the tomes a player has: always the primer, whatever the row says */
+export const tomesOf = raw => { const t = parseList(raw); return t.includes(STARTER) ? t : [STARTER, ...t]; };
+
 export async function loadState(db, pid, now = Date.now(), tz = 0) {
   // every read at once: one round trip to the database, not two
   const [ps, coins, scrolls, chests] = await Promise.all([
     db.prepare(
       `SELECT players.username, s.xp, s.marks, s.brush_level, s.frame, s.bio, s.selected_title, s.pinned_ids,
               s.owned_frames, s.owned_titles, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
-              s.journal, s.well_level
+              s.journal, s.well_level, s.tomes
          FROM player_state s JOIN players ON players.id = s.player_id
         WHERE s.player_id = ?1`
     ).bind(pid).first(),
@@ -99,6 +103,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     chests: (chests.results || []).map(r => ({ id: r.id, tier: r.tier })),
     scrollCap: SCRIBE.scrollCap,
     wellLevel: ps.well_level || 0, inkMax: inkFor(ps.well_level || 0),
+    tomes: tomesOf(ps.tomes),
     journal: journalOut(ps.journal, all),
     streak: dailyStreak(daily, now, tz),
     // the door's daily gift: waiting now, or how long until it is

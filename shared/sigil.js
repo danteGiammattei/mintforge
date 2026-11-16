@@ -54,6 +54,9 @@ export const TRAITS = {
 export const LIFTS = {
   care:  { mark: "CARE" },                 // time spent drawing
   crave: { mark: "DESIRED" },              // today's craving, lifting twice
+  fair:  { mark: "A FAIR COPY" },          // how close the copy is to its page
+  close: { mark: "A CLOSE COPY" },
+  true:  { mark: "A TRUE COPY" },
 };
 export const TRAIT_KEYS = Object.keys(TRAITS);
 
@@ -179,6 +182,10 @@ export function measure(a) {
  *          be searched for offline and a winning drawing cannot be replayed.
  * opts:    craving  today's craved trait (cravingOn)
  *          maxMs    the most drawing time to believe (time since last seal)
+ *          page     the tome page copied (shared/tomes.js): its tier is the
+ *                   cap instead of the traits', likeness lifts it, and a
+ *                   page copied again is never "familiar"
+ *          likeness how close the copy is, 0…1 (likeness())
  *
  * Returns the rarity, and how it got there: `base` is the roll, `steps`
  * each lift in order ({ why: trait | "care" | "crave", to }). */
@@ -196,17 +203,24 @@ export function rollScroll(a, recent = [], salt = 0, opts = {}) {
   // a hurried scrap should not pay like a sigil: too little ink, or too
   // little time, and the roll usually comes to nothing
   const effort = Math.min(1, a.ink / SIGIL.effortInk, time / SIGIL.hurriedMs);
-  const faint = rng() < (1 - effort) * SIGIL.faintChance;
+  const page = opts.page || null, like = page ? Math.max(0, Math.min(1, opts.likeness ?? 0)) : null;
+  const poor = page ? like < SIGIL.copy.poor : false;           // nothing like the page
+  const faint = rng() < (1 - effort) * SIGIL.faintChance || poor;
   if (faint) rarity = 0;
 
-  // how high this drawing may climb, by how many traits it has
+  // how high this drawing may climb: by its page's tier, or (drawn
+  // freehand) by how many traits it has
   const traits = traitsOf(a);
-  const cap = SIGIL.capByTraits[Math.min(traits.length, SIGIL.capByTraits.length - 1)];
+  const cap = page ? Math.min(RARITY.length - 1, page.tier) : SIGIL.capByTraits[Math.min(traits.length, SIGIL.capByTraits.length - 1)];
   rarity = Math.min(rarity, cap);
   const base = rarity, steps = [], bumped = [];
   const lift = why => { if (rarity >= cap) return false; rarity++; steps.push({ why, to: rarity }); return true; };
 
   if (!faint) {
+    // the copy itself: the closer, the higher, before anything else
+    // (each grade reached is a chance of a lift, not a certainty: the
+    // seal still has to feel like a roll)
+    if (page) for (const [k, at] of [["fair", SIGIL.copy.fair], ["close", SIGIL.copy.close], ["true", SIGIL.copy.true]]) if (like >= at && rng() < SIGIL.copy.bump) lift(k);
     // today's craving always lifts, and sometimes lifts again
     const craved = opts.craving && traits.includes(opts.craving) ? opts.craving : null;
     if (craved && lift(craved)) {
@@ -214,7 +228,8 @@ export function rollScroll(a, recent = [], salt = 0, opts = {}) {
       if (rng() < SIGIL.craving.again) lift("crave");
     }
     // the other traits lift often, in an order that changes scroll to scroll
-    const order = traits.filter(t => t !== craved).map(t => [rng(), t]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
+    // (not for a copy: its traits are the page's, so only the craving counts)
+    const order = page ? [] : traits.filter(t => t !== craved).map(t => [rng(), t]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
     for (const t of order) {
       if (bumped.length >= SIGIL.maxBumps) break;
       if (rng() < SIGIL.bump && lift(t)) bumped.push(t);
@@ -224,10 +239,11 @@ export function rollScroll(a, recent = [], salt = 0, opts = {}) {
   }
 
   // a near-copy of something recent is worth much less
-  const familiar = recent.some(sig => similarity(sig, a.signature) > SIGIL.familiar);
+  // (a page is meant to be copied again and again)
+  const familiar = !page && recent.some(sig => similarity(sig, a.signature) > SIGIL.familiar);
   if (familiar) { rarity = Math.max(0, rarity - SIGIL.familiarPenalty); bumped.length = 0; steps.length = 0; }
 
-  return { rarity, base: familiar ? rarity : base, steps, traits, bumped, familiar, faint, ink: a.ink, seed, signature: a.signature };
+  return { rarity, base: familiar ? rarity : base, steps, traits, bumped, familiar, faint, poor, likeness: like, ink: a.ink, seed, signature: a.signature };
 }
 
 /* ─── measurements ────────────────────────────────────────────────── */
@@ -298,4 +314,50 @@ function hashStrokes(strokes) {
 export function rnd(seed) {
   let s = seed >>> 0 || 1;
   return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
+}
+
+/* ─── likeness: how close a copy is to its page ───────────────────────
+ * Both become clouds of evenly spaced points along their lines, moved to
+ * the same centre and scaled to the same size; then each point of each
+ * is matched to the nearest of the other, both ways. Stroke order,
+ * direction and where the pen lifted never matter, and nor do size or
+ * place on the sheet: only the shape. 1 is the page itself, 0 nothing
+ * like it. */
+const CLOUD = 64;
+function cloudOf(strokes) {
+  const ss = strokes.map(s => s.map(p => Array.isArray(p) ? { x: p[0], y: p[1] } : p)).filter(s => s.length);
+  let len = 0;
+  for (const s of ss) for (let i = 1; i < s.length; i++) len += Math.hypot(s[i].x - s[i - 1].x, s[i].y - s[i - 1].y);
+  if (!ss.length) return null;
+  const out = [];
+  if (len <= 0) { for (const s of ss) out.push(...s); }
+  else {
+    const step = len / (CLOUD - 1);
+    let carry = 0;
+    for (const s of ss) {
+      out.push({ x: s[0].x, y: s[0].y });
+      for (let i = 1; i < s.length; i++) {
+        const a = s[i - 1], b = s[i], d = Math.hypot(b.x - a.x, b.y - a.y);
+        let at = step - carry;
+        while (at <= d) { out.push({ x: a.x + (b.x - a.x) * at / d, y: a.y + (b.y - a.y) * at / d }); at += step; }
+        carry = d - (at - step);
+      }
+    }
+  }
+  let cx = 0, cy = 0, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const p of out) { cx += p.x; cy += p.y; x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+  cx /= out.length; cy /= out.length;
+  const k = Math.max(x1 - x0, y1 - y0) || 1;
+  return out.map(p => ({ x: (p.x - cx) / k, y: (p.y - cy) / k }));
+}
+const near = (a, b) => a.reduce((s, p) => s + Math.min(...b.map(q => Math.hypot(p.x - q.x, p.y - q.y))), 0) / a.length;
+export function copyDistance(strokes, page) {
+  const a = cloudOf(strokes), b = cloudOf(page.strokes);
+  if (!a || !b || a.length < 2) return Infinity;
+  return (near(a, b) + near(b, a)) / 2;
+}
+export function likeness(strokes, page) {
+  const { perfect, none } = SIGIL.copy;
+  const d = copyDistance(strokes, page);
+  return Math.max(0, Math.min(1, 1 - (d - perfect) / (none - perfect)));
 }

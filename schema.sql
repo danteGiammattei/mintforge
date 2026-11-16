@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS player_state (
   last_seal_at    INTEGER NOT NULL DEFAULT 0,
   journal         TEXT    NOT NULL DEFAULT '{}',
   well_level      INTEGER NOT NULL DEFAULT 0,
+  tomes           TEXT    NOT NULL DEFAULT '["primer"]',   -- shared/tomes.js ids (migration 020)
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 

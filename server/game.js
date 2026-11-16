@@ -20,7 +20,7 @@
  *  whose reply it never received.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { analyse, rollScroll, measure, TRAITS, cravingOn } from "../shared/sigil.js";
+import { analyse, rollScroll, measure, TRAITS, cravingOn, likeness } from "../shared/sigil.js";
 import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
@@ -29,10 +29,11 @@ import {
   inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz, placeAstral,
 } from "../shared/economy.js";
 import { heldSigns } from "./signs.js";
+import { pageOf, tomeFromChest } from "../shared/tomes.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
-import { loadState, parseList, parseObj, coinOut } from "./state.js";
+import { loadState, parseList, parseObj, coinOut, tomesOf } from "./state.js";
 import { stall, buy } from "./stall.js";
 import { LISTS, listHash } from "../shared/listhash.js";
 
@@ -75,12 +76,16 @@ async function seal(db, pid, body, { now, rand, tz }) {
   if (!a) throw new Refusal("Nothing to seal");
 
   const [ps, held] = await Promise.all([
-    db.prepare(`SELECT last_seal_at, seal_nonce, seal_count, recent_sigs, well_level FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+    db.prepare(`SELECT last_seal_at, seal_nonce, seal_count, recent_sigs, well_level, tomes FROM player_state WHERE player_id = ?1`).bind(pid).first(),
     db.prepare(`SELECT COUNT(*) AS n FROM scrolls WHERE player_id = ?1`).bind(pid).first(),
   ]);
   if (a.ink > inkFor(ps.well_level) * SCRIBE.inkSlack) throw new Refusal("More ink than your well holds");
   if (now - ps.last_seal_at < SCRIBE.cooldownMs) throw new Refusal("The wax is still warm", 429);
   if (held.n >= SCRIBE.scrollCap) throw new Refusal("Your satchel is full", 409);
+  // every scroll is a copy of a page of one of your tomes
+  const page = pageOf(String(body.tome || ""), String(body.page || ""), tomesOf(ps.tomes));
+  if (!page) throw new Refusal("Choose a page of your tome to copy");
+  const like = likeness(strokes, page);
 
   // claim the cooldown; a concurrent seal loses here and stops
   const claim = await db.prepare(
@@ -95,6 +100,7 @@ async function seal(db, pid, body, { now, rand, tz }) {
     // the client stamps its own strokes, so never believe more drawing
     // time than has really passed since the last seal
     maxMs: ps.last_seal_at ? now - ps.last_seal_at + 1000 : Infinity,
+    page, likeness: like,
   });
   const hint = r.bumped.length ? r.bumped[Math.min(r.bumped.length - 1, Math.floor(rand() * r.bumped.length))] : null;
   const id = "s_" + randomHex(8);
@@ -107,13 +113,15 @@ async function seal(db, pid, body, { now, rand, tz }) {
     db.prepare(
       `INSERT INTO seal_log (player_id, created_at, rarity, traits, bumped, familiar, well_level, m) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
     ).bind(pid, now, r.rarity, r.traits.join(","), r.bumped.join(","), r.familiar ? 1 : 0, ps.well_level || 0,
-           JSON.stringify(Object.fromEntries(Object.entries(measure(a)).map(([k, v]) => [k, Math.round(v * 10000) / 10000])))),
+           JSON.stringify({ ...Object.fromEntries(Object.entries(measure(a)).map(([k, v]) => [k, Math.round(v * 10000) / 10000])),
+                            page: `${body.tome}/${page.id}`, like: Math.round(like * 1000) / 1000 })),
     db.prepare(
       `UPDATE player_state SET xp = xp + ?2, seal_nonce = ?3, seal_count = seal_count + 1, recent_sigs = ?4,
               stats = ${bump("sealed")} WHERE player_id = ?1`
     ).bind(pid, xp, nonce, JSON.stringify(sigs)),
   ]);
-  return { scroll: { id, rarity: r.rarity, seed: r.seed }, familiar: r.familiar, xp, base: r.base, steps: r.steps };
+  return { scroll: { id, rarity: r.rarity, seed: r.seed }, familiar: r.familiar, xp, base: r.base, steps: r.steps,
+           likeness: Math.round(like * 100) / 100, poor: r.poor };
 }
 
 /* ─── offer ───────────────────────────────────────────────────────── */
@@ -303,9 +311,11 @@ async function open(db, pid, body, { now, rand }) {
   if (!idOk(body.chestId)) throw new Refusal("Which chest?");
   const [ch, ps] = await Promise.all([
     db.prepare(`DELETE FROM chests WHERE id = ?1 AND player_id = ?2 RETURNING tier`).bind(body.chestId, pid).first(),
-    db.prepare(`SELECT brush_level FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+    db.prepare(`SELECT brush_level, tomes FROM player_state WHERE player_id = ?1`).bind(pid).first(),
   ]);
   if (!ch) throw new Refusal("That chest is gone", 404);
+  // now and then a tome, tucked in with the coin
+  const tome = tomeFromChest(ch.tier, tomesOf(ps.tomes), CHESTS.tomeChance, rand);
   const rolled = rollCoin(ch.tier, ps.brush_level || 0, rand);
   const id = "c_" + randomHex(8);
   // an astral coin takes a sign its owner lacks (and if two chests race
@@ -320,11 +330,14 @@ async function open(db, pid, body, { now, rand }) {
            VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, 1, ?8, ?9)`
         ).bind(id, pid, c.seed, c.metalIdx, c.shiny ? 1 : 0, c.rarity, now, c.material || null, c.sign ?? null),
         db.prepare(`UPDATE player_state SET xp = xp + ?2 WHERE player_id = ?1`).bind(pid, XP.open),
+        ...(tome ? [db.prepare(
+          `UPDATE player_state SET tomes = json_insert(tomes, '$[#]', ?2)
+            WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(tomes) WHERE value = ?2)`).bind(pid, tome)] : []),
       ]);
       break;
     } catch (e) { if (tries >= 2 || !/UNIQUE/i.test(String(e?.message))) throw e; }
   }
-  return { tier: ch.tier, coin: { id, seed: c.seed, metalIdx: c.metalIdx, shiny: c.shiny, locked: false, rarity: c.rarity }, xp: XP.open };
+  return { tier: ch.tier, coin: { id, seed: c.seed, metalIdx: c.metalIdx, shiny: c.shiny, locked: false, rarity: c.rarity }, xp: XP.open, ...(tome ? { tome } : {}) };
 }
 
 async function brush(db, pid, body, { now }) {
