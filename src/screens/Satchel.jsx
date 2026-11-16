@@ -28,7 +28,7 @@ function Ceremony({ chest, onDone, onClose }) {
     done: raw => onDone(live.current.dusty.find(c => c.id === raw?.id) || null), say: ui.say, feel,
   }, { tier: chest.tier }), [chest.id]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div className="veil appear" style={{ zIndex: 450, flexDirection: "column", gap: 12, padding: 0, background: `rgb(${SURROUND})` }}>
+    <div className="veil appear" style={{ zIndex: 450, flexDirection: "column", gap: 12, padding: "env(safe-area-inset-top) 0 max(12px, env(safe-area-inset-bottom))", background: `rgb(${SURROUND})` }}>
       <div className="scene" style={{ width: "100%", background: "transparent" }}>
         <canvas ref={ref} tabIndex={0} autoFocus role="button"
                 aria-label={`A ${CHESTS.names[chest.tier].toLowerCase()} chest. Hold to break the seal.`}

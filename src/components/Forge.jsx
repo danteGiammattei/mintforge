@@ -82,13 +82,13 @@ export default function Forge({ coinId, onClose }) {
   };
 
   return (
-    <div className="veil appear" style={{ zIndex: 520, flexDirection: "column", padding: 0, background: `rgb(${SURROUND})` }}
+    <div className="veil appear" style={{ zIndex: 520, flexDirection: "column", justifyContent: "flex-start", paddingLeft: 0, paddingRight: 0, paddingTop: "env(safe-area-inset-top)", background: `rgb(${SURROUND})` }}
          role="dialog" aria-modal="true" aria-label="The forge">
-      <div className="scene" style={{ width: "100%", background: "transparent" }}>
+      <div className="scene" style={{ width: "100%", minHeight: 200, background: "transparent" }}>
         <canvas ref={ref} role="img" style={{ display: "block" }}
                 aria-label={`A ${r.name} ${m.name} coin on an anvil, a hammer raised over it, coals glowing below.`}/>
       </div>
-      <div style={{ width: "100%", maxWidth: 360, padding: "0 16px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ width: "100%", maxWidth: 360, padding: "0 16px 0", flexShrink: 0, display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="between">
           <span style={{ color: m.hl }}>{coinName(coin)}</span>
           <span className="t-gold row" style={{ gap: 6 }} aria-label={`You have ${g.marks} marks`}><PixelIcon name="mark" size={11}/>{g.marks.toLocaleString()}</span>

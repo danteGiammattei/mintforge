@@ -160,7 +160,12 @@ canvas { image-rendering: pixelated; }
   .meter > i { display: block; height: 100%; background: var(--candle); }
 
   /* ── overlays ── */
-  .veil  { position: fixed; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2,3,5,.88); }
+  /* an overlay: clear of the notch and the home bar (the page runs under
+   * both, viewport-fit=cover), and scrollable if a small phone cannot
+   * hold it all; "safe" centring never pushes its top out of reach */
+  .veil  { position: fixed; inset: 0; z-index: 400; display: flex; align-items: center; justify-content: center; align-items: safe center; justify-content: safe center; overflow-y: auto; overscroll-behavior: contain;
+           padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+           background: rgba(2,3,5,.88); }
   .sheet { width: 100%; max-width: 360px; max-height: 100%; overflow-y: auto; }
 
   .badge { min-width: 16px; height: 16px; padding: 0 4px; background: var(--candle); color: var(--void); font-size: 12px; line-height: 16px; text-align: center; }
@@ -203,7 +208,12 @@ canvas { image-rendering: pixelated; }
 
 /* ── layout ──────────────────────────────────────────────────────────── */
 .app    { height: 100%; display: flex; flex-direction: column; background: var(--void); }
-.scene  { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--void); }
+/* A scene takes what room is left and its canvas never asks for more:
+ * the canvas is laid over the box, not in it, so Safari cannot let its
+ * natural height push the buttons below off the screen. lib/kit fit()
+ * sizes it to the box in whole pixels. */
+.scene  { flex: 1 1 0; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; background: var(--void); }
+.scene > canvas { position: absolute; inset: 0; margin: auto; }
 .page   { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .page-in { max-width: 480px; margin: 0 auto; padding: 16px 12px 24px; display: flex; flex-direction: column; gap: 16px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
