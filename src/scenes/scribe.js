@@ -8,7 +8,11 @@
  *  collects strokes and nothing else; the judging happens on the server
  *  (shared/sigil.js) and comes back through the bus as a verdict.
  *
- *    bus.seal(strokes)   → Promise<{ scroll: { rarity, seed }, familiar, base, steps }>
+ *    bus.seal(strokes)   → Promise<{ scroll: { rarity, seed }, familiar, base, steps, likeness, poor }>
+ *    bus.page()          { tome, page, n, of }: the tome open on the desk and
+ *                        the page it is open at (shared/tomes.js)
+ *    bus.flip(d)         turn the tome's page, d = -1 or 1
+ *    bus.shelf()         the player tapped the tome's name: choose another
  *    bus.craving()       the trait he craves today (shared/sigil.js TRAITS)
  *    bus.room()          how many more scrolls the satchel will take
  *    bus.firstTime()     true until the player has sealed once
@@ -19,12 +23,16 @@
  *    bus.deeper()        true if a deeper well can still be bought
  *    bus.well()          the player tapped the ink: offer the next well
  *
+ *  Every scroll is a copy of the open page: the book lies under the
+ *  sheet, and the closer the copy the higher the seal climbs.
+ *
  *  The player is never told the rules, but is shown what happened: the
  *  seal climbs a tier for each lift and names it, the care meter fills
  *  while they draw, and the desk says what he craves today.
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { tiedScroll } from "../lib/forms.js";
+import { pageSigil } from "../lib/tomeArt.js";
 import { RARITY, TRAITS, LIFTS, careOf } from "../../shared/sigil.js";
 import { SCRIBE } from "../../shared/tuning.js";
 import { stage, pointer, W, H, FONT, INK, rnd, wrap, feather } from "./kit.js";
@@ -43,6 +51,9 @@ const P = { room:"#080705", deskA:"#17120c", deskEdge:"#2f2518", ink:"#17140d" }
 const STEP = 18;                             // frames between each lift on the seal
 const markOf = why => (TRAITS[why] || LIFTS[why] || { mark: why }).mark;
 const BTN = { undo:[20,304,48,30], clear:[74,304,48,30], seal:[128,304,47,30] };
+const BOOK = [20, 342, 155, 72];             // the open tome, under the buttons
+const FLIP = { back: [24, 392, 30, 20], on: [64, 392, 30, 20] };
+const SHELF = [16, 18, 110, 18];              // the tome's name, top left: another tome
 
 const S = {
   t: 0, strokes: [], cur: null, ink: 0,
@@ -113,8 +124,8 @@ function drawStrokes() {
 /* ─── chrome ──────────────────────────────────────────────────────── */
 function drawChrome() {
   ctx.font = FONT;
-  ctx.textAlign = "left"; ctx.fillStyle = INK.warm;
-  ctx.fillText("SCRIBE", 20, 30);
+  ctx.textAlign = "left"; ctx.fillStyle = INK.warmHi;
+  ctx.fillText(bus.page().tome.name + " \u25BE", 20, 30);
 
   // ink remaining
   const frac = Math.max(0, 1 - S.ink / inkMax()), low = frac < 0.18;
@@ -149,21 +160,52 @@ function drawChrome() {
     ctx.textAlign = "center"; ctx.fillStyle = INK.warm;
     ctx.fillText("YOUR SATCHEL IS FULL.", W / 2, 350);
     btn(DOOR_BTN, "TO THE DOOR", true);
-  } else if (S.fresh && !S.strokes.length && S.phase === "draw") {
-    // the one-time prompt: what to do, never how to do it well. It sits
-    // on the desk, not the parchment, where it can be read.
-    ctx.textAlign = "center"; ctx.fillStyle = INK.warmHi;
-    ctx.fillText("DRAW ANY MARK ON THE SHEET.", W / 2, 350);
-    ctx.fillText("THEN SEAL IT.", W / 2, 362);
-    ctx.fillStyle = INK.warm;
-    ctx.fillText("HE PAYS FOR SCROLLS.", W / 2, 380);
-  } else if (S.noteA > 0.01) {
-    ctx.globalAlpha = Math.min(1, S.noteA);
-    ctx.textAlign = "center"; ctx.fillStyle = INK.warmHi;
-    wrap(S.note, 32).forEach((l, i) => ctx.fillText(l, W / 2, 350 + i * 10));
+  } else drawBook();
+
+  // lines for the player sit in a dark band across the foot of the sheet,
+  // where they can be read: the one-time prompt, then passing notes
+  const lines = S.fresh && !S.strokes.length && S.phase === "draw"
+    ? ["COPY THE PAGE ONTO THE SHEET.", "THEN SEAL IT. HE PAYS FOR SCROLLS."]
+    : S.noteA > 0.01 ? wrap(S.note, 32) : null;
+  if (lines) {
+    const a = S.fresh && !S.strokes.length ? 1 : Math.min(1, S.noteA), y0 = SHEET.y + SHEET.h - 6 - lines.length * 10;
+    ctx.globalAlpha = 0.85 * a; plot(SHEET.x, y0 - 4, SHEET.w, lines.length * 10 + 6, "#0d0b08");
+    ctx.globalAlpha = a; ctx.textAlign = "center"; ctx.fillStyle = INK.warmHi;
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, y0 + 6 + i * 10));
     ctx.globalAlpha = 1;
-    S.noteA -= 0.008;
+    if (!S.fresh || S.strokes.length) S.noteA -= 0.008;
   }
+}
+
+/* ─── the open tome ───────────────────────────────────────────────────
+ * Leather round two pages: on the left the page's name, how high it can
+ * go, and the turns; on the right its sigil, in ink, to copy. */
+const PAGE_INK = "#2a2014", PARCH = ["#8a7652", "#a89068", "#bca27a"];
+function drawBook() {
+  const { tome, page, n, of } = bus.page();
+  const [x, y, w, h] = BOOK, half = (w - 6) / 2;
+  plot(x, y, w, h, "#0a0806");
+  plot(x + 1, y + 1, w - 2, h - 2, tome.look.leather);
+  for (const [px0, pw] of [[x + 3, half - 1], [x + 4 + half, half - 1]]) {
+    plot(px0, y + 3, pw, h - 6, PARCH[1]);
+    plot(px0, y + 3, pw, 1, PARCH[2]);
+    plot(px0, y + h - 4, pw, 1, PARCH[0]);
+  }
+  plot(x + 2 + half, y + 2, 2, h - 4, "#3a2c1c");                           // the gutter
+  // left: the page's name, its tier as pips in the rarity colours, turns
+  ctx.font = FONT; ctx.textAlign = "left"; ctx.fillStyle = PAGE_INK;
+  wrap(page.name, 12).slice(0, 2).forEach((l, i) => ctx.fillText(l, x + 7, y + 13 + i * 9));
+  for (let i = 1; i <= 5; i++) plot(x + 7 + (i - 1) * 7, y + 34, 5, 5, i <= page.tier ? RARITY[i].c : PARCH[0]);
+  ctx.fillStyle = "#5a4a32"; ctx.fillText(`${n} / ${of}`, x + 7, y + 48);
+  btnInk(FLIP.back, "<", n > 1); btnInk(FLIP.on, ">", n < of);
+  // right: the sigil
+  const sz = Math.min(half - 8, h - 12) | 0, sg = pageSigil(page, sz, PAGE_INK);
+  ctx.drawImage(sg, Math.round(x + 4 + half + (half - 1 - sz) / 2), Math.round(y + (h - sz) / 2));
+}
+function btnInk([x, y, w, h], label, on) {
+  plot(x, y, w, h, on ? PARCH[0] : PARCH[1]);
+  ctx.font = FONT; ctx.textAlign = "center"; ctx.fillStyle = on ? PAGE_INK : "#8a7652";
+  ctx.fillText(label, x + w / 2, y + h / 2 + 3);
 }
 const DOOR_BTN = [50, 362, 95, 30];
 function btn([x, y, w, h], label, on) {
@@ -206,6 +248,10 @@ function drawSeal() {
   }
   if (k > 0.55) {
     ctx.globalAlpha = Math.min(1, (k - 0.55) / 0.3);
+    if (r.likeness != null) {
+      ctx.fillStyle = r.poor ? INK.warn : INK.warmHi;
+      ctx.fillText(r.poor ? "NOTHING LIKE THE PAGE" : `LIKENESS ${Math.round(r.likeness * 100)}%`, W / 2, 232);
+    }
     ctx.fillStyle = col;
     ctx.fillText(RARITY[tier].n, W / 2, 246);
     ctx.fillStyle = INK.warm;
@@ -251,6 +297,11 @@ const onDown = e => {
   if (hit(p, BTN.undo))  return undo();
   if (hit(p, BTN.clear)) return clear();
   if (hit(p, BTN.seal))  return seal();
+  if (hit(p, SHELF)) { bus.feel("tap"); return bus.shelf(); }
+  if (bus.room() > 0) {
+    if (hit(p, FLIP.back) && bus.page().n > 1) { bus.feel("tap"); return bus.flip(-1); }
+    if (hit(p, FLIP.on) && bus.page().n < bus.page().of) { bus.feel("tap"); return bus.flip(1); }
+  }
   if (bus.room() <= 0 && hit(p, DOOR_BTN)) return bus.toDoor();
   if (!inSheet(p) || S.ink >= inkMax()) return;
   S.cur = [{ x: p.x, y: p.y, t: performance.now() }];
@@ -305,10 +356,12 @@ function seal() {
   bus.seal(rel).then(res => {
     if (!alive) return;
     const steps = Array.isArray(res.steps) ? res.steps : [];
-    S.result = { rarity: res.scroll.rarity, base: res.base ?? res.scroll.rarity, steps, familiar: !!res.familiar };
+    S.result = { rarity: res.scroll.rarity, base: res.base ?? res.scroll.rarity, steps, familiar: !!res.familiar,
+                 likeness: typeof res.likeness === "number" ? res.likeness : null, poor: !!res.poor };
     S.phase = "sealed"; S.sealT = Math.min(S.sealT, 29); S.fresh = false; S.lifted = 0;
     if (!steps.length) bus.feel("rarity" + res.scroll.rarity);
-    bus.say("SEALED. A " + RARITY[res.scroll.rarity].n + " SCROLL." + (steps.length ? " LIFTED BY " + steps.map(s => markOf(s.why)).join(", ") + "." : "")
+    bus.say("SEALED. A " + RARITY[res.scroll.rarity].n + " SCROLL."
+      + (typeof res.likeness === "number" ? " LIKENESS " + Math.round(res.likeness * 100) + " PERCENT." : "") + (steps.length ? " LIFTED BY " + steps.map(s => markOf(s.why)).join(", ") + "." : "")
       + (res.familiar ? " HE HAS SEEN THIS ONE BEFORE." : ""));
   }, err => {
     if (!alive) return;
@@ -331,22 +384,25 @@ const teardown = () => {
 };
 /* for controls outside the canvas (keyboard, screen readers) */
 teardown.undo = undo; teardown.clear = clear;
-/* A mark made without a pointer: one wandering stroke. It is judged like
- * any other, so nobody is shut out of the loop for being unable to drag. */
+/* A copy made without a pointer: the open page, by a shaky hand, as
+ * much of it as the ink allows. It is judged like any other, so nobody
+ * is shut out of the loop for being unable to drag. */
 teardown.scrawl = () => {
-  if (S.phase !== "draw" || S.ink >= inkMax() - 20) return;
-  let x = SHEET.x + 20 + Math.random() * (SHEET.w - 40), y = SHEET.y + 20 + Math.random() * (SHEET.h - 40);
-  let a = Math.random() * 6.283, t = performance.now();
-  const stroke = [{ x, y, t }], budget = Math.min(140, inkMax() - S.ink - 1);
-  for (let used = 0; used + 4 <= budget; used += 4) {
-    a += (Math.random() - 0.5) * 1.1;
-    x = Math.max(SHEET.x + 2, Math.min(SHEET.x + SHEET.w - 2, x + Math.cos(a) * 4));
-    y = Math.max(SHEET.y + 2, Math.min(SHEET.y + SHEET.h - 2, y + Math.sin(a) * 4));
-    t += 14 + Math.random() * 30;
-    stroke.push({ x, y, t });
+  if (S.phase !== "draw") return;
+  const { page } = bus.page(), k = 120, ox = SHEET.x + (SHEET.w - k) / 2, oy = SHEET.y + (SHEET.h - k) / 2;
+  let t = performance.now(), ink = 0;
+  S.strokes = [];
+  for (const st of page.strokes) {
+    const out = [];
+    for (let i = 0; i < st.length; i++) {
+      const x = ox + st[i][0] * k + (Math.random() - 0.5) * 4, y = oy + st[i][1] * k + (Math.random() - 0.5) * 4;
+      if (out.length) { const l = out[out.length - 1]; ink += Math.hypot(x - l.x, y - l.y); if (ink > inkMax() - 2) break; }
+      out.push({ x, y, t: (t += 60) });
+    }
+    if (out.length) S.strokes.push(out);
   }
-  S.strokes.push(stroke); recount();
-  bus.say("A MARK IS ON THE SHEET.");
+  recount();
+  bus.say("THE PAGE IS COPIED ONTO THE SHEET.");
 };
 teardown.seal = () => (S.phase === "sealed" ? (sealDone() && newSheet()) : seal());
 return teardown;

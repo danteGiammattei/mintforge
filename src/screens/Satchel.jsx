@@ -13,6 +13,7 @@ import { RARITY } from "../../shared/sigil.js";
 import { CHESTS, ASTRAL } from "../../shared/tuning.js";
 import { BRUSH_UPS, RARITIES } from "../lib/data.js";
 import { coinRarity } from "../lib/coin.js";
+import { TOME_BY_ID } from "../../shared/tomes.js";
 
 /* ─── SATCHEL ─────────────────────────────────────────────────────────────
  * Everything in transit: scrolls waiting to be offered, chests waiting to
@@ -21,11 +22,15 @@ import { coinRarity } from "../lib/coin.js";
 
 function Ceremony({ chest, onDone, onClose }) {
   const g = useGame(), ui = useUi();
-  const ref = useRef(null), live = useRef(g);
+  const ref = useRef(null), live = useRef(g), found = useRef(null);
   live.current = g;
   useEffect(() => mountChest(ref.current, {
-    open: () => live.current.act("open", { chestId: chest.id }),
-    done: raw => onDone(live.current.dusty.find(c => c.id === raw?.id) || null), say: ui.say, feel,
+    open: () => live.current.act("open", { chestId: chest.id }).then(r => { found.current = r.tome || null; return r; }),
+    done: raw => {
+      onDone(live.current.dusty.find(c => c.id === raw?.id) || null);
+      // a tome tucked in with the coin
+      if (found.current) ui.toast(`A TOME WAS IN THE CHEST: ${TOME_BY_ID[found.current]?.name || "A TOME"}. OPEN IT AT THE DESK.`, "magic");
+    }, say: ui.say, feel,
   }, { tier: chest.tier }), [chest.id]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="veil appear" style={{ zIndex: 450, flexDirection: "column", gap: 12, padding: "env(safe-area-inset-top) 0 max(12px, env(safe-area-inset-bottom))", background: `rgb(${SURROUND})` }}>
