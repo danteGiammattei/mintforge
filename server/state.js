@@ -65,6 +65,35 @@ async function signOldAstrals(db, pid, rows) {
   catch { for (const r of bare) r.sign = null; }               // a race: try again next load
 }
 
+/* ─── the first-find bonus for star signs ─────────────────────────────
+ * ASTRAL.firstBonus marks for each sign a player has, the first time they
+ * have it, however it came: a chest, the tavern, a war, an old coin given
+ * its sign. Paid here because every way in ends with this load. The
+ * journal keeps the signs paid for ($.signsPaid, only ever gaining bits)
+ * and, from migration 019, the signs held before the bonus began
+ * ($.signs), which are back paid. A dusty coin waits until it is brushed,
+ * so the popup never gives away a reveal. Each sign is its own guarded
+ * statement, so two loads at once pay it once. */
+async function paySigns(db, pid, ps, rows) {
+  const j = parseObj(ps.journal);
+  let found = (j.signs | 0);
+  for (const r of rows) if (!r.dusty && r.sign != null) found |= 1 << r.sign;
+  const due = found & ~(j.signsPaid | 0);
+  if (!due) return [];
+  const signs = ASTRAL.signs.map((_, i) => i).filter(i => due & (1 << i));
+  let res;
+  try {
+    res = await db.batch(signs.map(i => db.prepare(
+      `UPDATE player_state SET marks = marks + ?3,
+         journal = json_set(journal, '$.signsPaid', COALESCE(json_extract(journal, '$.signsPaid'), 0) | ?2)
+       WHERE player_id = ?1 AND (COALESCE(json_extract(journal, '$.signsPaid'), 0) & ?2) = 0`
+    ).bind(pid, 1 << i, ASTRAL.firstBonus)));
+  } catch { return []; }                                       // try again next load
+  const paid = signs.filter((_, k) => res[k]?.meta?.changes);
+  ps.marks = (ps.marks || 0) + paid.length * ASTRAL.firstBonus;
+  return paid.map(sign => ({ sign, marks: ASTRAL.firstBonus }));
+}
+
 /* the tomes a player has: always the primer, whatever the row says */
 export const tomesOf = raw => { const t = parseList(raw); return t.includes(STARTER) ? t : [STARTER, ...t]; };
 
@@ -85,6 +114,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   if (!ps) throw new Refusal("State missing — your account may need recreating", 500);
   const all = coins.results || [];
   await signOldAstrals(db, pid, all);
+  const signBonus = await paySigns(db, pid, ps, all);
   const stats = parseObj(ps.stats);
   delete stats.lastVisitAt;
   const daily = stats.daily || {};
@@ -114,6 +144,8 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     gifts: parseList(ps.gifts).length,
     sealReadyIn: Math.max(0, SCRIBE.cooldownMs - (now - (ps.last_seal_at || 0))),
     craving: cravingOn(localDay(now, tz)),     // the trait he craves today
+    // star signs paid for just now, for the popup
+    ...(signBonus.length ? { signBonus } : {}),
   };
 }
 

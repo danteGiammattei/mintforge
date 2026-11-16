@@ -112,35 +112,38 @@ test("restrike: a new face for marks; metal, rarity, shape, shine and name stay"
   await assert.rejects(go({ action: "restrike", coinId: "rc" }), /sign/);
 });
 
-test("a star sign found for the first time pays 10,000 marks, once ever", async () => {
+test("a star sign found for the first time pays 10,000 marks, once ever, however it came", async () => {
   const { db, pid, go, marksOf } = await setup(0);
-  const dusty = (id, sign) => db.prepare(
-    `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES (?1, ?2, 77, 10, 0, 0, 2, 0, 1, ?3)`
-  ).bind(id, pid, sign).run();
-  await dusty("c_aries001", 0);
-  const r1 = (await go({ action: "brush", coinId: "c_aries001" })).result;
-  assert.deepEqual(r1.signBonus, { sign: 0, marks: 10000 });
-  assert.equal(await marksOf(), 10000);
+  const put = (id, sign, dusty) => db.prepare(
+    `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES (?1, ?2, 77, 10, 0, 0, 2, 0, ?4, ?3)`
+  ).bind(id, pid, sign, dusty).run();
+  // dusty: not yet, so the popup does not give the reveal away
+  await put("c_aries001", 0, 1);
+  assert.equal((await go({ action: "stall" })).state.signBonus, undefined);
+  assert.equal(await marksOf(), 0);
+  const r1 = await go({ action: "brush", coinId: "c_aries001" });
+  assert.deepEqual(r1.state.signBonus, [{ sign: 0, marks: 10000 }]);
+  assert.equal(r1.state.marks, 10000);
+  assert.equal((await go({ action: "stall" })).state.signBonus, undefined, "paid once");
   // let it go, find Aries again: nothing
   await db.prepare(`DELETE FROM coins WHERE id = 'c_aries001'`).run();
-  await dusty("c_aries002", 0);
-  const r2 = (await go({ action: "brush", coinId: "c_aries002" })).result;
-  assert.equal(r2.signBonus, undefined);
+  await put("c_aries002", 0, 1);
+  assert.equal((await go({ action: "brush", coinId: "c_aries002" })).state.signBonus, undefined);
   assert.equal(await marksOf(), 10000);
-  // a different sign pays again
-  await dusty("c_leo00001", 4);
-  assert.equal((await go({ action: "brush", coinId: "c_leo00001" })).result.signBonus.marks, 10000);
+  // a sign that arrives clean (won at war, say) pays on the next load
+  await put("c_leo00001", 4, 0);
+  assert.deepEqual((await go({ action: "stall" })).state.signBonus, [{ sign: 4, marks: 10000 }]);
   assert.equal(await marksOf(), 20000);
 });
 
-test("migration 019 marks held signs as found, without paying", async () => {
+test("signs held before the bonus began (migration 019) are back paid, once", async () => {
   const { readFileSync } = await import("node:fs");
   const { db, pid, go, marksOf } = await setup(0);
-  await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES ('c_virgo001', ?1, 77, 10, 0, 0, 2, 0, 1, 5)`).bind(pid).run();
+  await db.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES ('c_virgo001', ?1, 77, 10, 0, 0, 2, 0, 0, 5)`).bind(pid).run();
   db.raw.exec(readFileSync(new URL("../migrations/019_sign_bonus.sql", import.meta.url), "utf8"));
-  db.raw.exec(readFileSync(new URL("../migrations/019_sign_bonus.sql", import.meta.url), "utf8"));   // twice is fine
-  const j = JSON.parse((await db.prepare(`SELECT journal FROM player_state WHERE player_id = ?1`).bind(pid).first()).journal);
-  assert.equal(j.signs, 1 << 5);
-  assert.equal((await go({ action: "brush", coinId: "c_virgo001" })).result.signBonus, undefined);
-  assert.equal(await marksOf(), 0);
+  // then sold before the next load: still paid, it was theirs
+  await db.prepare(`DELETE FROM coins WHERE id = 'c_virgo001'`).run();
+  assert.deepEqual((await go({ action: "stall" })).state.signBonus, [{ sign: 5, marks: 10000 }]);
+  assert.equal((await go({ action: "stall" })).state.signBonus, undefined);
+  assert.equal(await marksOf(), 10000);
 });

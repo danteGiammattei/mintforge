@@ -1,8 +1,8 @@
 -- 019 · First-find bonus for star signs. The journal keeps a bitmask of
--- every sign a player has ever found ($.signs); finding a new one pays
--- ASTRAL.firstBonus marks. This marks the signs players hold today as
--- already found, so nobody is paid again for a sign they have. Safe to
--- run twice.
+-- every sign a player held when the bonus began ($.signs). The bonus is
+-- paid on load (server/state.js paySigns) for every sign held or in this
+-- list and not yet paid ($.signsPaid), so these are back paid, once,
+-- even if sold since. Safe to run twice.
 --   npx wrangler d1 execute mintforge --remote --file=migrations/019_sign_bonus.sql
 UPDATE player_state SET journal = json_set(COALESCE(journal, '{}'), '$.signs',
   COALESCE(json_extract(journal, '$.signs'), 0) |

@@ -292,19 +292,6 @@ export function journalStmt(db, pid, c) {
   ).bind(pid, c.shiny ? 1 : 0, value);
 }
 
-/* The first time a player ever finds a sign, ASTRAL.firstBonus marks. Found
- * signs are a bitmask in the journal ($.signs) that only gains bits, so
- * selling a sign and finding it again pays nothing. Only coins that come
- * out of the ground count (brushing, the tavern), not ones won from a friend.
- * The statement changes no row when the sign is already known. */
-export function signBonusStmt(db, pid, sign) {
-  return db.prepare(
-    `UPDATE player_state SET marks = marks + ?3,
-       journal = json_set(journal, '$.signs', COALESCE(json_extract(journal, '$.signs'), 0) | ?2)
-     WHERE player_id = ?1 AND (COALESCE(json_extract(journal, '$.signs'), 0) & ?2) = 0`
-  ).bind(pid, 1 << sign, ASTRAL.firstBonus);
-}
-
 /* ─── chest → dusty coin → vault ──────────────────────────────────── */
 
 async function open(db, pid, body, { now, rand }) {
@@ -348,13 +335,11 @@ async function brush(db, pid, body, { now }) {
   ).bind(body.coinId, pid, now).first();
   if (!c) throw new Refusal("That coin is already clean", 404);
   const xp = xpForBrush({ rarity: c.rarity, metalIdx: c.metal_idx, shiny: !!c.shiny });
-  const res = await db.batch([
+  await db.batch([
     db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${bump("brushed")} WHERE player_id = ?1`).bind(pid, xp),
     journalStmt(db, pid, { seed: c.seed, metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity, material: c.material }),
-    ...(c.sign != null ? [signBonusStmt(db, pid, c.sign)] : []),
   ]);
-  const bonus = c.sign != null && res[2]?.meta?.changes ? ASTRAL.firstBonus : 0;
-  return { coin: coinOut(c), xp, ...(bonus ? { signBonus: { sign: c.sign, marks: bonus } } : {}) };
+  return { coin: coinOut(c), xp };       // a new star sign's bonus is paid by the state load (server/state.js)
 }
 
 /* ─── sell ────────────────────────────────────────────────────────── */
@@ -524,9 +509,7 @@ async function gamble(db, pid, body, { now, rand }) {
     return c;
   });
   const xp = res.won ? g.winXp : g.lossXp;
-  const signed = minted.filter(c => c.sign != null);
-  const out = await db.batch([
-    ...signed.map(c => signBonusStmt(db, pid, c.sign)),
+  await db.batch([
     ...minted.map(c => journalStmt(db, pid, c)),
     ...minted.map(c => db.prepare(
       `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign)
@@ -536,7 +519,6 @@ async function gamble(db, pid, body, { now, rand }) {
   return {
     game: body.game, won: res.won, outcome: res.outcome, sector: res.sector ?? null, slot: res.slot ?? null, path: res.path ?? null,
     lost, kept: ids.filter(id => !lost.includes(id)), minted, xp,
-    signBonus: signed.filter((c, i) => out[i]?.meta?.changes).map(c => ({ sign: c.sign, marks: ASTRAL.firstBonus })),
   };
 }
 
