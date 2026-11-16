@@ -11,8 +11,9 @@
  *    bus.seal(strokes)   → Promise<{ scroll: { rarity, seed }, familiar, base, steps, likeness, poor }>
  *    bus.page()          { tome, page, n, of }: the tome open on the desk and
  *                        the page it is open at (shared/tomes.js)
- *    bus.flip(d)         turn the tome's page, d = -1 or 1
- *    bus.shelf()         the player tapped the tome's name: choose another
+ *    bus.lectern()       go to the lectern, to choose another tome or page:
+ *                        the TOMES tab in the left margin, the tome's name,
+ *                        the book, or a sideways swipe off the sheet
  *    bus.craving()       the trait he craves today (shared/sigil.js TRAITS)
  *    bus.room()          how many more scrolls the satchel will take
  *    bus.firstTime()     true until the player has sealed once
@@ -52,8 +53,8 @@ const STEP = 18;                             // frames between each lift on the 
 const markOf = why => (TRAITS[why] || LIFTS[why] || { mark: why }).mark;
 const BTN = { undo:[20,304,48,30], clear:[74,304,48,30], seal:[128,304,47,30] };
 const BOOK = [20, 342, 155, 72];             // the open tome, under the buttons
-const FLIP = { back: [24, 392, 30, 20], on: [64, 392, 30, 20] };
-const SHELF = [16, 18, 110, 18];              // the tome's name, top left: another tome
+const SHELF = [16, 18, 110, 18];              // the tome's name, top left: to the lectern
+const TAB = [0, 150, 15, 92];                 // the TOMES tab, in the margin left of the sheet
 
 const S = {
   t: 0, strokes: [], cur: null, ink: 0,
@@ -125,7 +126,7 @@ function drawStrokes() {
 function drawChrome() {
   ctx.font = FONT;
   ctx.textAlign = "left"; ctx.fillStyle = INK.warmHi;
-  ctx.fillText(bus.page().tome.name + " \u25BE", 20, 30);
+  ctx.fillText(bus.page().tome.name, 20, 30);
 
   // ink remaining
   const frac = Math.max(0, 1 - S.ink / inkMax()), low = frac < 0.18;
@@ -161,6 +162,7 @@ function drawChrome() {
     ctx.fillText("YOUR SATCHEL IS FULL.", W / 2, 350);
     btn(DOOR_BTN, "TO THE DOOR", true);
   } else drawBook();
+  if (S.phase === "draw") drawTab();
 
   // lines for the player sit in a dark band across the foot of the sheet,
   // where they can be read: the one-time prompt, then passing notes
@@ -197,15 +199,20 @@ function drawBook() {
   wrap(page.name, 12).slice(0, 2).forEach((l, i) => ctx.fillText(l, x + 7, y + 13 + i * 9));
   for (let i = 1; i <= 5; i++) plot(x + 7 + (i - 1) * 7, y + 34, 5, 5, i <= page.tier ? RARITY[i].c : PARCH[0]);
   ctx.fillStyle = "#5a4a32"; ctx.fillText(`${n} / ${of}`, x + 7, y + 48);
-  btnInk(FLIP.back, "<", n > 1); btnInk(FLIP.on, ">", n < of);
+  ctx.fillText("TAP TO CHANGE", x + 7, y + 62);
   // right: the sigil
   const sz = Math.min(half - 8, h - 12) | 0, sg = pageSigil(page, sz, PAGE_INK);
   ctx.drawImage(sg, Math.round(x + 4 + half + (half - 1 - sz) / 2), Math.round(y + (h - sz) / 2));
 }
-function btnInk([x, y, w, h], label, on) {
-  plot(x, y, w, h, on ? PARCH[0] : PARCH[1]);
-  ctx.font = FONT; ctx.textAlign = "center"; ctx.fillStyle = on ? PAGE_INK : "#8a7652";
-  ctx.fillText(label, x + w / 2, y + h / 2 + 3);
+/* the TOMES tab in the left margin: the way to the lectern, which lies
+ * that way. It breathes a little, so it is noticed. */
+function drawTab() {
+  const [x, y, w, h] = TAB, a = 0.75 + Math.sin(S.t * 0.04) * 0.25;
+  plot(x, y, w, h, "#1d1710"); plot(x + w - 1, y, 1, h, "#4a3e2b"); plot(x, y, w, 1, "#4a3e2b"); plot(x, y + h - 1, w, 1, "#4a3e2b");
+  ctx.globalAlpha = a; ctx.font = FONT; ctx.textAlign = "center"; ctx.fillStyle = INK.warmHi;
+  ctx.fillText("<", x + w / 2, y + 12);
+  [..."TOMES"].forEach((ch, i) => ctx.fillText(ch, x + w / 2, y + 28 + i * 12));
+  ctx.globalAlpha = 1;
 }
 const DOOR_BTN = [50, 362, 95, 30];
 function btn([x, y, w, h], label, on) {
@@ -297,18 +304,21 @@ const onDown = e => {
   if (hit(p, BTN.undo))  return undo();
   if (hit(p, BTN.clear)) return clear();
   if (hit(p, BTN.seal))  return seal();
-  if (hit(p, SHELF)) { bus.feel("tap"); return bus.shelf(); }
-  if (bus.room() > 0) {
-    if (hit(p, FLIP.back) && bus.page().n > 1) { bus.feel("tap"); return bus.flip(-1); }
-    if (hit(p, FLIP.on) && bus.page().n < bus.page().of) { bus.feel("tap"); return bus.flip(1); }
-  }
+  if (hit(p, SHELF) || hit(p, TAB) || (bus.room() > 0 && hit(p, BOOK))) { bus.feel("tap"); return bus.lectern(); }
   if (bus.room() <= 0 && hit(p, DOOR_BTN)) return bus.toDoor();
-  if (!inSheet(p) || S.ink >= inkMax()) return;
+  // off the sheet, a touch may be the start of a sideways swipe to the lectern
+  if (!inSheet(p)) { S.swipe = { x: p.x, y: p.y }; return; }
+  if (S.ink >= inkMax()) return;
   S.cur = [{ x: p.x, y: p.y, t: performance.now() }];
   S.strokes.push(S.cur);
   cv.setPointerCapture?.(e.pointerId);
 };
 const onMove = e => {
+  if (S.swipe) {
+    const p = pointer(cv, e), dx = p.x - S.swipe.x, dy = p.y - S.swipe.y;
+    if (Math.abs(dx) > 28 && Math.abs(dx) > Math.abs(dy) * 1.2) { S.swipe = null; bus.feel("tap"); bus.lectern(); }
+    return;
+  }
   if (!S.cur || S.phase !== "draw") return;
   const p = pointer(cv, e);
   if (!inSheet(p)) { S.cur = null; return; }
@@ -323,7 +333,7 @@ const onMove = e => {
   S.ink += d;
   S.cur.push({ x: p.x, y: p.y, t: performance.now() });
 };
-const onUp = () => { S.cur = null; };
+const onUp = () => { S.cur = null; S.swipe = null; };
 cv.addEventListener("pointerdown", onDown);
 cv.addEventListener("pointermove", onMove);
 cv.addEventListener("pointerup", onUp);

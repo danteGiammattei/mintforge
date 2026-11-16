@@ -39,6 +39,8 @@ const CUES = {
   strike:  [[35],           [[1250, 0.05, "square", 0.05], [620, 0.16, "triangle", 0.06]]],
   dull:    [[12],           [[150, 0.14, "sine", 0.05]]],
   error:   [[30, 40, 30],   [[120, 0.18, "square", 0.04]]],
+  open:    [[12, 30, 8],    [[110, 0.14, "sine", 0.07], [300, 0.08, "triangle", 0.03]]],   // a heavy book opening
+  leaf:    [[3],            [[2400, 0.025, "triangle", 0.015]]],                          // one page flicking past
   // a sealed scroll speaks its tier: higher, longer, brighter
   rarity0: [[10],               [[330, 0.10, "sine", 0.04]]],
   rarity1: [[12],               [[392, 0.12, "sine", 0.05]]],

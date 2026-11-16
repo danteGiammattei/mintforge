@@ -5,7 +5,7 @@ import { CoinTile } from "../screens/Vault.jsx";
 import { TitleText } from "../screens/Friends.jsx";
 import { METALS, MAX_RARITY, BRUSH_UPS } from "../lib/data.js";
 import { TOMES } from "../../shared/tomes.js";
-import { TomeCover } from "./TomeShelf.jsx";
+import { TomeCover } from "./TomeCover.jsx";
 
 /* ─── a profile as other players see it ───────────────────────────────────
  * Banner, name, level and title, bio, three counts, their brush and

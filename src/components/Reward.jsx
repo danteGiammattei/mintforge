@@ -6,7 +6,7 @@ import { SCRIBE, DAILY, CHESTS, ASTRAL } from "../../shared/tuning.js";
 import { TOME_BY_ID } from "../../shared/tomes.js";
 import { RARITY } from "../../shared/sigil.js";
 import CoinCanvas from "./CoinCanvas.jsx";
-import { TomeCover } from "./TomeShelf.jsx";
+import { TomeCover } from "./TomeCover.jsx";
 import PixelBanner from "./PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { TitleText } from "../screens/Friends.jsx";
