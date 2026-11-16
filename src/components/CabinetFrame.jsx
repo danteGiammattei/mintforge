@@ -8,7 +8,8 @@ import { onAuraFrame, auraStill } from "../lib/aura.js";
  *   1  a few curios ………………………… stone
  *   2  a fine cabinet ……………………… gold, with a glint of light crossing it
  *   3  a collector's cabinet …………… void, its stars twinkling
- *   4  a legendary hoard ………………… (eldritch, to come: drawn in code for now)
+ *   4  a legendary hoard ………………… eldritch, its tentacles writhing, spores
+ *                                   drifting off, green glimmering in the carving
  *   5  a mythic hoard ……………………… (astral, to come: drawn in code for now)
  * The painted frames are Gemini's, rebuilt as nine-slices by tools/frames
  * (corners K × K, the sides one repeating run). Everything is drawn at
@@ -20,6 +21,9 @@ const ART = [
   { src: "/sprites/frames/stone.png", k: 12, band: 10, plaque: { lo: [44, 46, 50], mid: [74, 76, 80], hi: [112, 114, 118], ink: [214, 218, 210] } },
   { src: "/sprites/frames/gold.png",  k: 15, band: 9,  plaque: { lo: [120, 82, 28], mid: [198, 148, 52], hi: [244, 204, 88], ink: [42, 26, 8] }, fx: "glint" },
   { src: "/sprites/frames/void.png",  k: 10, band: 9,  plaque: { lo: [18, 22, 44], mid: [30, 38, 70], hi: [150, 160, 190], ink: [214, 222, 246] }, fx: "twinkle" },
+  // the tentacles reach `bleed` pixels past the frame proper, so the frame
+  // is drawn that much outside the box and only the band pads its contents
+  { src: "/sprites/frames/eldritch.png", k: 12, band: 12, bleed: 5, plaque: { lo: [14, 22, 24], mid: [34, 54, 58], hi: [70, 110, 112], ink: [122, 216, 136] }, fx: "writhe" },
 ];
 const sheets = new Map();
 function sheet(src) {
@@ -77,7 +81,48 @@ function fx(base, kind, f) {
       }
     }
   }
+  else if (kind === "writhe") writhe(base, d, f);
   return img;
+}
+
+/* The eldritch frame: in the outer ring only the corner tentacles reach.
+ * Their outer part sways as one, a pixel at a time, each corner on its
+ * own beat, while the roots hold; spores leave the corners and drift off;
+ * and here and there the carving in the band glimmers green. */
+const TENT_LIT = [76, 120, 118], GLOW = [[46, 96, 64], [78, 160, 100], [122, 216, 136]];
+function writhe(base, d, f) {
+  const w = base.width, h = base.height, src = base.data, M = 5, ph = (f / 16) * Math.PI * 2;
+  const put = (x, y, c, a = 255) => { if (x < 0 || y < 0 || x >= w || y >= h) return; const j = (y * w + x) * 4; d[j] = c[0]; d[j + 1] = c[1]; d[j + 2] = c[2]; d[j + 3] = a; };
+  // each corner's sway this frame: a step of at most a pixel
+  const sway = [0, 1, 2, 3].map(k => [Math.round(Math.sin(ph + k * 1.7) * 0.7), Math.round(Math.cos(ph * 0.5 + k * 2.3) * 0.7)]);
+  const tip = (x, y) => Math.min(x, y, w - 1 - x, h - 1 - y) < 3;       // the outer part, that moves
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (tip(x, y)) d[(y * w + x) * 4 + 3] = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    if (!tip(x, y) || !src[i + 3]) continue;
+    const [dx, dy] = sway[(x < w / 2 ? 0 : 1) + (y < h / 2 ? 0 : 2)];
+    put(x + dx, y + dy, [src[i], src[i + 1], src[i + 2]]);
+  }
+  // spores off each corner, rising and fading
+  const corners = [[2, 2, -1, -1], [w - 3, 2, 1, -1], [2, h - 3, -1, 1], [w - 3, h - 3, 1, 1]];
+  corners.forEach(([cx, cy, sx, sy], k) => {
+    for (let n = 0; n < 2; n++) {
+      const life = 24, age = (f + k * 7 + n * 12) % life, u = age / life;
+      const x = Math.round(cx + sx * (2 + u * 6) + Math.sin(u * 6 + k) * 1.5), y = Math.round(cy - 1 - u * 9 + (sy > 0 ? 2 : 0));
+      if (u < 0.85) put(x, y, u < 0.4 ? GLOW[1] : TENT_LIT, Math.round(255 * (1 - u)));
+    }
+  });
+  // the carving glimmers: a few mid-band pixels at a time, each on its beat
+  const n = Math.round((w + h) / 7);
+  for (let s = 0; s < n; s++) {
+    const side = s % 4, along = h32(s * 31 + 7), depth = 7 + Math.floor(h32(s * 17 + 3) * 3);
+    const x = side === 0 ? Math.floor(along * w) : side === 1 ? w - 1 - depth : side === 2 ? Math.floor(along * w) : depth;
+    const y = side === 0 ? depth : side === 2 ? h - 1 - depth : Math.floor(along * h);
+    const i = (y * w + x) * 4;
+    if (!src[i + 3] || src[i] + src[i + 1] + src[i + 2] < 60) continue;
+    const b = Math.sin(ph * 0.5 + s * 2.1);
+    if (b > 0.55) put(x, y, GLOW[b > 0.92 ? 2 : b > 0.75 ? 1 : 0]);
+  }
 }
 
 const S = 2;                                    // screen pixels per frame pixel
@@ -182,8 +227,10 @@ export default function CabinetFrame({ rank = 0, score = null, children, pad = 0
       c.getContext("2d").putImageData(art.fx && f != null ? fx(base, art.fx, f) : base, 0, 0);
     };
     const size = async () => {
-      w = Math.floor(el.clientWidth / S); h = Math.floor(el.clientHeight / S);
+      const b = art?.bleed || 0;
+      w = Math.floor(el.clientWidth / S) + 2 * b; h = Math.floor(el.clientHeight / S) + 2 * b;
       c.width = w; c.height = h; c.style.width = w * S + "px"; c.style.height = h * S + "px";
+      c.style.left = c.style.top = -b * S + "px";
       if (art) { const im = await sheet(art.src); if (!live || !im) return; base = lay(im, art.k, w, h); }
       draw(still ? null : 0);
     };
@@ -191,7 +238,7 @@ export default function CabinetFrame({ rank = 0, score = null, children, pad = 0
     if (!still && (art ? art.fx : rank === 5)) off = onAuraFrame(draw);
     return () => { live = false; ro.disconnect(); off?.(); };
   }, [rank, art]);
-  const P = (art ? art.band : FRAME_THICK[rank]) * S + pad, m = art ? art.plaque : PLAQUE[rank];
+  const P = (art ? art.band - (art.bleed || 0) : FRAME_THICK[rank]) * S + pad, m = art ? art.plaque : PLAQUE[rank];
   return (
     <div style={{ paddingBottom: score != null ? 12 : 0 }}>
       <div ref={box} style={{ position: "relative", padding: P }}>

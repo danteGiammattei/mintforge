@@ -20,3 +20,8 @@ its band (how thick the frame proper is, without the corner ornament).
 | stone | 1 | 12 34 12 bottom |
 | gold  | 2 | 15 30 4 top |
 | void  | 3 | 10 30 12 bottom |
+| eldritch | 4 | 12 20 16 top, then `tentacles.py` (relights it), bleed 5 |
+
+The eldritch frame's corner tentacles reach 5 pixels past the frame
+proper, so its `ART` entry has `bleed: 5`: the canvas is drawn that much
+outside the box and only the frame proper pads the cabinet.
