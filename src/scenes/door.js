@@ -34,6 +34,7 @@ import {
   goblinHand, goblinHandPoint, GOBLIN_HAND, playerHand, PLAYER_HAND,
   tiedScroll, TIED, chest as chestSprite, pouch,
 } from "../lib/forms.js";
+import { auraFrame, LOOP as AURA_LOOP, PAD as AURA_PAD, TOP as AURA_TOP } from "../lib/spriteAura.js";
 import { playerHandArt, loadPlayerHand, HAND_ART } from "../lib/playerHandArt.js";
 import { RARITY } from "../../shared/sigil.js";
 import { stage, pointer, W, H, FONT, INK, lerp, ease, wrap, grainLayer, feather } from "./kit.js";
@@ -53,7 +54,7 @@ const P = {
 
 const GX = 72, GW = 46;          // the slot
 const HEADY = 242;
-const DRAWER_H = 146;
+const DRAWER_H = 166;                    // two rows of scrolls with room for their auras, then the button
 
 /* sprite metrics, from the forms that own them */
 const HK = GOBLIN_HAND.scale, HT = GOBLIN_HAND.frame;
@@ -288,13 +289,24 @@ function drawOurHand(k, holding, rarity) {
   return { x: gx, y: Math.round(gy + 2) };
 }
 
+/* a scroll, wreathed in its aura as in the satchel (lib/spriteAura.js):
+ * none for common, a cloak from uncommon, wisps from rare, more from
+ * legendary; on the shared 8-a-second beat, still for reduced motion */
+const auraLevel = r => (r >= 4 ? 3 : r >= 2 ? 2 : r);
+const auraBeat = () => (view.calm ? 0 : Math.floor(performance.now() / 125) % AURA_LOOP);
+function scrollSprite(r) {
+  const col = colourOf(r), lvl = auraLevel(r);
+  if (!lvl) return { img: tiedScroll(col), dx: 0, dy: 0 };
+  return { img: auraFrame(tiedScroll(col), col, lvl, auraBeat()), dx: AURA_PAD, dy: AURA_TOP };
+}
 function drawScroll(x, y, r) {
-  ctx.drawImage(tiedScroll(colourOf(r)), Math.round(x - TIED.w / 2), Math.round(y - TIED.h / 2));
+  const { img, dx, dy } = scrollSprite(r);
+  ctx.drawImage(img, Math.round(x - TIED.w / 2) - dx, Math.round(y - TIED.h / 2) - dy);
 }
 
 /* ── the inventory drawer ────────────────────────────────── */
 const CELLS = [];
-for (let i = 0; i < 8; i++) CELLS.push({ x: 12 + (i % 4) * 44, y: 24 + ((i / 4) | 0) * 36, w: 40, h: 32 });
+for (let i = 0; i < 8; i++) CELLS.push({ x: 12 + (i % 4) * 44, y: 24 + ((i / 4) | 0) * 46, w: 40, h: 42 });   // tall enough for an aura
 const CONFIRM = { x: 12, y: DRAWER_H - 40, w: W - 24, h: 30 };
 const drawerTop = () => H - DRAWER_H * S.drawer;
 
@@ -330,14 +342,8 @@ function drawDrawer() {
     px(bx, by, c.w, c.h, on ? "#141822" : "#0e1118");
     ctx.strokeStyle = on ? col : "#1c2029";
     ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, c.w - 1, c.h - 1);
-    if (s.rarity > 0) {                                  // the ink's glow, behind it
-      ctx.globalAlpha = 0.26 + (view.calm ? 0 : Math.sin(S.t * 0.06 + i) * 0.08);
-      const g = ctx.createRadialGradient(bx + c.w / 2, by + c.h / 2, 0, bx + c.w / 2, by + c.h / 2, 13);
-      g.addColorStop(0, col); g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = g; ctx.fillRect(bx, by, c.w, c.h);
-      ctx.globalAlpha = 1;
-    }
-    ctx.drawImage(tiedScroll(col), Math.round(bx + (c.w - TIED.w) / 2), Math.round(by + (c.h - TIED.h) / 2));
+    // the scroll in its aura, as in the satchel, sat low so the wisps rise into the cell
+    drawScroll(bx + c.w / 2, by + c.h - TIED.h / 2 - 2, s.rarity);
   }
 
   // confirm, or the way to the desk

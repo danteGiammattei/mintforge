@@ -33,6 +33,8 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { pageSigil } from "../lib/tomeArt.js";
+import { tiedScroll, TIED } from "../lib/forms.js";
+import { auraFrame, LOOP as AURA_LOOP, PAD as AURA_PAD, TOP as AURA_TOP } from "../lib/spriteAura.js";
 import { RARITY, TRAITS, LIFTS, careOf } from "../../shared/sigil.js";
 import { SCRIBE } from "../../shared/tuning.js";
 import { stage, pointer, W, H, FONT, INK, rnd, wrap, feather } from "./kit.js";
@@ -227,7 +229,12 @@ function btn([x, y, w, h], label, on) {
  * The ribbon takes the roll's colour, then steps up a tier for each lift
  * (a trait, care, the craving), naming each as it lands. */
 const shownSteps = () => (S.result ? Math.max(0, Math.min(S.result.steps.length, Math.floor((S.sealT - 40) / (view.calm ? 1 : STEP)) + 1)) : 0);
-const sealDone = () => S.phase === "sealed" && S.sealT > 58 + (view.calm ? 0 : STEP * (S.result?.steps.length || 0));
+/* after the last lift lands the glowing sheet is held a moment
+ * (HOLD), then rolls itself up and ties into the scroll (ROLL) */
+const HOLD = 54, ROLL = 64;
+const revealEnd = () => 58 + (view.calm ? 0 : STEP * (S.result?.steps.length || 0));
+const rollAt = () => (!S.result ? -1 : view.calm ? (S.sealT >= revealEnd() ? ROLL : -1) : S.sealT - revealEnd() - HOLD);
+const sealDone = () => S.phase === "sealed" && rollAt() >= ROLL;
 /* ─── the reveal: the ink itself lights up ───────────────────────────
  * As the wax sets the desk falls dark round the sheet and the lines warm.
  * When the verdict lands they light in the scroll's colour, in layers so
@@ -330,8 +337,11 @@ function drawSeal() {
     return;
   }
 
+  const rolled = rollAt(), since = S.sealT - (S.flashAt ?? -99);
+  if (rolled >= 0) drawRoll(tier, rolled);
+  else {
   // the glow, breathing; a white flash as each lift lands
-  const since = S.sealT - (S.flashAt ?? -99), flash = !view.calm && since < 10 ? 1 - since / 10 : 0;
+  const flash = !view.calm && since < 10 ? 1 - since / 10 : 0;
   const shown = Math.min(1, e * 1.4);
   ctx.globalAlpha = shown * (view.calm ? 1 : 0.88 + 0.12 * Math.sin(S.t * 0.08));
   ctx.drawImage(glowOf(tier), 0, 0);
@@ -383,6 +393,8 @@ function drawSeal() {
     ctx.globalAlpha = 1;
   }
 
+  }
+
   // the verdict, under the sheet
   ctx.font = FONT; ctx.textAlign = "center";
   if (k > 0.55) {
@@ -406,6 +418,60 @@ function drawSeal() {
     ctx.globalAlpha = 1;
   }
   if (sealDone()) { ctx.fillStyle = INK.warm; ctx.fillText("TAP TO BEGIN ANOTHER", W / 2, H - 12); }
+}
+
+/* ─── the sheet rolls itself up into the scroll ──────────────────────
+ * From the bottom, the glowing ink going with it and catching on the
+ * roll's edge; the roll then comes to the middle of the desk, narrowing,
+ * and with a flash it is tied: the scroll, three times its satchel size,
+ * in the same aura it has there. */
+const PARCH_ROLL = ["#e7d6a8", "#cdb98a", "#b39f72", "#8e7c55", "#6b5c3e"];
+const AURA_LVL = r => (r >= 4 ? 3 : r >= 2 ? 2 : r);
+function drawRoll(tier, t) {
+  const col = RARITY[tier].c, glow = glowOf(tier), cy = SHEET.y + SHEET.h / 2 - 10;
+  const ease = k => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+  plot(SHEET.x - 2, SHEET.y - 2, SHEET.w + 4, SHEET.h + 4, `rgb(${SURROUND})`);
+  const roll = (x, y, w, h) => {
+    for (let k = 0; k < h; k++) plot(x, Math.round(y - h / 2 + k), w, 1, PARCH_ROLL[Math.min(4, Math.floor(k / h * 5))]);
+    plot(x, Math.round(y - h / 2), 1, h, PARCH_ROLL[4]); plot(x + w - 1, Math.round(y - h / 2), 1, h, PARCH_ROLL[4]);
+    if (tier) { ctx.globalAlpha = 0.85; plot(x + 2, Math.round(y), w - 4, 1, lighten(col, 0.3)); ctx.globalAlpha = 1; }   // the ink, wrapped inside, showing at the edge
+  };
+  if (t < 36) {
+    // rolling up from the bottom: what is left of the sheet, then the roll
+    const u = ease(t / 36), left = Math.round(SHEET.h * (1 - u)), rh = 5 + Math.round(u * 7);
+    if (left > 0) {
+      ctx.drawImage(sheetLayer, 2, 2, SHEET.w, left, SHEET.x, SHEET.y, SHEET.w, left);
+      ctx.globalAlpha = 0.6; plot(SHEET.x, SHEET.y, SHEET.w, left, "#050403"); ctx.globalAlpha = 1;
+      ctx.drawImage(glow, SHEET.x, SHEET.y, SHEET.w, left, SHEET.x, SHEET.y, SHEET.w, left);
+    }
+    roll(SHEET.x, SHEET.y + left, SHEET.w, rh);
+    return;
+  }
+  if (t < 56) {
+    // to the middle, narrowing toward the size of the tied scroll
+    const v = ease((t - 36) / 20), w = Math.round(SHEET.w + (TIED.w * 3 - 10 - SHEET.w) * v), y = SHEET.y + (cy - SHEET.y) * v;
+    roll(Math.round(W / 2 - w / 2), y, w, 12 + Math.round(v * 8));
+    return;
+  }
+  // tied: the scroll in its aura, at three times
+  const lvl = AURA_LVL(tier), src = tiedScroll(col);
+  const img = lvl ? auraFrame(src, col, lvl, view.calm ? 0 : Math.floor(S.t / 7.5) % AURA_LOOP) : src;
+  const dx = lvl ? AURA_PAD : 0, dy = lvl ? AURA_TOP : 0, k = 3;
+  ctx.drawImage(img, Math.round(W / 2 - (TIED.w / 2 + dx) * k), Math.round(cy - (TIED.h / 2 + dy) * k), img.width * k, img.height * k);
+  // the flash of the tying, and a ring of sparks going out
+  const since = t - 56;
+  if (since < 14 && !view.calm) {
+    const f = 1 - since / 14;
+    // the scroll itself flares, brightening only its own pixels
+    ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = f * 0.7;
+    ctx.drawImage(img, Math.round(W / 2 - (TIED.w / 2 + dx) * k), Math.round(cy - (TIED.h / 2 + dy) * k), img.width * k, img.height * k);
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2, d = 20 + since * 4;
+      ctx.globalAlpha = f; plot(Math.round(W / 2 + Math.cos(a) * d), Math.round(cy + Math.sin(a) * d * 0.8), 1, 1, i % 2 ? ACCENT[tier] : col);
+    }
+    ctx.globalAlpha = 1;
+  }
 }
 
 /* ─── loop ────────────────────────────────────────────────────────── */
