@@ -24,11 +24,6 @@ const poly = (cx, cy, r, k, skip = 1, turn = -Math.PI / 2) =>
   Array.from({ length: k + 1 }, (_, i) => { const a = turn + TAU * ((i * skip) % k) / k; return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]; });
 const spiral = (cx, cy, r, turns, n = 48) =>
   Array.from({ length: n + 1 }, (_, i) => { const t = i / n, a = -Math.PI / 2 + t * turns * TAU; return [cx + Math.cos(a) * r * t, cy + Math.sin(a) * r * t]; });
-const wave = (x0, x1, y, amp, waves, n = 32) =>
-  Array.from({ length: n + 1 }, (_, i) => { const t = i / n; return [x0 + (x1 - x0) * t, y + Math.sin(t * waves * TAU) * amp]; });
-// a star of k points, alternating outer and inner, in one line
-const points = (cx, cy, R, r, k, turn = -Math.PI / 2) =>
-  Array.from({ length: k * 2 + 1 }, (_, i) => { const a = turn + Math.PI * i / k, d = i % 2 ? r : R; return [cx + Math.cos(a) * d, cy + Math.sin(a) * d]; });
 const rays = (cx, cy, r0, r1, k, turn = -Math.PI / 2) =>
   Array.from({ length: k }, (_, i) => { const a = turn + TAU * i / k; return [[cx + Math.cos(a) * r0, cy + Math.sin(a) * r0], [cx + Math.cos(a) * r1, cy + Math.sin(a) * r1]]; });
 
