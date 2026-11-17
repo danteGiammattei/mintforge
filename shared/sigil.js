@@ -53,7 +53,7 @@ export const TRAITS = {
 /* the lifts that are not traits */
 export const LIFTS = {
   care:  { mark: "CARE" },                 // time spent drawing
-  crave: { mark: "DESIRED" },              // today's craving, lifting twice
+  crave: { mark: "DESIRED", hint: "IT IS THE PAGE HE WANTED. HE IS GLAD" },   // today's craving, lifting twice
   fair:  { mark: "A FAIR COPY" },          // how close the copy is to its page
   close: { mark: "A CLOSE COPY" },
   true:  { mark: "A TRUE COPY" },
@@ -180,7 +180,8 @@ export function measure(a) {
  * salt:    mixed into the drawing's seed. The server passes a secret
  *          per-player value that moves with every seal, so the roll cannot
  *          be searched for offline and a winning drawing cannot be replayed.
- * opts:    craving  today's craved trait (cravingOn)
+ * opts:    craving  today's craved trait, for a freehand drawing (cravingOn)
+ *          craved   the page copied is the one he wants today (tomes.cravedPage)
  *          maxMs    the most drawing time to believe (time since last seal)
  *          page     the tome page copied (shared/tomes.js): its tier is the
  *                   cap instead of the traits', likeness lifts it, and a
@@ -221,8 +222,12 @@ export function rollScroll(a, recent = [], salt = 0, opts = {}) {
     // (each grade reached is a chance of a lift, not a certainty: the
     // seal still has to feel like a roll)
     if (page) for (const [k, at] of [["fair", SIGIL.copy.fair], ["close", SIGIL.copy.close], ["true", SIGIL.copy.true]]) if (like >= at && rng() < SIGIL.copy.bump) lift(k);
-    // today's craving always lifts, and sometimes lifts again
-    const craved = opts.craving && traits.includes(opts.craving) ? opts.craving : null;
+    // what he wants today always lifts, and sometimes lifts again: for a
+    // copy, his page (opts.craved), copied at least fairly; drawn
+    // freehand, his trait (opts.craving)
+    const craved = page
+      ? (opts.craved && like >= SIGIL.copy.fair ? "crave" : null)
+      : (opts.craving && traits.includes(opts.craving) ? opts.craving : null);
     if (craved && lift(craved)) {
       bumped.push(craved);
       if (rng() < SIGIL.craving.again) lift("crave");

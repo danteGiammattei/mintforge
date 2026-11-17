@@ -20,7 +20,7 @@
  *  whose reply it never received.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { analyse, rollScroll, measure, TRAITS, cravingOn, likeness } from "../shared/sigil.js";
+import { analyse, rollScroll, measure, TRAITS, LIFTS, likeness } from "../shared/sigil.js";
 import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
@@ -29,7 +29,7 @@ import {
   inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz, placeAstral,
 } from "../shared/economy.js";
 import { heldSigns } from "./signs.js";
-import { pageOf, tomeFromChest } from "../shared/tomes.js";
+import { pageOf, tomeFromChest, cravedPage } from "../shared/tomes.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
@@ -83,7 +83,8 @@ async function seal(db, pid, body, { now, rand, tz }) {
   if (now - ps.last_seal_at < SCRIBE.cooldownMs) throw new Refusal("The wax is still warm", 429);
   if (held.n >= SCRIBE.scrollCap) throw new Refusal("Your satchel is full", 409);
   // every scroll is a copy of a page of one of your tomes
-  const page = pageOf(String(body.tome || ""), String(body.page || ""), tomesOf(ps.tomes));
+  const owned = tomesOf(ps.tomes);
+  const page = pageOf(String(body.tome || ""), String(body.page || ""), owned);
   if (!page) throw new Refusal("Choose a page of your tome to copy");
   const like = likeness(strokes, page);
 
@@ -96,7 +97,7 @@ async function seal(db, pid, body, { now, rand, tz }) {
   const nonce = ps.seal_nonce || (u32(rand) || 1);
   const recent = parseList(ps.recent_sigs);
   const r = rollScroll(a, recent, sealSalt(nonce, ps.seal_count), {
-    craving: cravingOn(localDay(now, tz)),
+    craved: (w => !!w && w.tome === body.tome && w.page === page.id)(cravedPage(localDay(now, tz), pid, owned)),
     // the client stamps its own strokes, so never believe more drawing
     // time than has really passed since the last seal
     maxMs: ps.last_seal_at ? now - ps.last_seal_at + 1000 : Infinity,
@@ -162,7 +163,7 @@ async function offerOne(db, pid, scrollId, { now, rand }) {
   await db.batch(stmts);
 
   // He only ever praises, and only what actually lifted the scroll.
-  const hint = sc.hint && TRAITS[sc.hint] && rand() < CHESTS.hintChance ? TRAITS[sc.hint].hint : null;
+  const hint = sc.hint && (TRAITS[sc.hint] || LIFTS[sc.hint])?.hint && rand() < CHESTS.hintChance ? (TRAITS[sc.hint] || LIFTS[sc.hint]).hint : null;
   return { rarity: sc.rarity, hint, lean: leanOf(pot), chest: given, xp };
 }
 

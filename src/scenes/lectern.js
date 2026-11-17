@@ -15,6 +15,7 @@
  *    bus.tomes()             every tome (shared/tomes.js TOMES)
  *    bus.owned()             ids of the tomes the player has
  *    bus.chosen()            { tome, page }: the tome id and page index in use
+ *    bus.wanted()            { tome, page } ids of the page he wants today, or null
  *    bus.choose(tome, page)  use this page of this tome at the desk
  *    bus.back()              go back to the desk
  *    bus.where(tier)         where a locked tome is found, as words
@@ -223,6 +224,7 @@ export function mount(cv, bus) {
       ctx.fillStyle = "#6a5638";
       ctx.fillText(`UP TO ${RARITY[page.tier].n}`, SPREAD.x + 8, y + 64);
       ctx.fillText(`${i + 1} / ${t.pages.length}`, SPREAD.x + 8, y + SPREAD.h - 10);
+      if (isWanted(t, page)) { ctx.fillStyle = "#7a2418"; ctx.fillText("HE WANTS IT", SPREAD.x + 8, y + 76); }
     }
     if (show.right) {
       const sz = 66, sg = pageSigil(page, sz, PAGE_INK, true);
@@ -343,6 +345,9 @@ export function mount(cv, bus) {
       ctx.fillText(`${i + 1} / ${t.pages.length}`, SPREAD.x + 8, y + SPREAD.h - 10);
     }
   }
+
+  // the page he wants today (bus.wanted: { tome, page } ids)
+  function isWanted(t, page) { const w = bus.wanted?.(); return !!w && w.tome === t.id && w.page === page.id; }
 
   /* ─── what the player does ───────────────────────────────────────── */
   const hit = (p, [x, y, w, h]) => p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;

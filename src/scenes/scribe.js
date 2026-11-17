@@ -15,7 +15,9 @@
  *    bus.lectern()       go to the lectern, to choose another tome or page:
  *                        the TOMES tab in the left margin, the tome's name,
  *                        the book, or a sideways swipe off the sheet
- *    bus.craving()       the trait he craves today (shared/sigil.js TRAITS)
+ *    bus.wanted()        the page he wants today: { name, here } (here: it is
+ *                        the open page), or null
+ *    bus.toWanted()      open the tome at that page
  *    bus.room()          how many more scrolls the satchel will take
  *    bus.firstTime()     true until the player has sealed once
  *    bus.say(text)       for the aria-live region
@@ -56,7 +58,8 @@ const markOf = why => (TRAITS[why] || LIFTS[why] || { mark: why }).mark;
 const BTN = { undo:[20,304,48,30], clear:[74,304,48,30], seal:[128,304,47,30] };
 const BOOK = [20, 342, 155, 72];             // the open tome, under the buttons
 const SHELF = [16, 18, 110, 18];              // the tome's name, top left: to the lectern
-const TAB = [0, 150, 15, 92];                 // the TOMES tab, in the margin left of the sheet
+const TAB = [0, 150, 15, 92];
+const WANT = [16, 48, 130, 20];                // "TODAY HE DESIRES", on the desk: tap to open his page                 // the TOMES tab, in the margin left of the sheet
 
 const S = {
   t: 0, strokes: [], cur: null, ink: 0,
@@ -145,13 +148,13 @@ function drawChrome() {
   plot(barX, 42, 62, 4, "#1d1812");
   plot(barX, 42, Math.round(62 * care), 4, care >= 1 ? "#c9a25a" : "#6a5636");
 
-  // what he craves today, on the desk
-  const crave = TRAITS[bus.craving()];
-  if (crave) {
+  // the page he wants today, on the desk; tapped, the tome opens at it
+  const want = bus.wanted?.();
+  if (want) {
     ctx.textAlign = "left"; ctx.fillStyle = INK.warm;
     ctx.fillText("TODAY HE DESIRES", 20, 56);
     ctx.fillStyle = INK.warmHi;
-    ctx.fillText(crave.want, 20, 64);
+    ctx.fillText(want.here ? `${want.name}: THIS PAGE` : `${want.name} ›`, 20, 64);
   }
 
   const can = S.strokes.length > 0 && S.phase === "draw", full = bus.room() <= 0;
@@ -201,7 +204,8 @@ function drawBook() {
   wrap(page.name, 12).slice(0, 2).forEach((l, i) => ctx.fillText(l, x + 7, y + 13 + i * 9));
   for (let i = 1; i <= 5; i++) plot(x + 7 + (i - 1) * 7, y + 34, 5, 5, i <= page.tier ? RARITY[i].c : PARCH[0]);
   ctx.fillStyle = "#5a4a32"; ctx.fillText(`${n} / ${of}`, x + 7, y + 48);
-  ctx.fillText("TAP TO CHANGE", x + 7, y + 62);
+  if (bus.wanted?.()?.here) { ctx.fillStyle = "#7a2418"; ctx.fillText("HE WANTS IT", x + 7, y + 62); }
+  else ctx.fillText("TAP TO CHANGE", x + 7, y + 62);
   // right: the sigil
   const sz = Math.min(half - 8, h - 12) | 0, sg = pageSigil(page, sz, PAGE_INK);
   ctx.drawImage(sg, Math.round(x + 4 + half + (half - 1 - sz) / 2), Math.round(y + (h - sz) / 2));
@@ -507,6 +511,7 @@ const onDown = e => {
   if (S.phase === "sealed") { if (sealDone()) newSheet(); return; }
   if (S.phase !== "draw") return;
   if (hit(p, WELL) && bus.deeper()) return bus.well();
+  if (hit(p, WANT) && bus.wanted?.() && !bus.wanted().here) { bus.feel("tap"); return bus.toWanted(); }
   if (hit(p, BTN.undo))  return undo();
   if (hit(p, BTN.clear)) return clear();
   if (hit(p, BTN.seal))  return seal();

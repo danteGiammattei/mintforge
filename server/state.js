@@ -11,10 +11,9 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay } from "../shared/economy.js";
-import { cravingOn } from "../shared/sigil.js";
 import { SCRIBE, ASTRAL } from "../shared/tuning.js";
 import { heldSigns } from "./signs.js";
-import { STARTER } from "../shared/tomes.js";
+import { STARTER, cravedPage } from "../shared/tomes.js";
 import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
 
@@ -143,7 +142,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     stats,
     gifts: parseList(ps.gifts).length,
     sealReadyIn: Math.max(0, SCRIBE.cooldownMs - (now - (ps.last_seal_at || 0))),
-    craving: cravingOn(localDay(now, tz)),     // the trait he craves today
+    craving: cravedPage(localDay(now, tz), pid, tomesOf(ps.tomes)),   // the page he wants today: { tome, page }
     // star signs paid for just now, for the popup
     ...(signBonus.length ? { signBonus } : {}),
   };

@@ -24,7 +24,7 @@ const keepSeen = n => { try { localStorage.setItem(SEEN_KEY, String(n)); } catch
  * which page, and the lectern (to the desk's left) where they are chosen. */
 
 /* The lectern, sliding in from the left over the desk and back out. */
-function Lectern({ owned, chosen, choose, onBack }) {
+function Lectern({ owned, wanted, chosen, choose, onBack }) {
   const ref = useRef(null), scene = useRef(null), live = useRef({ owned, chosen });
   live.current = { owned, chosen };
   const [inPlace, setIn] = useState(false);
@@ -34,6 +34,7 @@ function Lectern({ owned, chosen, choose, onBack }) {
       tomes: () => TOMES,
       owned: () => live.current.owned,
       chosen: () => live.current.chosen,
+      wanted: () => wanted,
       choose: (t, p) => { choose(t, p); setOpen(true); },
       back: () => leave(),
       where: tier => `IN ${CHESTS.names[tier]} CHESTS AND RARER`,
@@ -68,6 +69,8 @@ export default function Scribe() {
   const [lectern, setLectern] = useState(false);
   const [open, setOpenRaw] = useState(() => readOpen() || { tome: STARTER, page: 0 });
   const setOpen = v => { setOpenRaw(v); keepOpen(v); };
+  const setOpenRef = useRef(setOpen);
+  setOpenRef.current = setOpen;
   // the open tome, if you have it, else the primer; the page held in range
   const tome = g.tomes.includes(open.tome) && TOME_BY_ID[open.tome] ? TOME_BY_ID[open.tome] : TOME_BY_ID[STARTER];
   const pageAt = Math.max(0, Math.min(tome.pages.length - 1, tome.id === open.tome ? open.page : 0));
@@ -93,7 +96,16 @@ export default function Scribe() {
   useEffect(() => {
     scene.current = mount(ref.current, {
       inkMax: () => live.current.inkMax,
-      craving: () => live.current.craving,
+      wanted: () => {
+        const w = live.current.craving, t = w && live.current.tomes.includes(w.tome) && TOME_BY_ID[w.tome];
+        const pg = t && t.pages.find(p => p.id === w.page);
+        if (!pg) return null;
+        return { name: pg.name, here: book.current.tome.id === t.id && book.current.page.id === pg.id };
+      },
+      toWanted: () => {
+        const w = live.current.craving, t = TOME_BY_ID[w?.tome], i = t ? t.pages.findIndex(p => p.id === w.page) : -1;
+        if (i >= 0) setOpenRef.current({ tome: t.id, page: i });
+      },
       deeper: () => live.current.wellLevel < SCRIBE.wells.length - 1,
       well: () => buyRef.current(),
       seal: strokes => live.current.act("seal", { strokes, tome: book.current.tome.id, page: book.current.page.id }),
@@ -115,13 +127,14 @@ export default function Scribe() {
               style={{ touchAction: "none", display: "block" }}/>
       <div className="sr-only">
         <button onClick={() => scene.current?.scrawl()}>Copy the page onto the sheet</button>
+        {g.craving && <button onClick={() => { const t = TOME_BY_ID[g.craving.tome], i = t ? t.pages.findIndex(p => p.id === g.craving.page) : -1; if (i >= 0) setOpen({ tome: t.id, page: i }); }}>Open the page he wants today</button>}
         <button onClick={() => { keepSeen(g.tomes.length); setLectern(true); }}>Go to the lectern to choose a tome and page</button>
         <button onClick={() => scene.current?.undo()}>Undo the last stroke</button>
         <button onClick={() => scene.current?.clear()}>Clear the sheet</button>
         <button onClick={() => scene.current?.seal()}>Seal the scroll</button>
         {g.wellLevel < SCRIBE.wells.length - 1 && <button onClick={buyWell}>Buy a deeper inkwell</button>}
       </div>
-      {lectern && <Lectern owned={g.tomes} chosen={{ tome: tome.id, page: pageAt }} choose={(t, p) => setOpen({ tome: t, page: p })} onBack={() => setLectern(false)}/>}
+      {lectern && <Lectern owned={g.tomes} wanted={g.craving} chosen={{ tome: tome.id, page: pageAt }} choose={(t, p) => setOpen({ tome: t, page: p })} onBack={() => setLectern(false)}/>}
     </section>
   );
 }

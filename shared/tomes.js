@@ -102,6 +102,18 @@ export function pageOf(tomeId, pageId, owned) {
   return TOME_BY_ID[tomeId]?.pages.find(p => p.id === pageId) || null;
 }
 
+/* What he wants today: one page of one of the player's own tomes, the
+ * same all day (`day` a day number, economy.localDay) and different for
+ * each player, so a new tome is new pages he may ask for. */
+export function cravedPage(day, pid, owned) {
+  const pages = TOMES.filter(t => owned.includes(t.id)).flatMap(t => t.pages.map(p => ({ tome: t.id, page: p.id })));
+  if (!pages.length) return null;
+  let h = Math.imul((day | 0) ^ 0x5bd1e995, 0x9e3779b1) >>> 0;
+  for (const ch of String(pid)) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+  h ^= h >>> 15; h = Math.imul(h, 0x85ebca6b) >>> 0; h ^= h >>> 13;
+  return pages[(h >>> 0) % pages.length];
+}
+
 /* Which tome a chest of `tier` holds, if any: one the player lacks, no
  * rarer than the chest, the chest's own rarity likelier. */
 export function tomeFromChest(tier, owned, chance, rand) {

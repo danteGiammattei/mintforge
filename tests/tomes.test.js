@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TOMES, TOME_BY_ID, tomeFromChest, pageOf } from "../shared/tomes.js";
+import { TOMES, TOME_BY_ID, tomeFromChest, pageOf, cravedPage } from "../shared/tomes.js";
 import { likeness, rollScroll, analyse } from "../shared/sigil.js";
 import { SCRIBE, CHESTS, SIGIL } from "../shared/tuning.js";
 import { seeded } from "./d1.js";
@@ -92,4 +92,32 @@ test("a chest's tome is kept, once, and the seal can use it", async () => {
     const s = await go("seal", { tome: "hedge", page: "copper", strokes: copy(sun, 0.02).map(st => st.slice(0, 40)) });
     assert.ok(s.result.likeness > 0);
   } finally { CHESTS.tomeChance.splice(0, 5, 0, 0.06, 0.1, 0.16, 0.25); }
+});
+
+test("what he wants: a page of your own tomes, the same all day, not the same for everyone", () => {
+  const owned = ["primer", TOMES.find(t => t.tier > 0).id];
+  for (let d = 20000; d < 20060; d++) {
+    const w = cravedPage(d, "p1", owned);
+    assert.ok(pageOf(w.tome, w.page, owned), JSON.stringify(w));
+    assert.deepEqual(cravedPage(d, "p1", owned), w);
+  }
+  const days = Array.from({ length: 30 }, (_, d) => d + 20000);
+  assert.ok(days.some(d => cravedPage(d, "p1", owned).page !== cravedPage(d, "p2", owned).page), "players differ");
+  assert.ok(new Set(days.map(d => cravedPage(d, "p1", ["primer"]).page)).size > 3, "it moves day to day");
+});
+
+test("a fair copy of the page he wants lifts; a poor one does not", () => {
+  const star = TOME_BY_ID.primer.pages.find(p => p.id === "mercury");
+  const a = analyse(copy(star, 0.02), SCRIBE.sheet);
+  let lifted = 0;
+  for (let salt = 0; salt < 200; salt++) {
+    const r = rollScroll(a, [], salt, { page: star, likeness: SIGIL.copy.fair, maxMs: Infinity, craved: true });
+    if (r.steps.some(st => st.why === "crave")) lifted++;
+    else assert.ok(r.base >= star.tier || r.steps.length && r.steps.at(-1).to >= star.tier, "only the cap stops it");
+    const plain = rollScroll(a, [], salt, { page: star, likeness: SIGIL.copy.fair, maxMs: Infinity });
+    assert.ok(r.rarity >= plain.rarity);
+  }
+  assert.ok(lifted > 100);
+  const poor = rollScroll(a, [], 1, { page: star, likeness: SIGIL.copy.fair - 0.01, maxMs: Infinity, craved: true });
+  assert.ok(!poor.steps.some(st => st.why === "crave"));
 });
