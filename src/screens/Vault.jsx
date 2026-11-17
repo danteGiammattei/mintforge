@@ -22,6 +22,10 @@ const SORTS = [
   ["value",  "VALUE",  (a, b) => coinValue(b) - coinValue(a)],
 ];
 
+const tileName = coin => {
+  const n = coinName(coin);
+  return { text: n.length > 10 ? n.slice(0, 9) + "…" : n, small: n.length > 8 };
+};
 export function CoinTile({ coin, selected, pinned, disabled, onClick, label }) {
   const m = matterOf(coin), r = RARITIES[coinRarity(coin)];
   return (
@@ -29,7 +33,8 @@ export function CoinTile({ coin, selected, pinned, disabled, onClick, label }) {
             style={{ borderTopColor: r.color, ...(r.id >= 4 && !selected ? { background: `radial-gradient(circle at 50% 38%, ${r.glow}, transparent 70%), var(--stone-1)` } : {}) }}
             aria-label={label || `${r.name} ${m.name} coin, ${coinName(coin)}${coin.shiny ? ", shiny" : ""}${coin.locked ? ", locked" : ""}`}>
       <CoinCanvas coin={coin} size={64}/>
-      <span aria-hidden style={{ color: m.hl, maxWidth: "100%", overflowWrap: "anywhere", textAlign: "center", lineHeight: 1.25 }}>{coinName(coin)}</span>
+      {/* one line always: a long name a size smaller, a very long one cut */}
+      <span aria-hidden style={{ color: m.hl, maxWidth: "100%", whiteSpace: "nowrap", overflow: "hidden", textAlign: "center", lineHeight: 1.25, fontSize: tileName(coin).small ? 10 : undefined }}>{tileName(coin).text}</span>
       <span aria-hidden style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 4, color: "var(--candle)" }}>
         {coin.shiny && <PixelIcon name="spark" size={11}/>}
         {coin.locked && <PixelIcon name="lock" size={11}/>}
@@ -48,7 +53,8 @@ export default function Vault() {
   const [openId, setOpenId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [forging, setForging] = useState(null);
-  const [view, setView] = useState("coins");
+  // another screen can send the player straight to the journal
+  const [view, setView] = useState(() => { try { const v = sessionStorage.getItem("mf.vaultView"); sessionStorage.removeItem("mf.vaultView"); return v === "journal" ? "journal" : "coins"; } catch { return "coins"; } });
 
   const pinnedSet = useMemo(() => new Set(g.showcase.filter(Boolean).map(c => c.id)), [g.showcase]);
   const counts = useMemo(() => METALS.map((_, i) => g.coins.filter(c => c.metalIdx === i).length), [g.coins]);
