@@ -2,6 +2,7 @@ import { useGame } from "../lib/GameContext.js";
 import { METALS, RARITIES } from "../lib/data.js";
 import { ASTRAL } from "../../shared/tuning.js";
 import CoinCanvas from "./CoinCanvas.jsx";
+import { mkCoin } from "../lib/coin.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { LEDGER_MARKS } from "../../shared/economy.js";
 import { GIFTS, CHESTS } from "../../shared/tuning.js";
@@ -50,6 +51,27 @@ export default function Journal() {
       </div>
       {next ? <p className="t-magic" style={{ margin: 0, textAlign: "center" }}>AT {next} KINDS HE HAS {prize(next)} FOR YOU. COLLECT IT AT THE DOOR.</p>
             : <p className="t-gold" style={{ margin: 0, textAlign: "center" }}>EVERY KIND THERE IS. THE LEDGER IS COMPLETE.</p>}
+
+      {/* the metal ladder: what "rises a metal" means, lowest to highest,
+          the metals found lit */}
+      <section className="panel" style={{ padding: 8 }} aria-label="The metals, lowest to highest">
+        <div className="between" style={{ marginBottom: 6 }}>
+          <span className="t-label">THE METALS, LOWEST TO HIGHEST</span>
+          <span className="t-label">{METALS.filter((_, mi) => RARITIES.some((_r, ri) => count(mi, ri) > 0)).length} / {METALS.length}</span>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${METALS.length}, minmax(0, 1fr))`, gap: 2, alignItems: "end" }}>
+          {METALS.map((m, mi) => {
+            const has = RARITIES.some((_r, ri) => count(mi, ri) > 0);
+            return (
+              <div key={m.name} title={m.name} style={{ display: "grid", justifyItems: "center", gap: 2, opacity: has ? 1 : 0.28, filter: has ? "none" : "grayscale(1) brightness(.5)" }}>
+                <CoinCanvas coin={mkCoin(7 + mi * 13, 1, mi, undefined, 0)} size={26}/>
+                <i aria-hidden style={{ display: "block", width: "70%", height: 2 + mi, background: has ? m.hl : "var(--line)" }}/>
+              </div>
+            );
+          })}
+        </div>
+        <p className="t-dim" style={{ margin: "8px 0 0", fontSize: 12 }}>THE TAVERN CAN RAISE A COIN UP THIS LADDER, OR TAKE IT.</p>
+      </section>
 
       <section className="panel" style={{ padding: 8, overflowX: "auto" }} aria-label="Kinds of coin found">
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 4, tableLayout: "fixed" }}>

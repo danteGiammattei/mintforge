@@ -108,6 +108,12 @@ export default function Tavern() {
         {game === "war" ? <War/> : (
         <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
           <p className="t-dim" style={{ margin: 0 }}>{def.rule}</p>
+          {(
+            <button className="t-magic" onClick={() => { try { sessionStorage.setItem("mf.vaultView", "journal"); } catch { /* fine */ } g.setTab("vault"); }}
+                    style={{ background: "none", border: 0, padding: 0, font: "inherit", textAlign: "left", cursor: "pointer", minHeight: 32 }}>
+              WHICH METAL IS NEXT? SEE THE LADDER IN YOUR JOURNAL ›
+            </button>
+          )}
 
           {game === "roulette" && (
             <>
