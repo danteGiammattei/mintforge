@@ -125,6 +125,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     brushLevel: ps.brush_level || 0,
     frame: ps.frame, bio: ps.bio || "", selectedTitle: currentTitle(ps.selected_title),
     pinnedIds: ps.pinned_ids ? JSON.parse(ps.pinned_ids) : null,
+    iconCoin: stats.iconCoin || null,
     ownedFrames: parseList(ps.owned_frames), ownedTitles: parseList(ps.owned_titles),
     coins: all.filter(r => !r.dusty).map(coinOut),
     dusty: all.filter(r => r.dusty).map(coinOut),
@@ -187,6 +188,14 @@ export async function patchCosmetics(db, pid, body) {
     else if (Array.isArray(s.pinnedIds)) {
       const ids = s.pinnedIds.slice(0, 8).map(x => (typeof x === "string" && x.length <= 80 ? x : null));
       set("pinned_ids", JSON.stringify(ids));
+    }
+  }
+
+  // the coin chosen as the app's icon (lib/appIcon.js), or null for none
+  if ("iconCoin" in s) {
+    if (s.iconCoin === null) sets.push(`stats = json_remove(COALESCE(stats, '{}'), '$.iconCoin')`);
+    else if (typeof s.iconCoin === "string" && s.iconCoin.length <= 80) {
+      binds.push(s.iconCoin); sets.push(`stats = json_set(COALESCE(stats, '{}'), '$.iconCoin', ?${binds.length})`);
     }
   }
 

@@ -55,6 +55,17 @@ export default function Vault() {
   const [forging, setForging] = useState(null);
   // another screen can send the player straight to the journal
   const [view, setView] = useState(() => { try { const v = sessionStorage.getItem("mf.vaultView"); sessionStorage.removeItem("mf.vaultView"); return v === "journal" ? "journal" : "coins"; } catch { return "coins"; } });
+  // a coin as the app's icon (lib/appIcon.js); tapped again, the old icon back
+  const pickIcon = c => {
+    feel("tap");
+    if (g.iconCoin === c.id) { g.setIconCoin(null); ui.toast("MINTFORGE HAS ITS OWN ICON AGAIN."); return; }
+    g.setIconCoin(c.id);
+    ui.notify({
+      title: "YOUR APP ICON",
+      body: "THE TAB ICON HAS CHANGED ALREADY. A PHONE KEEPS THE ICON IT WAS GIVEN WHEN THE APP WAS ADDED, SO TO SEE THIS COIN ON YOUR HOME SCREEN: REMOVE MINTFORGE FROM IT, OPEN THE GAME IN YOUR BROWSER, SIGN IN, AND ADD IT TO YOUR HOME SCREEN AGAIN. YOUR COINS ARE KEPT ON YOUR ACCOUNT.",
+      yes: "GOT IT",
+    });
+  };
   // the first-loop guide ends at the journal
   useEffect(() => { if (view === "journal") g.sawJournal?.(); }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -182,7 +193,8 @@ export default function Vault() {
       {open && (
         <CoinModal coin={open} busy={busy} onClose={() => setOpenId(null)} onToggleLock={g.toggleLock} onSell={c => sell([c])}
                    pinned={pinnedSet.has(open.id)} onTogglePin={id => { g.togglePin(id); feel("tap"); }}
-                   onForge={c => { setOpenId(null); setForging(c.id); }}/>
+                   onForge={c => { setOpenId(null); setForging(c.id); }}
+                   isIcon={g.iconCoin === open.id} onIcon={pickIcon}/>
       )}
       {forging && <Forge coinId={forging} onClose={() => setForging(null)}/>}
     </div>

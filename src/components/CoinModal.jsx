@@ -13,7 +13,7 @@ import { coinName, matterOf } from "../lib/coinview.js";
  * `onTogglePin` and `onForge` are optional — a coin in someone else's cabinet has none. */
 const SIZE = 192;
 
-export default function CoinModal({ coin, onClose, onToggleLock, onSell, onTogglePin, onForge, pinned, busy }) {
+export default function CoinModal({ coin, onClose, onToggleLock, onSell, onTogglePin, onForge, pinned, busy, isIcon, onIcon }) {
   const cvRef    = useRef();
   const rotRef   = useRef({ x: 12, y: 0 });
   const velRef   = useRef({ x: 0,  y: 0 });
@@ -125,6 +125,11 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
           {onSell && !coin.locked && (
             <button className="btn btn-danger" style={{ flex: "1 1 120px" }} disabled={busy} onClick={() => onSell(coin)}>
               <PixelIcon name="mark" size={11}/>SELL {coinValue(coin).toLocaleString()}
+            </button>
+          )}
+          {onIcon && (
+            <button className={`btn ${isIcon ? "btn-gold" : ""}`} style={{ flex: "1 1 120px" }} aria-pressed={!!isIcon} onClick={() => onIcon(coin)}>
+              <PixelIcon name="spark" size={11}/>{isIcon ? "APP ICON" : "USE AS APP ICON"}
             </button>
           )}
           <button className="btn btn-ghost" style={{ flex: "1 1 80px" }} onClick={onClose}>CLOSE</button>

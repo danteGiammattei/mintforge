@@ -12,6 +12,7 @@ import AuthScreen from "./components/AuthScreen.jsx";
 import BottomNav, { TABS } from "./components/BottomNav.jsx";
 import TopBar from "./components/TopBar.jsx";
 import Guide, { guideStep, journalSeen } from "./components/Guide.jsx";
+import { setAppIcon } from "./lib/appIcon.js";
 import Scribe from "./screens/Scribe.jsx";
 import Door from "./screens/Door.jsx";
 import Satchel from "./screens/Satchel.jsx";
@@ -110,6 +111,9 @@ function Game({ game }) {
 
 
   const war = useWar(game.api, game.refresh, tab === "tavern");
+  // the coin chosen as the app's icon, painted wherever it was chosen
+  const iconCoin = game.coins.find(c => c.id === game.iconCoin) || null;
+  useEffect(() => { setAppIcon(iconCoin); }, [iconCoin?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // the first loop, walked once (components/Guide.jsx)
   const [, nudge] = useState(0);
   const guide = guideStep(game);

@@ -8,14 +8,14 @@ export const onRequestGet = ({ request, env }) => guarded(async () => {
   return json(await loadState(env.DB, auth.player.id, Date.now(), tzOf(request)));
 });
 
-/* POST /api/vault — choices only: frame, title, bio, cabinet, locks.
+/* POST /api/vault — choices only: frame, title, bio, cabinet, app icon, locks.
  *
  * This endpoint used to take coins to add, coins to remove and a marks
  * balance from the client. It takes none of them now; anything else in
  * the body is refused rather than ignored, so an old client fails loudly
  * instead of believing it saved. Value changes go through /api/act. */
 const ALLOWED_TOP = new Set(["state", "lock"]);
-const ALLOWED_STATE = new Set(["frame", "bio", "selectedTitle", "pinnedIds"]);
+const ALLOWED_STATE = new Set(["frame", "bio", "selectedTitle", "pinnedIds", "iconCoin"]);
 
 export const onRequestPost = ({ request, env }) => guarded(async () => {
   const auth = await getAuth(request, env);
