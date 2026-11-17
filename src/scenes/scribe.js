@@ -172,7 +172,7 @@ function drawChrome() {
   // lines for the player sit in a dark band across the foot of the sheet,
   // where they can be read: the one-time prompt, then passing notes
   const lines = S.fresh && !S.strokes.length && S.phase === "draw"
-    ? ["COPY THE PAGE ONTO THE SHEET.", "THEN SEAL IT. HE PAYS FOR SCROLLS."]
+    ? ["COPY THE PAGE ONTO THE SHEET.", "THEN SEAL IT. HE PAYS FOR SCROLLS.", "A SLOW, CAREFUL HAND PAYS MORE."]
     : S.noteA > 0.01 ? wrap(S.note, 32) : null;
   if (lines) {
     const a = S.fresh && !S.strokes.length ? 1 : Math.min(1, S.noteA), y0 = SHEET.y + SHEET.h - 6 - lines.length * 10;

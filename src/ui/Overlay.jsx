@@ -69,7 +69,7 @@ export function OverlayProvider({ children }) {
       {children}
       <div aria-live="polite" role="status" className="sr-only">{live}</div>
       {/* toasts sit just above the tab bar, clear of every screen's header */}
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: "calc(env(safe-area-inset-bottom, 0px) + var(--nav-h) + 12px)", zIndex: 800, display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 8, pointerEvents: "none", padding: "0 16px" }}>
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: "calc(env(safe-area-inset-bottom, 0px) + var(--nav-h) + var(--guide-h, 0px) + 12px)", zIndex: 800, display: "flex", flexDirection: "column-reverse", alignItems: "center", gap: 8, pointerEvents: "none", padding: "0 16px" }}>
         {toasts.map(t => (
           <div key={t.id} className="panel panel-hi rise" style={{ padding: "8px 12px", textAlign: "center", color: t.tone === "bad" ? "var(--blood)" : t.tone === "magic" ? "var(--magic)" : "var(--candle)" }}>{t.text}</div>
         ))}

@@ -11,6 +11,7 @@ import { feel } from "./lib/feel.js";
 import AuthScreen from "./components/AuthScreen.jsx";
 import BottomNav, { TABS } from "./components/BottomNav.jsx";
 import TopBar from "./components/TopBar.jsx";
+import Guide, { guideStep, journalSeen } from "./components/Guide.jsx";
 import Scribe from "./screens/Scribe.jsx";
 import Door from "./screens/Door.jsx";
 import Satchel from "./screens/Satchel.jsx";
@@ -109,7 +110,11 @@ function Game({ game }) {
 
 
   const war = useWar(game.api, game.refresh, tab === "tavern");
-  const ctx = useMemo(() => ({ ...game, tab, setTab, war }), [game, tab, setTab, war]);
+  // the first loop, walked once (components/Guide.jsx)
+  const [, nudge] = useState(0);
+  const guide = guideStep(game);
+  const sawJournal = useCallback(() => { journalSeen(); nudge(n => n + 1); }, []);
+  const ctx = useMemo(() => ({ ...game, tab, setTab, war, sawJournal }), [game, tab, setTab, war, sawJournal]);
   const warBadge = war.invites.length || (war.table?.status === "playing" && !war.table.youFlipped ? "!" : 0);
   const Screen = SCREENS[tab] || Scribe;
   const waiting = game.chests.length + game.dusty.length;
@@ -128,7 +133,8 @@ function Game({ game }) {
         <main id="main" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: BARE.has(tab) ? "env(safe-area-inset-top, 0px)" : 0 }}>
           <Suspense key={tab} fallback={<div className="page"><p className="t-dim blink" style={{ padding: 24, textAlign: "center" }}>…</p></div>}><Screen/></Suspense>
         </main>
-        <BottomNav tab={tab} setTab={setTab} badges={{ satchel: waiting, door: game.dailyReady && tab !== "door" ? "!" : 0, tavern: tab !== "tavern" ? warBadge : 0 }}/>
+        <Guide step={guide} tab={tab} setTab={setTab} bare={BARE.has(tab)} onSkip={() => nudge(n => n + 1)}/>
+        <BottomNav tab={tab} setTab={setTab} guide={guide && guide.tab !== tab ? guide.tab : null} badges={{ satchel: waiting, door: game.dailyReady && tab !== "door" ? "!" : 0, tavern: tab !== "tavern" ? warBadge : 0 }}/>
       </div>
       </RewardHost>
     </GameContext.Provider>

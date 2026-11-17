@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
@@ -55,6 +55,8 @@ export default function Vault() {
   const [forging, setForging] = useState(null);
   // another screen can send the player straight to the journal
   const [view, setView] = useState(() => { try { const v = sessionStorage.getItem("mf.vaultView"); sessionStorage.removeItem("mf.vaultView"); return v === "journal" ? "journal" : "coins"; } catch { return "coins"; } });
+  // the first-loop guide ends at the journal
+  useEffect(() => { if (view === "journal") g.sawJournal?.(); }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pinnedSet = useMemo(() => new Set(g.showcase.filter(Boolean).map(c => c.id)), [g.showcase]);
   const counts = useMemo(() => METALS.map((_, i) => g.coins.filter(c => c.metalIdx === i).length), [g.coins]);

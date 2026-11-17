@@ -11,7 +11,7 @@ export const TABS = [
   ["profile", "face",    "PROFILE"],
 ];
 
-export default function BottomNav({ tab, setTab, badges = {} }) {
+export default function BottomNav({ tab, setTab, badges = {}, guide = null }) {
   return (
     <nav aria-label="Main" style={{
       flexShrink: 0, display: "flex", background: "var(--stone-0)", borderTop: "2px solid var(--line)",
@@ -28,6 +28,8 @@ export default function BottomNav({ tab, setTab, badges = {} }) {
                     background: on ? "var(--stone-2)" : "transparent", border: 0,
                     borderTop: `2px solid ${on ? "var(--candle)" : "transparent"}`, marginTop: -2,
                     color: on ? "var(--candle)" : "var(--bone-dim)",
+                    // the tab the first-loop guide points at breathes
+                    ...(guide === id ? { animation: "guideGlow 1.4s ease-in-out infinite", color: "var(--candle)" } : {}),
                   }}>
             <PixelIcon name={icon} size={22}/>
             <span style={{ fontSize: 12, lineHeight: 1, letterSpacing: 0 }} aria-hidden>{label}</span>
