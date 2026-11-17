@@ -20,6 +20,10 @@
  *    bus.more()           true while he still has something waiting (the daily gift)
  *    bus.coach()          a line for a player who has never offered, or null
  *    bus.toStall()        he has walked away to his stall: show it
+ *    bus.invite()         "first": there is something on his stall you could
+ *                        buy and you have never been (his lantern burns
+ *                        bright, he says so once, an arrow points up);
+ *                        "known": you have been (it burns low); or null
  *
  *  A swipe up from high in the frame (on him, not the satchel) asks for
  *  his wares: he turns, walks off into the light and the scene goes to
@@ -108,6 +112,27 @@ function drawGap(flick) {
   }
   px(GX - 3, 0, 3, H, P.jamb); px(GX + GW, 0, 3, H, P.jamb);
   px(GX - 1, 0, 1, H, "#000"); px(GX + GW, 0, 1, H, "#000");
+}
+
+/* his stall's lantern, somewhere beyond him, high in the gap: lit once
+ * there is something there you could buy (bus.invite "first"), and left
+ * burning low once you have been ("known") */
+function drawLantern() {
+  const how = bus.invite?.(); if (!how) return;
+  const a = (how === "first" ? 0.95 : 0.45) * (view.calm ? 1 : 0.82 + Math.sin(S.t * 0.05) * 0.12 + Math.random() * 0.06);
+  const ly = 58, lx = Math.round(GX + GW / 2 + (view.calm ? 0 : Math.sin(S.t * 0.017) * 1.5));
+  for (let y = 10; y < 112; y++) {
+    const d = Math.abs(y - ly) / 50, k = Math.max(0, 1 - d * d) * a * 0.32;
+    if (k < 0.02) continue;
+    ctx.globalAlpha = k; px(GX, y, GW, 1, "#c98a3a");
+  }
+  ctx.globalAlpha = a;
+  px(lx, 0, 1, ly - 5, "#2a2118");                                    // its chain
+  px(lx - 1, ly - 5, 3, 1, "#3a2a18");
+  px(lx - 2, ly - 4, 5, 7, "#b07030");
+  px(lx - 1, ly - 3, 3, 5, "#ffd890");
+  px(lx - 1, ly + 3, 3, 1, "#3a2a18");
+  ctx.globalAlpha = 1;
 }
 
 function drawDust() {
@@ -515,6 +540,11 @@ function frame() {
       const line = bus.coach();
       if (line) speak(line, 3.4);
     }
+    // the first time there is something you could buy from him, he says so
+    else if (!S.invited && S.t > 200 && S.lineA < 0.4 && S.drawer < 0.01 && !S.arriving && bus.invite?.() === "first") {
+      S.invited = true;
+      speak("HE NODS AT YOUR MARKS. HE HAS THINGS TO SELL. SWIPE UP ON HIM.", 3.6);
+    }
   }
 
   // his posture follows the pot, slowly: he does not jump
@@ -525,6 +555,7 @@ function frame() {
   if (S.mode !== "give" && S.curl > 0.001) S.curl += (0 - S.curl) * 0.1;
 
   drawGap(flick);
+  drawLantern();
   drawDust();
   const cx = drawFigure(S.lean);
 
@@ -571,6 +602,15 @@ function frame() {
   if (S.dark > 0) { ctx.globalAlpha = S.dark; ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
 
   // swipe affordance, only when nothing is happening
+  if (S.mode === "idle" && S.drawer < 0.01 && bus.invite?.() === "first") {
+    // and until you have been, one up there on him too, toward the lantern
+    ctx.globalAlpha = view.calm ? 0.9 : 0.65 + Math.sin(S.t * 0.06) * 0.3;
+    const cx = Math.round(GX + GW / 2), bob = view.calm ? 0 : Math.round(Math.sin(S.t * 0.06) * 2);
+    for (const dy of [0, 6]) for (let k = 0; k < 4; k++) {               // two chevrons, pointing up
+      px(cx - k - 1, 140 + dy + k + bob, 1, 1, "#e0b070"); px(cx + k, 140 + dy + k + bob, 1, 1, "#e0b070");
+    }
+    ctx.globalAlpha = 1;
+  }
   if (S.mode === "idle" && S.drawer < 0.01) {
     ctx.globalAlpha = view.calm ? 0.9 : 0.85 + Math.sin(S.t * 0.04) * 0.15;
     ctx.fillStyle = INK.cold;

@@ -5,8 +5,12 @@ import { feel } from "../lib/feel.js";
 import { mount, SURROUND } from "../scenes/door.js";
 import { useCelebrate, giftToReward } from "../components/Reward.jsx";
 import { RARITY } from "../../shared/sigil.js";
-import { CHESTS } from "../../shared/tuning.js";
+import { CHESTS, STALL } from "../../shared/tuning.js";
 const Stall = lazy(() => import("../components/Stall.jsx"));
+// whether this device has followed him to his stall
+const STALL_KEY = "mf.stallSeen";
+const stallSeen = () => { try { return !!localStorage.getItem(STALL_KEY); } catch { return false; } };
+const keepStallSeen = () => { try { localStorage.setItem(STALL_KEY, "1"); } catch { /* fine */ } };
 
 /* The goblin at the door. There is no menu, price or tooltip on this
  * screen and none may be added: the only chrome is the scene itself.
@@ -46,7 +50,10 @@ export default function Door() {
         if (what.type !== "chest") feel("gift");
       },
       toDesk: () => live.current.setTab("scribe"),
-      toStall: () => setStall(true),
+      toStall: () => { keepStallSeen(); setStall(true); },
+      // his lantern: lit once his cheapest chest is within your marks
+      invite: () => stallSeen() ? "known"
+        : live.current.stats.offered > 0 && live.current.marks >= STALL.chestPrice[0] ? "first" : null,
       more: () => live.current.dailyReady,
       coach: () => (live.current.stats.offered > 0 ? null
         : live.current.scrolls.length ? "HE WANTS WHAT YOU MADE. SWIPE UP."
