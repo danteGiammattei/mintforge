@@ -5,9 +5,13 @@ import { rune } from "../lib/coin.js";
 /* ─── AUTH ────────────────────────────────────────────────────────────────
  * Sign in or make an account. Username: 3–20 letters, digits or
  * underscores. PIN: 4–6 digits. Too many wrong PINs and the server asks
- * you to wait; the message says for how long. */
+ * you to wait; the message says for how long.
+ * A device that has never signed in opens on NEW ACCOUNT: someone new is
+ * likelier than someone returning on a new phone. */
+const KNOWN = "mf.known";
+const known = () => { try { return !!localStorage.getItem(KNOWN); } catch { return false; } };
 export default function AuthScreen({ onAuthed }) {
-  const [mode,     setMode]     = useState("login");
+  const [mode,     setMode]     = useState(() => (known() ? "login" : "register"));
   const [username, setUsername] = useState("");
   const [pin,      setPin]      = useState("");
   const [busy,     setBusy]     = useState(false);
@@ -21,6 +25,7 @@ export default function AuthScreen({ onAuthed }) {
     try {
       const api = apiClient(null);
       const res = await (mode === "login" ? api.login(username.trim(), pin) : api.register(username.trim(), pin));
+      try { localStorage.setItem(KNOWN, "1"); } catch { /* fine */ }
       onAuthed(res.token);
     } catch (ex) { setErr(ex.message); setBusy(false); }
   };
