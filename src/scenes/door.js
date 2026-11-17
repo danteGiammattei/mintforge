@@ -81,6 +81,7 @@ const S = {
   blink: 0,
   hurry: false, say: [], queue: [],   // skip-ahead; hints and chests still to come
   arriving: null,          // { kind: "chest"|"gift", tier, k, what }
+  coachAt: 90,             // when a player who has never offered is next told what he wants
   dark: 0,
   dust: Array.from({ length: 22 }, () => ({ x: GX + Math.random() * GW, y: Math.random() * H, v: 0.04 + Math.random() * 0.10, p: Math.random() * 6.28 })),
   motes: [],
@@ -402,7 +403,10 @@ function stepGive() {
       if (!view.calm && Math.random() < 0.5) S.motes.push({ life: 1, a: Math.random() * 6.28 });
       if (S.orb.t >= 1) {
         S.phase = "close"; S.anim = 0; bus.feel("taken");
+        // his praise first, then what he makes of it: how near the next
+        // chest is, in words, by the same measure as his posture
         S.say = [...(S.res.hints || [])];
+        if (!(S.res.chests || []).length) S.say.push(LEAN_LINES[Math.min(LEAN_LINES.length - 1, S.res.lean | 0)]);
         if (S.say.length) speak(S.say.shift());
       }
     }
@@ -416,7 +420,7 @@ function stepGive() {
     if (S.reach < 0.08) {
       const got = S.res?.chests || [];
       endGive();
-      for (const c of got) S.queue.push({ kind: "chest", tier: c.tier, what: { type: "chest", ...c } });
+      for (const c of got) S.queue.push({ kind: "chest", tier: c.tier, what: { type: "chest", ...c }, line: "THAT IS ENOUGH. HE PUSHES A CHEST THROUGH THE GAP" });
     }
   } else if (S.phase === "refuse") {
     S.ourK = Math.max(0, S.ourK - 0.03);
@@ -426,6 +430,19 @@ function stepGive() {
 function endGive() {
   S.mode = "idle"; S.phase = ""; S.curl = 0; S.orb = null; S.glow = 0; S.want = 1; S.res = null; S.fail = null; S.motes = [];
 }
+/* what he makes of an offer, by how far toward the next chest it leaves
+ * him (shared/economy.js leanOf, 0 to CHESTS.leanSteps): never a number */
+const LEAN_LINES = [
+  "HE TAKES IT. HE WANTS MORE THAN THIS.",
+  "HE TAKES IT. HE WANTS MORE THAN THIS.",
+  "HE TAKES IT. NOT ENOUGH YET.",
+  "HE TAKES IT. NOT ENOUGH YET.",
+  "HE WEIGHS IT. HALFWAY, PERHAPS.",
+  "HE WEIGHS IT. HALFWAY, PERHAPS.",
+  "HE IS NEARLY SATISFIED.",
+  "A LITTLE MORE, AND HE WILL PAY.",
+  "A LITTLE MORE, AND HE WILL PAY.",
+];
 function arrive(a, text) {
   S.arriving = { ...a, k: 0 }; S.mode = "arrive";
   speak(text, 2.6); bus.feel("arrive");
@@ -490,10 +507,11 @@ function frame() {
   if (S.mode === "idle") {
     S.hurry = false;
     if (S.say?.length && S.lineA < 1) speak(S.say.shift());           // anything else he had to say
-    else if (S.queue.length && S.drawer < 0.01) arrive(S.queue.shift(), "HE PUSHES A CHEST THROUGH THE GAP");
-    // a new player is told, once a visit, what he wants — and nothing more
-    else if (!S.coached && S.t > 300 && S.lineA < 0.4 && S.drawer < 0.01 && !S.arriving) {
-      S.coached = true;
+    else if (S.queue.length && S.drawer < 0.01) { const a = S.queue.shift(); arrive(a, a.line || "HE PUSHES A CHEST THROUGH THE GAP"); }
+    // a player who has never offered is told what he wants, soon after
+    // arriving and again every so often while nothing happens
+    else if (S.t > S.coachAt && S.lineA < 0.4 && S.drawer < 0.01 && !S.arriving) {
+      S.coachAt = S.t + 1200;
       const line = bus.coach();
       if (line) speak(line, 3.4);
     }
@@ -557,7 +575,9 @@ function frame() {
     ctx.globalAlpha = view.calm ? 0.9 : 0.85 + Math.sin(S.t * 0.04) * 0.15;
     ctx.fillStyle = INK.cold;
     ctx.font = FONT; ctx.textAlign = "center";
-    ctx.fillText("^", W / 2, H - 20);
+    // with scrolls to give, say so by the arrow
+    const n = bus.scrolls().length;
+    ctx.fillText(n ? `^  ${n} SCROLL${n > 1 ? "S" : ""}` : "^", W / 2, H - 20);
     ctx.globalAlpha = 1;
   }
 }
