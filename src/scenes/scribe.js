@@ -11,6 +11,7 @@
  *    bus.seal(strokes)   → Promise<{ scroll: { rarity, seed }, familiar, base, steps, likeness, poor }>
  *    bus.page()          { tome, page, n, of }: the tome open on the desk and
  *                        the page it is open at (shared/tomes.js)
+ *    bus.newTome()       a tome the player has not yet looked at in the temple
  *    bus.lectern()       go to the lectern, to choose another tome or page:
  *                        the TOMES tab in the left margin, the tome's name,
  *                        the book, or a sideways swipe off the sheet
@@ -208,12 +209,18 @@ function drawBook() {
 /* the TOMES tab in the left margin: the way to the lectern, which lies
  * that way. It breathes a little, so it is noticed. */
 function drawTab() {
-  const [x, y, w, h] = TAB, a = 0.75 + Math.sin(S.t * 0.04) * 0.25;
+  // a tome not yet looked at in the temple: it calls louder, and says so
+  const fresh = bus.newTome?.(), a = fresh ? 0.6 + Math.abs(Math.sin(S.t * 0.09)) * 0.4 : 0.75 + Math.sin(S.t * 0.04) * 0.25;
+  const [x, y, w, h] = TAB;
   plot(x, y, w, h, "#1d1710"); plot(x + w - 1, y, 1, h, "#4a3e2b"); plot(x, y, w, 1, "#4a3e2b"); plot(x, y + h - 1, w, 1, "#4a3e2b");
   ctx.globalAlpha = a; ctx.font = FONT; ctx.textAlign = "center"; ctx.fillStyle = INK.warmHi;
   ctx.fillText("<", x + w / 2, y + 12);
   [..."TOMES"].forEach((ch, i) => ctx.fillText(ch, x + w / 2, y + 28 + i * 12));
   ctx.globalAlpha = 1;
+  if (fresh) {
+    plot(x, y + h + 3, w + 18, 11, "#3a2a10"); plot(x, y + h + 3, w + 18, 1, "#f0b850");
+    ctx.textAlign = "left"; ctx.fillStyle = "#f0d080"; ctx.fillText("NEW", x + 3, y + h + 12);
+  }
 }
 const DOOR_BTN = [50, 362, 95, 30];
 function btn([x, y, w, h], label, on) {

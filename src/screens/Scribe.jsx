@@ -13,6 +13,10 @@ import { mount as mountLectern, SURROUND as HALL } from "../scenes/lectern.js";
 const OPEN_KEY = "mf.tome";
 const readOpen = () => { try { return JSON.parse(localStorage.getItem(OPEN_KEY)) || null; } catch { return null; } };
 const keepOpen = v => { try { localStorage.setItem(OPEN_KEY, JSON.stringify(v)); } catch { /* fine */ } };
+// how many tomes the player had when they last looked in the temple
+const SEEN_KEY = "mf.tomesSeen";
+const readSeen = () => { try { return +localStorage.getItem(SEEN_KEY) || 1; } catch { return 1; } };
+const keepSeen = n => { try { localStorage.setItem(SEEN_KEY, String(n)); } catch { /* fine */ } };
 
 /* The scribe's desk. The scene owns its canvas and its loop; this hands
  * it a bus into game state and mirrors its buttons as real ones for
@@ -94,7 +98,8 @@ export default function Scribe() {
       well: () => buyRef.current(),
       seal: strokes => live.current.act("seal", { strokes, tome: book.current.tome.id, page: book.current.page.id }),
       page: () => book.current,
-      lectern: () => setLectern(true),
+      lectern: () => { keepSeen(live.current.tomes.length); setLectern(true); },
+      newTome: () => live.current.tomes.length > readSeen(),
       room: () => live.current.scrollCap - live.current.scrolls.length,
       firstTime: () => !(live.current.stats.sealed > 0),
       say: ui.say, feel,
@@ -110,7 +115,7 @@ export default function Scribe() {
               style={{ touchAction: "none", display: "block" }}/>
       <div className="sr-only">
         <button onClick={() => scene.current?.scrawl()}>Copy the page onto the sheet</button>
-        <button onClick={() => setLectern(true)}>Go to the lectern to choose a tome and page</button>
+        <button onClick={() => { keepSeen(g.tomes.length); setLectern(true); }}>Go to the lectern to choose a tome and page</button>
         <button onClick={() => scene.current?.undo()}>Undo the last stroke</button>
         <button onClick={() => scene.current?.clear()}>Clear the sheet</button>
         <button onClick={() => scene.current?.seal()}>Seal the scroll</button>
