@@ -40,6 +40,7 @@ const CUES = {
   dull:    [[12],           [[150, 0.14, "sine", 0.05]]],
   error:   [[30, 40, 30],   [[120, 0.18, "square", 0.04]]],
   open:    [[12, 30, 8],    [[110, 0.14, "sine", 0.07], [300, 0.08, "triangle", 0.03]]],   // a heavy book opening
+  snuff:   [[10, 60, 30],   [[200, 0.30, "sawtooth", 0.012], [90, 0.45, "sine", 0.03]]],    // a breath, and a candle going out
   leaf:    [[3],            [[2400, 0.025, "triangle", 0.015]]],                          // one page flicking past
   // a sealed scroll speaks its tier: higher, longer, brighter
   rarity0: [[10],               [[330, 0.10, "sine", 0.04]]],

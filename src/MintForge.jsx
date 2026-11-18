@@ -13,6 +13,7 @@ import BottomNav, { TABS } from "./components/BottomNav.jsx";
 import TopBar from "./components/TopBar.jsx";
 import Guide, { guideStep, journalSeen } from "./components/Guide.jsx";
 import { setAppIcon } from "./lib/appIcon.js";
+import Opening, { introSeen } from "./components/Opening.jsx";
 import Scribe from "./screens/Scribe.jsx";
 import Door from "./screens/Door.jsx";
 import Satchel from "./screens/Satchel.jsx";
@@ -118,7 +119,10 @@ function Game({ game }) {
   const [, nudge] = useState(0);
   const guide = guideStep(game);
   const sawJournal = useCallback(() => { journalSeen(); nudge(n => n + 1); }, []);
-  const ctx = useMemo(() => ({ ...game, tab, setTab, war, sawJournal }), [game, tab, setTab, war, sawJournal]);
+  // the opening story: once, for a new player, and whenever the journal asks
+  const [story, setStory] = useState(() => !introSeen() && !(game.stats?.visits > 0));
+  const replayStory = useCallback(() => setStory(true), []);
+  const ctx = useMemo(() => ({ ...game, tab, setTab, war, sawJournal, replayStory }), [game, tab, setTab, war, sawJournal, replayStory]);
   const warBadge = war.invites.length || (war.table?.status === "playing" && !war.table.youFlipped ? "!" : 0);
   const Screen = SCREENS[tab] || Scribe;
   const waiting = game.chests.length + game.dusty.length;
@@ -135,11 +139,13 @@ function Game({ game }) {
         {!BARE.has(tab) && <TopBar marks={game.marks} level={game.level} xp={game.xp} onRetry={game.retrySaves}
                                    daily={game.dailyReady} onDaily={() => setTab("door")}/>}
         <main id="main" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: BARE.has(tab) ? "env(safe-area-inset-top, 0px)" : 0 }}>
-          <Suspense key={tab} fallback={<div className="page"><p className="t-dim blink" style={{ padding: 24, textAlign: "center" }}>…</p></div>}><Screen/></Suspense>
+          {/* held back while the story plays, so the door's welcome waits for its end */}
+          {!story && <Suspense key={tab} fallback={<div className="page"><p className="t-dim blink" style={{ padding: 24, textAlign: "center" }}>…</p></div>}><Screen/></Suspense>}
         </main>
         <Guide step={guide} tab={tab} setTab={setTab} bare={BARE.has(tab)} onSkip={() => nudge(n => n + 1)}/>
         <BottomNav tab={tab} setTab={setTab} guide={guide && guide.tab !== tab ? guide.tab : null} badges={{ satchel: waiting, door: game.dailyReady && tab !== "door" ? "!" : 0, tavern: tab !== "tavern" ? warBadge : 0 }}/>
       </div>
+      {story && <Opening onDone={() => setStory(false)}/>}
       </RewardHost>
     </GameContext.Provider>
   );

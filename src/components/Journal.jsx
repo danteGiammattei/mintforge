@@ -141,6 +141,9 @@ export default function Journal() {
         {everything ? <>{everything.toLocaleString()} COINS CLEANED OR WON, ALL TOLD.</> : <>NOTHING YET. BRUSH A COIN CLEAN AND IT IS WRITTEN HERE.</>}
         {g.streak > 1 && <><br/><PixelIcon name="door" size={11} style={{ display: "inline", verticalAlign: "-1px" }}/> {g.streak} DAYS RUNNING AT THE DOOR.</>}
       </p>
+      {g.replayStory && (
+        <button className="btn btn-ghost" style={{ alignSelf: "center" }} onClick={g.replayStory}>HOW IT BEGAN</button>
+      )}
     </>
   );
 }
