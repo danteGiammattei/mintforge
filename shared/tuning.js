@@ -124,8 +124,9 @@ export const COIN_METAL_BY_CHEST = [
 /* Coin rarity starts from the standard weights and each chest tier leans
  * them toward the top: weight × (1 + tier × lean) ^ rarity. */
 export const COIN_RARITY = { base: [55, 28, 11, 4.5, 1.3, 0.2], leanPerTier: 0.35 };
-/* Shiny is decided when the chest opens, from the brush the player holds. */
-export const SHINY_CHANCE_BY_BRUSH = [0.005, 0.015, 0.03, 0.05, 0.08];
+/* Shiny is decided when the chest opens, a rare thing at the same odds
+ * for everyone: the sure way to a shiny coin is the forge (FORGE). */
+export const SHINY_CHANCE = 0.005;
 
 /* ─── what a coin sells for ───────────────────────────────────────────
  * value = metal base × rarity × condition × shiny.
@@ -200,7 +201,6 @@ export const GAMBLE = {
  * brushed, gambles). Order is priority. */
 export const GIFTS = [
   { id: "welcome",      when: { visits: 1 },                reward: { type: "chest", tier: 0 } },
-  { id: "brush1",       when: { brushed: 3 },               reward: { type: "brush", level: 1 } },
   // the journal: `kinds` is how many of the 66 metal × rarity kinds have
   // been cleaned or won, `found` the rarest rarity ever found. A reward
   // every five or six kinds, the last for a complete journal. (The ids
@@ -221,16 +221,13 @@ export const GIFTS = [
   { id: "ledger60",     when: { kinds: 60 },                reward: { type: "marks", n: 12000 } },
   { id: "keeper",       when: { kinds: 66 },                reward: { type: "title", id: "keeper" } },
   { id: "pouch1",       when: { offered: 10 },              reward: { type: "marks", n: 40 } },
-  { id: "brush2",       when: { brushed: 15 },              reward: { type: "brush", level: 2 } },
   { id: "goldspun",     when: { level: 10, chests: 12 },    reward: { type: "title", id: "goldspun" } },
   { id: "stargazer",    when: { level: 15, offered: 120 },  reward: { type: "frame", id: "stargazer" } },
-  { id: "brush3",       when: { brushed: 40 },              reward: { type: "brush", level: 3 } },
   { id: "bone_reaper",  when: { level: 18, sealed: 250 },   reward: { type: "title", id: "bone_reaper" } },
   { id: "archive",      when: { level: 20, chests: 60 },    reward: { type: "frame", id: "archive" } },
   { id: "voidtouched",  when: { level: 20, brushed: 80 },   reward: { type: "title", id: "voidtouched" } },
   { id: "wanderer",     when: { level: 25, visits: 150 },   reward: { type: "frame", id: "wanderer" } },
   { id: "fortunes_hand",when: { level: 25, gambles: 25 },   reward: { type: "title", id: "fortunes_hand" } },
-  { id: "brush4",       when: { brushed: 100 },             reward: { type: "brush", level: 4 } },
   { id: "astrarium",    when: { level: 30, chests: 150 },   reward: { type: "frame", id: "astrarium" } },
   { id: "astral",       when: { level: 35, offered: 600 },  reward: { type: "title", id: "astral" } },
 ];

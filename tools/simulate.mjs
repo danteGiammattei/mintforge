@@ -280,10 +280,10 @@ const agg = {
 for (let p = 0; p < N_PLAYERS; p++) {
   const R = rng(1000 + p * 7919);
   let pot = { favour: 0, tier: 0, cost: 0, best: 0, chests: 0 };
-  let t = 0, xp = 0, marks = 0, since = 0, brush = 0;
+  let t = 0, xp = 0, marks = 0, since = 0;
   const stats = { visits: 0, sealed: 0, offered: 0, chests: 0, brushed: 0, gambles: 0 }, given = [], reached = {}, journal = { c: {} };
   const open = tier => {
-    const c = rollCoin(tier, brush, R);
+    const c = rollCoin(tier, R);
     const coin = Object.assign(mkCoin(c.seed, 1, c.metalIdx), { shiny: c.shiny, rarity: c.rarity });
     const v = coinValue(coin);
     t += TIME.open + TIME.brush; xp += XP.open + xpForBrush(c); stats.brushed++;
@@ -300,7 +300,6 @@ for (let p = 0; p < N_PLAYERS; p++) {
     if (!(g.id in agg.gifts)) agg.gifts[g.id] = [];
     agg.gifts[g.id].push(t / 3600);
     if (g.reward.type === "chest") open(g.reward.tier);
-    else if (g.reward.type === "brush") brush = Math.max(brush, g.reward.level);
     else if (g.reward.type === "marks") marks += g.reward.n;
   };
   visit();

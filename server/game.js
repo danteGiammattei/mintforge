@@ -31,7 +31,7 @@ import {
 import { heldSigns } from "./signs.js";
 import { pageOf, tomeFromChest, cravedPage } from "../shared/tomes.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
-import { FRAMES, PREMIUM_TITLES, BRUSH_UPS } from "../src/lib/data.js";
+import { FRAMES, PREMIUM_TITLES } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
 import { loadState, parseList, parseObj, coinOut, tomesOf } from "./state.js";
 import { stall, buy } from "./stall.js";
@@ -194,7 +194,6 @@ const VISIT_GAP_MS = 5 * 60e3;       // how often a visit counts toward anything
 
 function describeReward(reward) {
   if (reward.type === "chest") return { type: "chest", tier: reward.tier, name: CHESTS.names[reward.tier] + " CHEST" };
-  if (reward.type === "brush") return { type: "brush", level: reward.level, name: BRUSH_UPS[reward.level].label.toUpperCase() };
   if (reward.type === "title") return { type: "title", id: reward.id, name: PREMIUM_TITLES.find(t => t.id === reward.id).label.toUpperCase() };
   if (reward.type === "frame") return { type: "frame", id: reward.id, name: FRAMES[reward.id].lbl.toUpperCase() };
   return { type: "marks", n: reward.n, name: reward.n + " MARKS" };
@@ -230,8 +229,6 @@ async function visit(db, pid, _body, { now, tz }) {
   if (r.type === "chest") {
     out.id = "k_" + randomHex(8);
     await db.prepare(`INSERT INTO chests (id, player_id, tier, created_at) VALUES (?1, ?2, ?3, ?4)`).bind(out.id, pid, r.tier, now).run();
-  } else if (r.type === "brush") {
-    await db.prepare(`UPDATE player_state SET brush_level = MAX(brush_level, ?2) WHERE player_id = ?1`).bind(pid, r.level).run();
   } else if (r.type === "marks") {
     await db.prepare(`UPDATE player_state SET marks = marks + ?2 WHERE player_id = ?1`).bind(pid, r.n).run();
   } else {
@@ -299,12 +296,12 @@ async function open(db, pid, body, { now, rand }) {
   if (!idOk(body.chestId)) throw new Refusal("Which chest?");
   const [ch, ps] = await Promise.all([
     db.prepare(`DELETE FROM chests WHERE id = ?1 AND player_id = ?2 RETURNING tier`).bind(body.chestId, pid).first(),
-    db.prepare(`SELECT brush_level, tomes FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+    db.prepare(`SELECT tomes FROM player_state WHERE player_id = ?1`).bind(pid).first(),
   ]);
   if (!ch) throw new Refusal("That chest is gone", 404);
   // now and then a tome, tucked in with the coin
   const tome = tomeFromChest(ch.tier, tomesOf(ps.tomes), CHESTS.tomeChance, rand);
-  const rolled = rollCoin(ch.tier, ps.brush_level || 0, rand);
+  const rolled = rollCoin(ch.tier, rand);
   const id = "c_" + randomHex(8);
   // an astral coin takes a sign its owner lacks (and if two chests race
   // for the last free one, the index refuses the second: pick again)

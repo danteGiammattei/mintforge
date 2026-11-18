@@ -235,10 +235,9 @@ test("later gifts wait for their conditions", async () => {
   const { db, pid } = await world();
   const go = driver(db, pid, seeded(2));
   await go("visit");
-  db.raw.prepare(`UPDATE player_state SET stats = json_set(stats, '$.brushed', 3) WHERE player_id = ?`).run(pid);
+  db.raw.prepare(`UPDATE player_state SET stats = json_set(stats, '$.offered', 10) WHERE player_id = ?`).run(pid);
   const g = await go("visit");
-  assert.deepEqual([g.result.gift.type, g.result.gift.level], ["brush", 1]);
-  assert.equal(g.state.brushLevel, 1);
+  assert.deepEqual([g.result.gift.type, g.result.gift.n], ["marks", 40]);
   // a title needs its level as well as its counter
   db.raw.prepare(`UPDATE player_state SET stats = json_set(stats, '$.chests', 99, '$.offered', 9) WHERE player_id = ?`).run(pid);
   assert.equal((await go("visit")).result.gift, null);
@@ -257,7 +256,6 @@ test("every gift names something that exists", async () => {
   for (let i = 0; i < GIFTS.length + 2; i++) { const r = await go("visit"); if (r.result.gift) got.push(r.result.gift.name); }
   assert.equal(got.length, GIFTS.length);
   const s = await loadState(db, pid);
-  assert.equal(s.brushLevel, 4);
   assert.equal(s.ownedFrames.length, 4);
   // every title but the ones only the stall sells
   assert.equal(s.ownedTitles.length, PREMIUM_TITLES.length - STALL.oddities.filter(o => o.type === "title").length);

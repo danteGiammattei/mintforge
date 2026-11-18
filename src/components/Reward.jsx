@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { feel } from "../lib/feel.js";
-import { BRUSH_UPS, BA, FRAMES, PREMIUM_TITLES } from "../lib/data.js";
+import { FRAMES, PREMIUM_TITLES } from "../lib/data.js";
 import { SCRIBE, DAILY, CHESTS, ASTRAL } from "../../shared/tuning.js";
 import { TOME_BY_ID } from "../../shared/tomes.js";
 import { RARITY } from "../../shared/sigil.js";
@@ -21,7 +21,7 @@ import { TitleText } from "../screens/Friends.jsx";
  *  cannot see the effect of does not feel like one.
  *
  *    const celebrate = useCelebrate();
- *    celebrate({ kind: "brush", level: 2 });
+ *    celebrate({ kind: "well", level: 2 });
  *    celebrate({ kind: "title", label: "Goldspun", from: "gift" });
  *    celebrate({ kind: "frame", id: "stargazer", from: "gift" });
  *    celebrate({ kind: "level", level: 10, titles: [...], frames: [...] });
@@ -36,8 +36,6 @@ import { TitleText } from "../screens/Friends.jsx";
 const Ctx = createContext(() => {});
 export const useCelebrate = () => useContext(Ctx);
 
-const pct = v => { const p = v * 100; return (Number.isInteger(Math.round(p * 10) / 10) ? Math.round(p) : p.toFixed(1)) + "%"; };
-const strength = a => "×" + (a / BA).toFixed(1);
 
 function Stat({ label, from, to }) {
   const up = from !== to;
@@ -71,21 +69,6 @@ function Burst({ colour }) {
 }
 
 function Body({ r }) {
-  if (r.kind === "brush") {
-    const from = BRUSH_UPS[Math.max(0, r.level - 1)], to = BRUSH_UPS[r.level];
-    return (
-      <>
-        <div className="t-title" style={{ textAlign: "center" }}>{to.label.toUpperCase()}</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <Stat label="CLEANING STRENGTH" from={strength(from.alpha)} to={strength(to.alpha)}/>
-          <Stat label="SHINY CHANCE" from={pct(from.shinyChance)} to={pct(to.shinyChance)}/>
-        </div>
-        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>
-          {to.alpha > from.alpha ? "DIRT COMES OFF FASTER. " : ""}EVERY CHEST YOU OPEN FROM NOW IS MORE LIKELY TO HOLD A SHINY COIN.
-        </p>
-      </>
-    );
-  }
   if (r.kind === "well") {
     const from = SCRIBE.wells[r.level - 1], to = SCRIBE.wells[r.level];
     return (
@@ -200,7 +183,6 @@ function Body({ r }) {
 }
 
 const HEADS = {
-  brush: ["A BETTER BRUSH", "HE PUSHED IT THROUGH THE GAP"],
   well:  ["A DEEPER WELL", "IT SITS ON YOUR DESK NOW"],
   title: ["A NEW TITLE", "HE PUSHED IT THROUGH THE GAP"],
   frame: ["A NEW BANNER", "HE PUSHED IT THROUGH THE GAP"],
@@ -210,7 +192,7 @@ const HEADS = {
   signs: ["A NEW STAR SIGN", "THE SKY PAYS ITS DUES"],
   tome:  ["A NEW TOME", "IT WAS IN THE CHEST"],
 };
-const COLOUR = { brush: "#e0b860", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", tome: "#c080ff" };
+const COLOUR = { well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", tome: "#c080ff" };
 
 function Card({ r, onClose }) {
   const g = useGame();
@@ -269,7 +251,6 @@ export function RewardHost({ children }) {
 
 /* What the server's gift descriptor (server/game.js describeReward) is, as a reward. */
 export function giftToReward(what) {
-  if (what.type === "brush") return { kind: "brush", level: what.level };
   if (what.type === "title") return { kind: "title", label: PREMIUM_TITLES.find(t => t.id === what.id)?.label || what.name, from: "gift" };
   if (what.type === "frame") return { kind: "frame", id: what.id, from: "gift" };
   if (what.type === "marks") return { kind: "marks", n: what.n };

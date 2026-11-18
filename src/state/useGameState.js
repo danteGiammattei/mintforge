@@ -196,7 +196,7 @@ export function useGameState() {
     coins, dusty,
     scrolls: snap?.scrolls || [], chests: snap?.chests || [],
     username: snap?.username || "", xp: snap?.xp || 0, level: snap?.level || 1, marks: snap?.marks || 0,
-    brushLevel: snap?.brushLevel || 0, lean: snap?.lean || 0, stats: snap?.stats || {},
+    lean: snap?.lean || 0, stats: snap?.stats || {},
     scrollCap: snap?.scrollCap || 8,
     inkMax: snap?.inkMax || 520, wellLevel: snap?.wellLevel || 0, streak: snap?.streak || 0, tomes: snap?.tomes || ["primer"],
     dailyReady: !!snap?.dailyReady, dailyIn: snap?.dailyIn || 0, craving: snap?.craving || null,

@@ -11,7 +11,7 @@
 
 import {
   FAVOUR_PER_RARITY, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
-  SHINY_CHANCE_BY_BRUSH, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL, ASTRAL, RESTRIKE,
+  SHINY_CHANCE, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL, ASTRAL, RESTRIKE,
 } from "./tuning.js";
 
 export const MAX_METAL = 10;
@@ -72,10 +72,10 @@ export function coinRarityWeights(tier) {
   return COIN_RARITY.base.map((w, r) => w * Math.pow(lean, r));
 }
 
-export function rollCoin(tier, brushLevel, rand) {
+export function rollCoin(tier, rand) {
   const metalIdx = weighted(COIN_METAL_BY_CHEST[tier] || COIN_METAL_BY_CHEST[0], rand());
   const rarity   = weighted(coinRarityWeights(tier), rand());
-  const shiny    = rand() < (SHINY_CHANCE_BY_BRUSH[brushLevel] ?? SHINY_CHANCE_BY_BRUSH[0]);
+  const shiny    = rand() < SHINY_CHANCE;
   const seed     = Math.floor(rand() * 4294967296) >>> 0;
   // rolled last, so the rolls before it are as they always were
   const material = rand() < MATERIAL.chance ? MATERIAL.byTier[metalIdx] || null : null;

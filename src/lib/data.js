@@ -6,7 +6,7 @@
  *  shared/tuning.js; this file only borrows from it.
  * ════════════════════════════════════════════════════════════════════════ */
 
-import { RARITY_VALUE_MUL, SHINY_CHANCE_BY_BRUSH } from "../../shared/tuning.js";
+import { RARITY_VALUE_MUL } from "../../shared/tuning.js";
 
 /* ─── METALS ──────────────────────────────────────────────────────────── */
 export const METALS = [
@@ -181,12 +181,6 @@ export const PREMIUM_TITLE_LABELS = new Set(PREMIUM_TITLES.map(t => t.label));
 
 /* ─── BRUSHES ─────────────────────────────────────────────────────────── */
 // `alpha` is how much dirt one pass lifts. Better brushes are gifts too.
-export const BA = 0.32;
-export const BRUSH_UPS = [
-  { label:"Rough Brush",  alpha:BA  },
-  { label:"Boar Bristle", alpha:.55 },
-  { label:"Silver Brush", alpha:.9  },
-  { label:"Gold Brush",   alpha:1.0 },
-  { label:"Void Brush",   alpha:1.0 },
-].map((b, i) => ({ ...b, shinyChance: SHINY_CHANCE_BY_BRUSH[i] }));
-export const MAX_BR = BRUSH_UPS.length - 1;
+// how much dust one stroke of the brush lifts (BrushReveal); one brush
+// for everyone now there is nothing to upgrade
+export const BA = 0.55;

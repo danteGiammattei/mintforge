@@ -23,7 +23,7 @@ export async function onRequestGet({ request, env, params }) {
             COALESCE(player_state.bio, '') AS bio,
             player_state.selected_title AS title,
             player_state.pinned_ids, player_state.journal,
-            COALESCE(player_state.brush_level, 0) AS brush_level, player_state.tomes
+            player_state.tomes
        FROM players
        LEFT JOIN player_state ON player_state.player_id = players.id
       WHERE players.username = ?1 COLLATE NOCASE`
@@ -69,7 +69,6 @@ export async function onRequestGet({ request, env, params }) {
     coinCount: allCoins.length,
     shinyCount: allCoins.filter(c => c.shiny).length,
     kinds,
-    brushLevel: player.brush_level,
     tomes: tomesOf(player.tomes),
     // the star signs they hold, one astral coin each
     signs: [...new Set(allCoins.filter(c => c.sign != null).map(c => c.sign))].sort((a, b) => a - b),

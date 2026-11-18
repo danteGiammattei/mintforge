@@ -140,7 +140,7 @@ function You({ g }) {
         <PublicProfile frame={g.frame} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
                        coins={g.coins.length} kinds={journalCounts(g.journal).kinds} shiny={g.coins.filter(c => c.shiny).length}
                        signs={[...new Set(g.coins.filter(c => c.sign != null).map(c => c.sign))]}
-                       brush={g.brushLevel} tomes={g.tomes}
+                       tomes={g.tomes}
                        cabinet={cab} showcase={shown} onCoin={c => setOpen(c)}
                        empty={<p className="t-dim" style={{ margin: 0 }}>YOUR CABINET IS EMPTY. COINS YOU KEEP WILL SHOW HERE.</p>}>
           <button className="btn btn-block" onClick={() => setEditing(true)}><PixelIcon name="face" size={11}/>EDIT PROFILE</button>

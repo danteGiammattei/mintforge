@@ -100,7 +100,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   // every read at once: one round trip to the database, not two
   const [ps, coins, scrolls, chests] = await Promise.all([
     db.prepare(
-      `SELECT players.username, s.xp, s.marks, s.brush_level, s.frame, s.bio, s.selected_title, s.pinned_ids,
+      `SELECT players.username, s.xp, s.marks, s.frame, s.bio, s.selected_title, s.pinned_ids,
               s.owned_frames, s.owned_titles, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
               s.journal, s.well_level, s.tomes
          FROM player_state s JOIN players ON players.id = s.player_id
@@ -122,7 +122,6 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   return {
     username: ps.username,
     xp: ps.xp, level: levelOf(ps.xp), marks: ps.marks || 0,
-    brushLevel: ps.brush_level || 0,
     frame: ps.frame, bio: ps.bio || "", selectedTitle: currentTitle(ps.selected_title),
     pinnedIds: ps.pinned_ids ? JSON.parse(ps.pinned_ids) : null,
     iconCoin: stats.iconCoin || null,

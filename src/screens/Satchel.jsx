@@ -11,7 +11,7 @@ import { tiedScroll, chest as chestSprite, dirtClod } from "../lib/forms.js";
 import { mount as mountChest, SURROUND } from "../scenes/chest.js";
 import { RARITY } from "../../shared/sigil.js";
 import { CHESTS } from "../../shared/tuning.js";
-import { BRUSH_UPS, RARITIES } from "../lib/data.js";
+import { RARITIES } from "../lib/data.js";
 import { coinRarity } from "../lib/coin.js";
 import { useCelebrate } from "../components/Reward.jsx";
 
@@ -61,7 +61,6 @@ export default function Satchel() {
   const [opening, setOpening] = useState(null);     // a chest
   const [brushing, setBrushing] = useState(null);   // a dusty coin
   const [found, setFound] = useState(null);         // { coin, xp } once clean
-  const brush = BRUSH_UPS[g.brushLevel] || BRUSH_UPS[0];
 
   // the coin object must outlive its move from `dusty` to the vault
   const startBrush = useCallback(coin => { setOpening(null); setBrushing(coin); }, []);
@@ -84,10 +83,7 @@ export default function Satchel() {
   return (
     <div className="page">
       <div className="page-in">
-        <div className="between">
-          <h1 className="t-big" style={{ margin: 0 }}>SATCHEL</h1>
-          <span className="t-label">{brush.label}</span>
-        </div>
+        <h1 className="t-big" style={{ margin: 0 }}>SATCHEL</h1>
 
         <Shelf title="CHESTS" count={g.chests.length}
                empty={<p className="t-dim" style={{ margin: 0 }}>NONE. HE PAYS IN CHESTS, WHEN HE HAS BEEN PAID ENOUGH.</p>}>
@@ -148,7 +144,7 @@ export default function Satchel() {
 
       {brushing && (
         <div className="veil appear" style={{ zIndex: 460, flexDirection: "column", gap: 24 }} role="dialog" aria-modal="true" aria-label="Brush the coin clean">
-          <BrushReveal coin={brushing} brushAlpha={brush.alpha} onRevealed={revealed}/>
+          <BrushReveal coin={brushing} onRevealed={revealed}/>
           <button className="btn btn-ghost" onClick={() => setBrushing(null)}>LATER</button>
         </div>
       )}
