@@ -51,8 +51,9 @@ export const SIGIL = {
   // since the last seal.
   care: { fromMs: 2000, fullMs: 12000, bump: 0.6 },
   hurriedMs: 2500,       // pen-down time at which a drawing stops counting as hurried
-  // one trait a day he craves (the same for everyone, by their calendar
-  // day): it always lifts, and sometimes lifts twice
+  // what he wants today (shared/tomes.js cravedPage: a page of the
+  // player's own tomes, by their calendar day): a fair copy of it always
+  // lifts, and sometimes lifts twice
   craving: { again: 0.35 },
   thresholds: {
     symmetric: 0.66,         // mirrored overlap, left against right, more than
