@@ -24,9 +24,9 @@ export default function ProfileFx({ fx }) {
       const r = cv.getBoundingClientRect();
       H = Math.max(12, Math.round(W * (r.height || 1) / (r.width || 1)));
       cv.width = W; cv.height = H;
-      const n = Math.round(W * H / 350);
+      const n = Math.round(W * H / 270);                  // a flake for every 270 of its pixels
       flakes = Array.from({ length: n }, (_, i) => ({
-        x: (i * 37.7) % W, y: (i * 13.3 * (H / 26)) % H, v: 0.12 + ((i * 7) % 10) / 55, ph: i * 0.7, big: i % 5 === 0,
+        x: (i * 37.7) % W, y: (i * 13.3 * (H / 26)) % H, v: 0.35 + ((i * 7) % 10) / 20, ph: i * 0.7, big: i % 5 === 0,
       }));
       rime = Array.from({ length: W }, (_, x) => {
         const corner = Math.max(0, 1 - Math.min(x, W - 1 - x) / 22);
@@ -43,7 +43,7 @@ export default function ProfileFx({ fx }) {
         }
       }
       for (const f of flakes) {
-        const y = Math.round((f.y + t * f.v) % (H + 2) - 1), x = Math.round((f.x + Math.sin(t * 0.03 + f.ph) * 1.5 + W) % W);
+        const y = Math.round((f.y + t * f.v) % (H + 2) - 1), x = Math.round((f.x + Math.sin(t * 0.06 + f.ph) * 2 + W) % W);
         ctx.fillStyle = "rgba(244,249,255,.9)"; ctx.fillRect(x, y, 1, 1);
         if (f.big) {
           ctx.fillStyle = "rgba(244,249,255,.45)";
