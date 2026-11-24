@@ -487,47 +487,57 @@ function paintSnow(put, G, seed, frame, face, dist) {
   }
 }
 
-/* A coin of the Long Night wears a Santa hat: a white fur band laid
- * along its top rim, following the rim's own curve, and the red hat
- * rising from it, leaning right, its tip drooping over to a white
- * pom-pom. Lit like the coins, from the upper left. It sits on the
- * aura's layer, so it can rise past the coin into the margin above. */
-const HAT = { hi: [214, 64, 54], mid: [168, 36, 32], lo: [110, 20, 20], edge: [72, 12, 14],
-              fur: [244, 246, 250], furLo: [196, 202, 214] };
+/* A coin of the Long Night wears a Santa hat, sat on it like a hat on a
+ * head and slanted off to the side: a white fur band across the upper
+ * part of the coin, tipped down to the right, the red hat rising from
+ * it and leaning right, its tip flopped over and hanging down past the
+ * coin's edge to a white pom-pom. Laid out upright in its own frame and
+ * turned, every pixel sampled back into that frame, so its edges stay
+ * hard at any tilt. Lit from the upper left. On the aura's layer, so it
+ * can reach into the margin round the coin. */
+const HAT = { hi: [214, 64, 54], mid: [168, 36, 32], lo: [112, 22, 22], edge: [70, 12, 14],
+              fur: [244, 246, 250], furLo: [190, 198, 212] };
+const TILT = 0.42;                                           // radians, right side down
 function paintHat(put, G, face) {
-  const cx = G / 2, top = new Map();
-  for (const p of face) if (!top.has(p.x) || p.y < top.get(p.x)) top.set(p.x, p.y);
-  const t0 = top.get(Math.round(cx)) ?? Math.min(...top.values());
-  const L = Math.round(cx - 15), R = Math.round(cx + 12);
-  // where the band sits, column by column: on the rim if the rim is there, else level
-  const rim = x => (top.has(x) ? Math.max(top.get(x), t0 - 1) : t0 + 2);
-  const base = Math.min(...Array.from({ length: R - L + 1 }, (_, i) => rim(L + i))) + 1;
-  // the hat: a cone from the band up to its peak, leaning right
-  const peak = { x: cx + 11, y: base - 13 };
-  for (let y = peak.y; y <= base; y++) {
-    const k = (y - peak.y) / (base - peak.y || 1);
-    const a = Math.round(peak.x + (L - peak.x) * k), b = Math.round(peak.x + (R - peak.x) * k);
-    for (let x = a; x <= b; x++) {
-      const u = (x - a) / Math.max(1, b - a);
-      const c = x === a || x === b ? HAT.edge : u < 0.3 ? HAT.hi : u < 0.75 ? HAT.mid : HAT.lo;
-      put(x, y, c, 1);
+  let top = G;
+  for (const p of face) if (Math.abs(p.x - G / 2) < 6 && p.y < top) top = p.y;
+  // the band's middle: a little left of centre, well down onto the coin
+  const ox = G / 2 - 4, oy = top + 9, c = Math.cos(TILT), s = Math.sin(TILT);
+  const BW = 18, BH = 3, CH = 18;                            // band half-width, half-height; cone height
+  // the flopped tip: a quadratic curve from the cone's peak, over and down
+  const P0 = [7, BH + CH], P1 = [18, BH + CH + 3], P2 = [22, BH + CH - 9];
+  const curve = t => [(1 - t) ** 2 * P0[0] + 2 * (1 - t) * t * P1[0] + t * t * P2[0], (1 - t) ** 2 * P0[1] + 2 * (1 - t) * t * P1[1] + t * t * P2[1]];
+  const TIP = Array.from({ length: 13 }, (_, i) => curve(i / 12));
+  const what = (u, v) => {                                   // u along the band, v up from it
+    if ((u - P2[0]) ** 2 + (v - P2[1] + 1) ** 2 <= 11) return u - P2[0] + (v - P2[1]) > 1 ? HAT.fur : u - P2[0] - (v - P2[1]) > 2 ? HAT.furLo : HAT.fur;
+    if (Math.abs(v) <= BH) {
+      const end = BW + 1.2 - Math.abs(v) * 0.3;
+      if (Math.abs(u) <= end) return v < -BH + 1.2 ? HAT.furLo : ((Math.round(u) * 5 + Math.round(v)) % 7 === 0 ? HAT.furLo : HAT.fur);
+      return null;
     }
-  }
-  // the tip, flopped over to the right and down
-  for (const [dx, dy] of [[1, 0], [2, 0], [3, 1], [4, 1], [5, 2], [6, 2], [6, 3], [7, 4], [7, 5]]) {
-    put(peak.x + dx, peak.y + dy, HAT.mid, 1); put(peak.x + dx, peak.y + dy - 1, dx < 4 ? HAT.hi : HAT.mid, 1);
-    put(peak.x + dx, peak.y + dy + 1, HAT.lo, 1);
-  }
-  // its pom-pom
-  const pp = { x: peak.x + 8, y: peak.y + 8 };
-  for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) {
-    if (x * x + y * y > 9) continue;
-    put(pp.x + x, pp.y + y, x + y > 1 ? HAT.furLo : HAT.fur, 1);
-  }
-  // the fur band, three deep, following the rim, lumpy
-  for (let x = L - 1; x <= R + 1; x++) {
-    const y0 = Math.min(rim(x), base + 3) - 2;
-    for (let k = 0; k < 5; k++) put(x, y0 + k, k === 4 || (x * 5 + k) % 7 === 0 ? HAT.furLo : HAT.fur, 1);
+    if (v > BH && v <= BH + CH) {
+      const k = (v - BH) / CH, mid = k * 7, half = (BW - 1) * (1 - k) ** 0.85 + 1.2;
+      const d = u - mid;
+      if (Math.abs(d) <= half) {
+        const w = (d + half) / (2 * half);
+        return Math.abs(d) > half - 1 ? HAT.edge : w < 0.32 ? HAT.hi : w < 0.72 ? HAT.mid : HAT.lo;
+      }
+    }
+    for (let i = 0; i < TIP.length; i++) {
+      const [tu, tv] = TIP[i], r = 2.6 - i * 0.08;
+      if ((u - tu) ** 2 + (v - tv) ** 2 <= r * r) return (v - tv) > 0.8 ? HAT.hi : (v - tv) < -1 ? HAT.lo : HAT.mid;
+    }
+    return null;
+  };
+  const R = 34;
+  for (let y = Math.max(0, Math.floor(oy - R)); y < Math.min(G, oy + R); y++) {
+    for (let x = Math.max(0, Math.floor(ox - R)); x < Math.min(G, ox + R); x++) {
+      // back into the hat's own frame: undo the turn (screen y is down, v is up)
+      const dx = x + 0.5 - ox, dy = y + 0.5 - oy;
+      const u = dx * c + dy * s, v = -(-dx * s + dy * c);
+      const col = what(u, v);
+      if (col) put(x, y, col, 1);
+    }
   }
 }
 
