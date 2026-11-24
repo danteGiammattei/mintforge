@@ -14,10 +14,10 @@ import { TomeCover } from "./TomeCover.jsx";
  * so what you see of yourself is what they see. */
 export const KINDS_TOTAL = METALS.length * (MAX_RARITY + 1);
 
-export default function PublicProfile({ frame, username, level, title, bio, coins, kinds, shiny, signs = [], tomes = ["primer"], cabinet, showcase, onCoin, empty, children }) {
+export default function PublicProfile({ frame, fx = null, username, level, title, bio, coins, kinds, shiny, signs = [], tomes = ["primer"], cabinet, showcase, onCoin, empty, children }) {
   return (
     <>
-      <PixelBanner frame={frame} height={96}/>
+      <PixelBanner frame={frame} fx={fx} height={96}/>
       <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
         <div>
           <div className="t-title t-plain" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{username}</div>

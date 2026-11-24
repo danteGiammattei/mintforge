@@ -15,6 +15,8 @@
  *    bus.lectern()       go to the lectern, to choose another tome or page:
  *                        the TOMES tab in the left margin, the tome's name,
  *                        the book, or a sideways swipe off the sheet
+ *    bus.season()        the season of the event running today, or null:
+ *                        the desk is dressed for it
  *    bus.wanted()        the page he wants today: { name, here } (here: it is
  *                        the open page), or null
  *    bus.toWanted()      open the tome at that page
@@ -88,6 +90,18 @@ function drawRoom(flick) {
   // the desk's far edge
   plot(0, 66, W, 2, P.deskEdge);
   plot(0, 68, W, 3, P.deskA);
+  // on the Long Night, a sprig of pine and holly laid along it
+  if (bus.season?.()) {
+    const X = 150, Y = 64;
+    for (let i = 0; i < 34; i++) plot(X + i, Y + (i >> 3), 1, 1, "#3a2a18");            // the twig
+    for (let i = 2; i < 32; i += 3) {
+      plot(X + i - 2, Y - 2 + (i >> 3), 2, 1, "#24442c"); plot(X + i + 1, Y - 3 + (i >> 3), 2, 1, "#2e5636");   // needles above
+      plot(X + i - 1, Y + 1 + (i >> 3), 2, 1, "#1c3424"); plot(X + i + 1, Y + 2 + (i >> 3), 2, 1, "#24442c");   // and below
+    }
+    plot(X + 4, Y - 1, 5, 3, "#2a4a2e"); plot(X + 6, Y - 2, 1, 1, "#3e6a44");            // a holly leaf
+    plot(X + 8, Y + 1, 2, 2, "#8a2420"); plot(X + 8, Y + 1, 1, 1, "#c8483e");              // and its berries
+    plot(X + 10, Y, 2, 2, "#8a2420"); plot(X + 10, Y, 1, 1, "#c8483e");
+  }
 }
 
 /* ─── the sheet, pinned flat ──────────────────────────────────────────

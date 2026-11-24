@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { PROFILE_FX } from "../../shared/events.js";
 import { useGame } from "../lib/GameContext.js";
 import { feel } from "../lib/feel.js";
 import { FRAMES, PREMIUM_TITLES } from "../lib/data.js";
@@ -69,6 +70,7 @@ function Burst({ colour }) {
 }
 
 function Body({ r }) {
+  const g = useGame();
   if (r.kind === "well") {
     const from = SCRIBE.wells[r.level - 1], to = SCRIBE.wells[r.level];
     return (
@@ -171,6 +173,17 @@ function Body({ r }) {
       </>
     );
   }
+  if (r.kind === "fx") {
+    const f = PROFILE_FX[r.id];
+    if (!f) return null;
+    return (
+      <>
+        <div style={{ border: "2px solid #000" }}><PixelBanner frame={g.frame} fx={r.id} height={96}/></div>
+        <div className="t-title" style={{ textAlign: "center", color: "#a8d8ff" }}>{f.label.toUpperCase()}</div>
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>{f.desc.toUpperCase()} EVERYONE WHO LOOKS YOU UP WILL SEE IT.</p>
+      </>
+    );
+  }
   if (r.kind === "marks") {
     return (
       <>
@@ -183,6 +196,7 @@ function Body({ r }) {
 }
 
 const HEADS = {
+  fx:    ["A PROFILE EFFECT", "IT WAS IN THE FROSTED CHEST"],
   well:  ["A DEEPER WELL", "IT SITS ON YOUR DESK NOW"],
   title: ["A NEW TITLE", "HE PUSHED IT THROUGH THE GAP"],
   frame: ["A NEW BANNER", "HE PUSHED IT THROUGH THE GAP"],
@@ -192,7 +206,7 @@ const HEADS = {
   signs: ["A NEW STAR SIGN", "THE SKY PAYS ITS DUES"],
   tome:  ["A NEW TOME", "IT WAS IN THE CHEST"],
 };
-const COLOUR = { well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", tome: "#c080ff" };
+const COLOUR = { fx: "#a8d8ff", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", tome: "#c080ff" };
 
 function Card({ r, onClose }) {
   const g = useGame();
@@ -207,10 +221,12 @@ function Card({ r, onClose }) {
   const [head0, sub0] = HEADS[r.kind];
   const sub = r.kind === "signs" && r.signs.length > 1 ? "THE SKY PAYS WHAT IT OWES" : sub0;
   const head = r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
-  const subline = r.from === "level" ? "" : sub;
+  const subline = r.from === "level" ? "" : r.from === "chest" ? "IT WAS IN THE FROSTED CHEST"
+                : r.kind === "daily" && g.event ? `A GIFT FOR ${g.event.name}` : sub;
   // something wearable can be put on from here
   const wear = r.kind === "title" ? { on: g.selectedTitle === r.label, go: () => g.setSelectedTitle(r.label) }
-             : r.kind === "frame" ? { on: g.frame === r.id, go: () => g.setFrame(r.id) } : null;
+             : r.kind === "frame" ? { on: g.frame === r.id, go: () => g.setFrame(r.id) }
+             : r.kind === "fx" ? { on: g.profileFx === r.id, go: () => g.setProfileFx(r.id) } : null;
 
   return (
     <div className="veil appear" style={{ zIndex: 650 }} onClick={onClose}>

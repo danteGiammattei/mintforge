@@ -96,6 +96,7 @@ export default function Scribe() {
   useEffect(() => {
     scene.current = mount(ref.current, {
       inkMax: () => live.current.inkMax,
+      season: () => live.current.event?.season || null,
       wanted: () => {
         const w = live.current.craving, t = w && live.current.tomes.includes(w.tome) && TOME_BY_ID[w.tome];
         const pg = t && t.pages.find(p => p.id === w.page);

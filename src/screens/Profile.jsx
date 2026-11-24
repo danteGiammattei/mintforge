@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PROFILE_FX } from "../../shared/events.js";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel, isMuted, setMuted } from "../lib/feel.js";
@@ -115,6 +116,24 @@ function EditProfile({ g, onDone }) {
         {nextFrame && <p className="t-label" style={{ margin: "12px 0 0" }}>{nextFrame.lbl} AT LEVEL {nextFrame.minLvl}</p>}
       </section>
 
+      {g.ownedFx.length > 0 && (
+        <section className="panel" style={{ padding: 12 }} aria-label="Effect">
+          <h2 className="t-title" style={{ margin: "0 0 12px" }}>EFFECT</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+            <button className="tile" aria-pressed={!g.profileFx} onClick={() => g.setProfileFx(null)} style={{ padding: 0, overflow: "hidden" }}>
+              <div style={{ width: "100%" }}><PixelBanner frame={g.frame} height={44}/></div>
+              <span style={{ padding: "4px 0 8px" }}>NONE</span>
+            </button>
+            {g.ownedFx.filter(id => PROFILE_FX[id]).map(id => (
+              <button key={id} className="tile" aria-pressed={g.profileFx === id} onClick={() => g.setProfileFx(id)} style={{ padding: 0, overflow: "hidden" }}>
+                <div style={{ width: "100%" }}><PixelBanner frame={g.frame} fx={id} height={44}/></div>
+                <span style={{ padding: "4px 0 8px" }}>{PROFILE_FX[id].label.toUpperCase()}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       <CabinetSlots g={g}/>
 
       <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }} aria-label="Settings">
@@ -137,7 +156,7 @@ function You({ g }) {
   return (
     <>
       <section className="panel" style={{ overflow: "hidden" }} aria-label="Your profile, as others see it">
-        <PublicProfile frame={g.frame} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
+        <PublicProfile frame={g.frame} fx={g.profileFx} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
                        coins={g.coins.length} kinds={journalCounts(g.journal).kinds} shiny={g.coins.filter(c => c.shiny).length}
                        signs={[...new Set(g.coins.filter(c => c.sign != null).map(c => c.sign))]}
                        tomes={g.tomes}

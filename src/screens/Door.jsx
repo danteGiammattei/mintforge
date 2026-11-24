@@ -52,6 +52,7 @@ export default function Door() {
       toDesk: () => live.current.setTab("scribe"),
       toStall: () => { keepStallSeen(); setStall(true); },
       // his lantern: lit once his cheapest chest is within your marks
+      season: () => live.current.event?.season || null,
       invite: () => stallSeen() ? "known"
         : live.current.stats.offered > 0 && live.current.marks >= STALL.chestPrice[0] ? "first" : null,
       more: () => live.current.dailyReady,

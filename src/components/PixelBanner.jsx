@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { BANNERS } from "../lib/data.js";
+import ProfileFx from "./ProfileFx.jsx";
 
 /* A profile banner. Banners are either a gradient or a painted image.
  * A gradient is redrawn small (96×28) in hard bands and shown large, so
@@ -12,7 +13,7 @@ function stops(css) {
   return m.map(h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
 }
 
-export default function PixelBanner({ frame, height = 112, dim = false, children }) {
+export default function PixelBanner({ frame, height = 112, dim = false, fx = null, children }) {
   const ref = useRef(null);
   useEffect(() => {
     const cv = ref.current; if (!cv) return;
@@ -37,6 +38,7 @@ export default function PixelBanner({ frame, height = 112, dim = false, children
       <canvas ref={ref} hidden={!!painted} width={BW} height={BH} aria-hidden
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", imageRendering: "pixelated", filter: dim ? "grayscale(.5) brightness(.6)" : "none" }}/>
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,9,0) 40%, rgba(5,6,9,.7) 100%)" }}/>
+      {fx && <ProfileFx fx={fx} height={height}/>}
       {children}
     </div>
   );
