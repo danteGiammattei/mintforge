@@ -206,7 +206,10 @@ function drawWinter() {
   px(wx + 9, wy - 6, 2, 1, "#8a2420"); px(wx + 11, wy - 5, 1, 2, "#c8c0b8"); px(wx + 11, wy - 3, 1, 1, "#8a2420");
   // presents stacked at the foot of the wall, half in the dark
   ctx.globalAlpha = 0.7;
-  ctx.drawImage(present(0), 4, 268); ctx.drawImage(present(1), 26, 276); ctx.drawImage(present(2), 14, 246);
+  // (painted ones are 48 × 40, ours 32: either way they stay clear of the jamb)
+  const big = present(0).width > 40;
+  if (big) { ctx.drawImage(present(2), 4, 256); ctx.drawImage(present(0), -6, 268); ctx.drawImage(present(1), 20, 276); }
+  else { ctx.drawImage(present(0), 4, 268); ctx.drawImage(present(1), 26, 276); ctx.drawImage(present(2), 14, 246); }
   ctx.globalAlpha = 1;
 }
 

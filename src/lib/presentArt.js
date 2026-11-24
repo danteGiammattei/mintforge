@@ -12,7 +12,8 @@
  * presentParts(tier) → { box, lid }  separate, for the opening (the lid
  *                                      lifts off); both 32 wide, the lid
  *                                      carrying the bow, so 16 tall
- * present(tier)      → one canvas, 32 × 32, closed: for tiles and slots */
+ * present(tier)      → one canvas, closed: for tiles and slots; the painted
+ *                      present (48 × 40) once loaded, else ours (32 × 32) */
 
 export const PRESENT = { w: 32, h: 32, lidH: 16, boxY: 16 };
 
@@ -76,6 +77,59 @@ function paint(tier) {
   return { box, lid };
 }
 
+/* ─── the painted presents, when they are there ─────────────────────
+ * tools/gifts.mjs puts five strips from cofe-man's Gifts Pixel Animation
+ * Pack in public/sprites/gifts/ (kept out of the repo): tierN.png, ten
+ * 48×40 frames each, closed, squash, stretch, lid off, sides falling.
+ * They are bright as bought, so as they load each frame is put in the
+ * game's light: dimmed, a little greyed, warm where the candle low on
+ * the left reaches and cold away from it, with snow lying on whatever
+ * faces up. Missing, the drawn presents above stand in. */
+export const GIFT = { w: 48, h: 40, frames: 10, lidOff: 3 };
+const graded = [];                 // by tier: ten canvases, or null
+let giftsLoading = null;
+export function loadGifts() {
+  if (giftsLoading) return giftsLoading;
+  if (typeof Image === "undefined") return (giftsLoading = Promise.resolve(false));
+  giftsLoading = Promise.all(PAPER.map((_, tier) => new Promise(ok => {
+    const im = new Image();
+    im.onload = () => { graded[tier] = grade(im); ok(true); };
+    im.onerror = () => ok(false);
+    im.src = `/sprites/gifts/tier${tier}.png`;
+  }))).then(r => r.every(Boolean));
+  return giftsLoading;
+}
+function grade(im) {
+  const out = [];
+  for (let f = 0; f < GIFT.frames; f++) {
+    const c = canvas(GIFT.w, GIFT.h), g = c.getContext("2d");
+    g.drawImage(im, f * GIFT.w, 0, GIFT.w, GIFT.h, 0, 0, GIFT.w, GIFT.h);
+    const img = g.getImageData(0, 0, GIFT.w, GIFT.h), d = img.data;
+    const solid = (x, y) => x >= 0 && y >= 0 && x < GIFT.w && y < GIFT.h && d[(y * GIFT.w + x) * 4 + 3] > 96;
+    const up = new Uint8Array(GIFT.w * GIFT.h);
+    for (let y = 0; y < GIFT.h; y++) for (let x = 0; x < GIFT.w; x++) if (solid(x, y) && !solid(x, y - 1)) up[y * GIFT.w + x] = 1;
+    for (let y = 0; y < GIFT.h; y++) for (let x = 0; x < GIFT.w; x++) {
+      const i = (y * GIFT.w + x) * 4;
+      if (d[i + 3] <= 96) continue;
+      const lum = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+      // the candle: brightest low on the left, falling away up and right
+      const k = 0.42 + 0.4 * (1 - x / GIFT.w) * 0.7 + 0.3 * (y / GIFT.h) * 0.6;
+      for (let j = 0; j < 3; j++) d[i + j] = Math.round((d[i + j] * 0.78 + lum * 0.22) * k);
+      d[i] = Math.min(255, d[i] + 8 * k); d[i + 2] = Math.max(0, d[i + 2] - 6);           // warmed a little
+      if (up[y * GIFT.w + x] || (solid(x, y - 1) && up[(y - 1) * GIFT.w + x] && ((x * 7 + y) % 3))) {
+        const s = up[y * GIFT.w + x] ? SNOW[2] : SNOW[1];                                   // snow lying on what faces up
+        d[i] = parseInt(s.slice(1, 3), 16); d[i + 1] = parseInt(s.slice(3, 5), 16); d[i + 2] = parseInt(s.slice(5, 7), 16);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    out.push(c);
+  }
+  return out;
+}
+/* frame f of tier's painted present, or null while (or if) there is none */
+export const giftFrame = (tier, f) => graded[Math.max(0, Math.min(PAPER.length - 1, tier | 0))]?.[Math.max(0, Math.min(GIFT.frames - 1, f | 0))] || null;
+loadGifts();
+
 export function presentParts(tier) {
   const key = tier | 0;
   if (!kept.has(key)) kept.set(key, paint(key));
@@ -85,6 +139,8 @@ export function presentParts(tier) {
 const whole = new Map();
 export function present(tier) {
   const key = tier | 0;
+  const painted = giftFrame(key, 0);
+  if (painted) return painted;
   if (whole.has(key)) return whole.get(key);
   const { box, lid } = presentParts(key), c = canvas(32, 32), g = c.getContext("2d");
   g.drawImage(box, 0, PRESENT.boxY); g.drawImage(lid, 0, 0);

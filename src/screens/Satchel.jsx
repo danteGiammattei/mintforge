@@ -8,7 +8,7 @@ import AuraSprite from "../components/AuraSprite.jsx";
 import BrushReveal from "../components/BrushReveal.jsx";
 import RevealBanner from "../components/RevealBanner.jsx";
 import { tiedScroll, chest as chestSprite, dirtClod } from "../lib/forms.js";
-import { present } from "../lib/presentArt.js";
+import { present, loadGifts } from "../lib/presentArt.js";
 import { mount as mountChest, SURROUND } from "../scenes/chest.js";
 import { RARITY } from "../../shared/sigil.js";
 import { CHESTS } from "../../shared/tuning.js";
@@ -65,6 +65,9 @@ export default function Satchel() {
   const [opening, setOpening] = useState(null);     // a chest
   const [brushing, setBrushing] = useState(null);   // a dusty coin
   const [found, setFound] = useState(null);         // { coin, xp } once clean
+  // the painted presents come in a moment after the page; redraw when they do
+  const [giftsIn, setGiftsIn] = useState(false);
+  useEffect(() => { let on = true; loadGifts().then(ok => on && setGiftsIn(ok)); return () => { on = false; }; }, []);
 
   // the coin object must outlive its move from `dusty` to the vault
   const startBrush = useCallback(coin => { setOpening(null); setBrushing(coin); }, []);
@@ -98,7 +101,7 @@ export default function Satchel() {
                         aria-label={c.season ? "A present. Open it." : `${CHESTS.names[c.tier]} chest. Open it.`}>
                   {/* sheets differ in height: stand every chest on the same floor */}
                   <div style={{ height: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                    <Sprite make={() => (c.season ? present(c.tier) : chestSprite(c.tier, "candle"))} dep={c.tier + (c.season || "")} scale={c.season ? 3 : 2}/>
+                    <Sprite make={() => (c.season ? present(c.tier) : chestSprite(c.tier, "candle"))} dep={c.tier + (c.season || "") + giftsIn} scale={c.season && !giftsIn ? 3 : 2}/>
                   </div>
                   <span aria-hidden style={c.season ? { color: "#d8584e" } : undefined}>{c.season ? "PRESENT" : CHESTS.names[c.tier]}</span>
                 </button>

@@ -15,7 +15,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { chestParts, CHEST, dirtClod } from "../lib/forms.js";
-import { presentParts, PRESENT } from "../lib/presentArt.js";
+import { presentParts, PRESENT, giftFrame, GIFT } from "../lib/presentArt.js";
 import { chestClosed, chestOpening, chestHeight, CHEST_W, OPEN_FRAMES, RATTLE, OPEN_FROM } from "../lib/chestArt.js";
 import { CHESTS } from "../../shared/tuning.js";
 import { stage, FONT, INK, lerp, ease, feather } from "./kit.js";
@@ -77,7 +77,18 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
       ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
     }
 
-    if (gift) {
+    const painted = gift && giftFrame(tier, 0);
+    if (painted) {
+      // the painted present (lib/presentArt.js): held, it squashes and
+      // stretches against its ribbon; let go of, it bursts open, the lid
+      // flung off and the sides falling flat
+      let f = 0;
+      if (S.phase === "hold") f = S.held && !view.calm && S.p > 0.25 ? [0, 1, 0, 2][(S.t >> (S.p > 0.7 ? 1 : 2)) % 4] : 0;
+      else if (S.failed) f = 0;
+      else f = Math.min(GIFT.frames - 1, 2 + Math.floor(S.anim / (view.calm ? 1 : 7)));
+      const im = giftFrame(tier, f), GS = 3;
+      ctx.drawImage(im, Math.round((CW - GIFT.w * GS) / 2) + shake, 150 + 6 - GIFT.h * GS, GIFT.w * GS, GIFT.h * GS);
+    } else if (gift) {
       // the box stands on the table; held, the lid strains and hops on
       // its ribbon; broken, it rises off, tipping, and fades
       const PW = PRESENT.w * SC, px = Math.round((CW - PW) / 2) + shake, boxY = 150 + 6 - 16 * SC;
@@ -125,7 +136,7 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
 
     // and the coin, which is all dirt
     if (S.phase !== "hold" && S.coin) {
-      const rise = drawn ? (view.calm ? 6 : 26) : gift ? 20 : 30;    // once the lid is up
+      const rise = drawn ? (view.calm ? 6 : 26) : gift ? (giftFrame(tier, 0) ? 14 : 20) : 30;    // once the lid is up
       const k = ease(Math.min(1, Math.max(0, (S.anim - rise) / 50)));
       if (S.anim > rise) {
         const sp = dirtClod(S.coin.seed);
