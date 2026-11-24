@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import Sprite from "../ui/Sprite.jsx";
+import { present, loadGifts } from "../lib/presentArt.js";
 import { PROFILE_FX } from "../../shared/events.js";
 import { useGame } from "../lib/GameContext.js";
 import { feel } from "../lib/feel.js";
@@ -37,6 +39,14 @@ import { TitleText } from "../screens/Friends.jsx";
 const Ctx = createContext(() => {});
 export const useCelebrate = () => useContext(Ctx);
 
+// how long an event has left, counting today, by the player's own calendar
+function eventLeft(to) {
+  const now = new Date(), today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const n = Math.max(1, Math.round((Date.parse(to + "T00:00:00Z") - today) / 86400e3) + 1);
+  const end = new Date(to + "T00:00:00Z").toLocaleDateString("en-AU", { day: "numeric", month: "long", timeZone: "UTC" }).toUpperCase();
+  return n === 1 ? "ITS LAST DAY" : `${n} DAYS LEFT · UNTIL ${end}`;
+}
+
 
 function Stat({ label, from, to }) {
   const up = from !== to;
@@ -71,6 +81,8 @@ function Burst({ colour }) {
 
 function Body({ r }) {
   const g = useGame();
+  const [giftsIn, setGiftsIn] = useState(false);
+  useEffect(() => { if (r.kind !== "event") return; let on = true; loadGifts().then(ok => on && setGiftsIn(ok)); return () => { on = false; }; }, [r.kind]);
   if (r.kind === "well") {
     const from = SCRIBE.wells[r.level - 1], to = SCRIBE.wells[r.level];
     return (
@@ -173,6 +185,22 @@ function Body({ r }) {
       </>
     );
   }
+  if (r.kind === "event") {
+    return (
+      <>
+        <div className="row" style={{ justifyContent: "center", gap: 8, alignItems: "flex-end", minHeight: 80 }} aria-hidden>
+          {[3, 7, 11].map(i => <Sprite key={i + (giftsIn ? "p" : "")} make={() => present(i)} dep={i + (giftsIn ? "p" : "")} scale={2}/>)}
+        </div>
+        <div className="t-title" style={{ textAlign: "center", color: "#d8584e" }}>{r.name}</div>
+        <ul className="t-dim" style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6, textAlign: "center" }}>
+          <li>ONE CHEST IN THREE HE GIVES IS A PRESENT.</li>
+          <li>EVERY PRESENT HOLDS A FROST COIN, MADE ONLY NOW.</li>
+          <li>SOME HOLD THE WINTER ALMANAC, A TITLE, OR FROSTFALL.</li>
+          <li>THE BETTER YOUR SCROLLS, THE BETTER THE PRESENT.</li>
+        </ul>
+      </>
+    );
+  }
   if (r.kind === "fx") {
     const f = PROFILE_FX[r.id];
     if (!f) return null;
@@ -205,8 +233,9 @@ const HEADS = {
   daily: ["TODAY'S GIFT", ""],
   signs: ["A NEW STAR SIGN", "THE SKY PAYS ITS DUES"],
   tome:  ["A NEW TOME", "IT WAS IN THE CHEST"],
+  event: ["LIMITED TIME EVENT", ""],
 };
-const COLOUR = { fx: "#a8d8ff", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", tome: "#c080ff" };
+const COLOUR = { event: "#d8584e", fx: "#a8d8ff", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", tome: "#c080ff" };
 
 function Card({ r, onClose }) {
   const g = useGame();
@@ -222,7 +251,7 @@ function Card({ r, onClose }) {
   const sub = r.kind === "signs" && r.signs.length > 1 ? "THE SKY PAYS WHAT IT OWES" : sub0;
   const head = r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
   const subline = r.from === "level" ? "" : r.from === "chest" ? "IT WAS IN THE PRESENT"
-                : r.kind === "daily" && g.event ? `A GIFT FOR ${g.event.name}` : sub;
+                : r.kind === "daily" && g.event ? `A GIFT FOR ${g.event.name}` : r.kind === "event" ? eventLeft(r.to) : sub;
   // something wearable can be put on from here
   const wear = r.kind === "title" ? { on: g.selectedTitle === r.label, go: () => g.setSelectedTitle(r.label) }
              : r.kind === "frame" ? { on: g.frame === r.id, go: () => g.setFrame(r.id) }

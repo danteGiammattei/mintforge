@@ -63,6 +63,21 @@ function LevelWatch({ level }) {
   return null;
 }
 
+/* While an event runs, the first visit of each day says so (Reward "event"). */
+const EVENT_SEEN = "mf.eventSeen";
+function EventWatch({ event, hold }) {
+  const celebrate = useCelebrate();
+  useEffect(() => {
+    if (!event || hold) return;
+    const d = new Date(), today = `${event.id}:${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+    let seen = null; try { seen = localStorage.getItem(EVENT_SEEN); } catch { /* fine */ }
+    if (seen === today) return;
+    try { localStorage.setItem(EVENT_SEEN, today); } catch { /* fine */ }
+    celebrate({ kind: "event", name: event.name, to: event.to });
+  }, [event?.id, hold, celebrate]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
 /* Star signs found for the first time, and paid for: one card for them all. */
 function SignWatch({ news }) {
   const celebrate = useCelebrate();
@@ -132,6 +147,7 @@ function Game({ game }) {
       <RewardHost>
       <LevelWatch level={game.level}/>
       <SignWatch news={game.news}/>
+      <EventWatch event={game.event} hold={story}/>
       <DailyNudge ready={game.dailyReady} onDoor={tab === "door"}/>
       <WarNudge invites={war.invites} inTavern={tab === "tavern"}/>
       <div className="app">
