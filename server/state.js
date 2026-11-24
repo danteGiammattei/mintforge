@@ -14,6 +14,7 @@ import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay } 
 import { SCRIBE, ASTRAL } from "../shared/tuning.js";
 import { heldSigns } from "./signs.js";
 import { STARTER, cravedPage } from "../shared/tomes.js";
+import { eventOn } from "../shared/events.js";
 import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
 
@@ -32,7 +33,7 @@ export const coinOut = r => ({
 /* The journal as stored, topped up with what the player holds right now —
  * so coins from before the journal existed count without a backfill. */
 export function journalOut(stored, coins) {
-  const j = parseObj(stored), c = { ...(j.c || {}) }, m = { ...(j.m || {}) }, held = {}, heldM = {};
+  const j = parseObj(stored), c = { ...(j.c || {}) }, m = { ...(j.m || {}) }, s = { ...(j.s || {}) }, held = {}, heldM = {};
   let shinyHeld = 0;
   for (const r of coins) {
     if (r.dusty) continue;
@@ -40,10 +41,11 @@ export function journalOut(stored, coins) {
     held[k] = (held[k] || 0) + 1;
     if (r.shiny) shinyHeld++;
     if (r.material) heldM[r.material] = (heldM[r.material] || 0) + 1;
+    if (r.season) { const sk = `${r.season}:${r.metal_idx}`; s[sk] = Math.max(s[sk] || 0, 1); }
   }
   for (const [k, n] of Object.entries(held)) c[k] = Math.max(c[k] || 0, n);
   for (const [k, n] of Object.entries(heldM)) m[k] = Math.max(m[k] || 0, n);
-  return { c, m, shiny: Math.max(j.shiny || 0, shinyHeld), best: j.best || 0 };
+  return { c, m, s, shiny: Math.max(j.shiny || 0, shinyHeld), best: j.best || 0 };
 }
 
 /* Astral coins from before the signs (migration 016) get one each, the
@@ -144,7 +146,9 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     stats,
     gifts: parseList(ps.gifts).length,
     sealReadyIn: Math.max(0, SCRIBE.cooldownMs - (now - (ps.last_seal_at || 0))),
-    craving: cravedPage(localDay(now, tz), pid, tomesOf(ps.tomes)),   // the page he wants today: { tome, page }
+    craving: cravedPage(localDay(now, tz), pid, tomesOf(ps.tomes)),
+    // the event running on the player's calendar today (shared/events.js), or null
+    event: (e => e && { id: e.id, name: e.name, season: e.season, to: e.to })(eventOn(localDay(now, tz))),   // the page he wants today: { tome, page }
     // star signs paid for just now, for the popup
     ...(signBonus.length ? { signBonus } : {}),
   };

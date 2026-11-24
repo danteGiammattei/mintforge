@@ -97,7 +97,7 @@ const h32 = (n) => { n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d); n = Math.imul(n 
 /* Paint one frame of a coin's aura into ctx, at 1 unit = 1 pixel. The
  * canvas is (64 + 2·margin) square, the coin sitting in the middle; the
  * layer lies over the coin, but touches only its outermost two pixels. */
-export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendrils = false, moon = false, layer = "front", flames = false) {
+export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendrils = false, moon = false, layer = "front", flames = false, snow = false) {
   const { G, ring, inner, face, inside } = rings(coin, M);
   ctx.clearRect(0, 0, G, G);
   if (layer === "behind") {
@@ -111,7 +111,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
     ctx.putImageData(img, 0, 0);
     return;
   }
-  if (rarity <= 0 && !shine && !tendrils && !moon && !flames) return;
+  if (rarity <= 0 && !shine && !tendrils && !moon && !flames && !snow) return;
   const img = ctx.createImageData(G, G), d = img.data;
   const put = (x, y, rgb, al) => {
     x = Math.round(x); y = Math.round(y);
@@ -122,6 +122,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
+  if (snow) paintSnow(put, G, seed, frame);
   if (rarity <= 0) {
     const f = frame % LOOP;
     if (flames) replay(d, G, `edge:${seed}:${shapeOf(coin)}:${M}:${f}`, p => paintBlazeEdge(p, inner, seed, f));
@@ -459,6 +460,22 @@ function paintMoon(put, G, M, inside, seed, frame) {
     if (d2 > 17 || hidden(x, y, p.near)) continue;
     const col = d2 > 11 ? MOON.rim : dx <= -1 ? MOON.lit : dx <= 1 ? MOON.mid : MOON.dark;
     put(x, y, col, 1);
+  }
+}
+
+/* A frost coin's snow: a few flakes falling past it, each at its own
+ * pace and drifting a little side to side, some single pixels, some
+ * small crosses, over the coin and the air round it. */
+const FLAKE = [244, 249, 255];
+function paintSnow(put, G, seed, frame) {
+  for (let k = 0; k < 9; k++) {
+    const hx = h32(seed + k * 17), hs = h32(seed * 3 + k * 29), hp = h32(seed * 5 + k * 41);
+    const speed = 0.7 + hs * 0.9, span = G + 6;
+    const y = ((hp * span + frame * speed) % span) - 3;
+    const x = hx * G + Math.sin((frame + k * 5) * 0.3) * 1.5;
+    const big = k % 3 === 0;
+    put(x, y, FLAKE, big ? 0.95 : 0.8);
+    if (big) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, FLAKE, 0.45);
   }
 }
 

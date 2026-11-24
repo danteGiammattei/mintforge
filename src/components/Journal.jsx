@@ -1,4 +1,5 @@
 import { useGame } from "../lib/GameContext.js";
+import { EVENTS, SEASONS } from "../../shared/events.js";
 import { METALS, RARITIES } from "../lib/data.js";
 import { ASTRAL } from "../../shared/tuning.js";
 import CoinCanvas from "./CoinCanvas.jsx";
@@ -72,6 +73,33 @@ export default function Journal() {
         </div>
         <p className="t-dim" style={{ margin: "8px 0 0", fontSize: 12 }}>THE TAVERN CAN RAISE A COIN UP THIS LADDER, OR TAKE IT.</p>
       </section>
+
+      {/* an event's own page: its season's coins, one per metal, found lit;
+          shown while it runs, and for good once one has been found */}
+      {EVENTS.filter(e => e.id === g.event?.id || METALS.some((_, mi) => (j.s || {})[`${e.season}:${mi}`])).map(e => {
+        const n = METALS.filter((_, mi) => (j.s || {})[`${e.season}:${mi}`]).length;
+        return (
+          <section key={e.id} className="panel" style={{ padding: 8, borderColor: "#6aa8e0" }} aria-label={`${e.name}: ${SEASONS[e.season].label} coins found`}>
+            <div className="between" style={{ marginBottom: 6 }}>
+              <span className="t-label" style={{ color: "#a8d8ff" }}>{e.name} · {SEASONS[e.season].label}</span>
+              <span className="t-label">{n} / {METALS.length}</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${METALS.length}, minmax(0, 1fr))`, gap: 2 }}>
+              {METALS.map((m, mi) => {
+                const has = !!(j.s || {})[`${e.season}:${mi}`];
+                return (
+                  <div key={m.name} title={m.name} style={{ display: "grid", justifyItems: "center", opacity: has ? 1 : 0.28, filter: has ? "none" : "grayscale(1) brightness(.5)" }}>
+                    <CoinCanvas coin={Object.assign(mkCoin(7 + mi * 13, 1, mi, undefined, 0), { season: e.season })} size={26} aura={has}/>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="t-dim" style={{ margin: "8px 0 0", fontSize: 12 }}>
+              {g.event?.id === e.id ? "FROSTED CHESTS COME THROUGH THE GAP UNTIL 5 JANUARY. THE BETTER THE SCROLLS, THE BETTER THE CHEST." : "NO MORE WILL BE MADE."}
+            </p>
+          </section>
+        );
+      })}
 
       <section className="panel" style={{ padding: 8, overflowX: "auto" }} aria-label="Kinds of coin found">
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 4, tableLayout: "fixed" }}>

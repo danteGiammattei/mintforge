@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { SEASONS } from "../../shared/events.js";
 import { drawCoin, coinRarity, coinValue, shapeOf } from "../lib/coin.js";
 import Aura from "./Aura.jsx";
 import { RARITIES, SHAPE_NAMES, METAL } from "../lib/data.js";
@@ -93,7 +94,10 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
               <div className="t-title">{coinName(coin)}</div>
               {coin.nick && <div className="t-label">STRUCK AS {coin.raw}</div>}
             </div>
-            {coin.shiny && <div style={{ display: "flex", gap: 6, alignItems: "center", animation: "shinyText 1s steps(2) infinite" }}><PixelIcon name="spark" size={11}/>SHINY</div>}
+            <div style={{ display: "grid", gap: 4, justifyItems: "end" }}>
+              {coin.shiny && <div style={{ display: "flex", gap: 6, alignItems: "center", animation: "shinyText 1s steps(2) infinite" }}><PixelIcon name="spark" size={11}/>SHINY</div>}
+              {SEASONS[coin.season] && <div style={{ color: "#a8d8ff", whiteSpace: "nowrap" }}>{SEASONS[coin.season].label}</div>}
+            </div>
           </div>
           <dl style={{ padding: 12, margin: 0, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {rows.map(([k, v, col]) => (

@@ -14,7 +14,7 @@
  *    bus.feel(name)    sound + haptics hook
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { chestParts, CHEST, dirtClod } from "../lib/forms.js";
+import { chestParts, CHEST, dirtClod, frosted } from "../lib/forms.js";
 import { chestClosed, chestOpening, chestHeight, CHEST_W, OPEN_FRAMES, RATTLE, OPEN_FROM } from "../lib/chestArt.js";
 import { CHESTS } from "../../shared/tuning.js";
 import { stage, FONT, INK, lerp, ease, feather } from "./kit.js";
@@ -24,7 +24,7 @@ export const SURROUND = [8, 7, 5];
 export const CW = 195, CH = 260;
 const SC = 3;                         // sprites are drawn at 3×, never between
 
-export function mount(cv, bus, { tier = 0 } = {}) {
+export function mount(cv, bus, { tier = 0, season = null } = {}) {
   const S = {
     t: 0, p: 0, held: false,
     phase: "hold",                    // hold | breaking | risen
@@ -33,7 +33,9 @@ export function mount(cv, bus, { tier = 0 } = {}) {
   };
   const { ctx, view, stop } = stage(cv, { w: CW, h: CH, step: frame });
   const plot = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, w | 0, h | 0); };
-  const { body, lid } = chestParts(tier, "candle");
+  // a chest of the Long Night comes frosted (lib/forms.js frosted)
+  const fz = season ? frosted : x => x;
+  const parts = chestParts(tier, "candle"), body = fz(parts.body), lid = fz(parts.lid);
   const bx = Math.round((CW - CHEST.w * SC) / 2), by = 92;
   // the drawn chest, when its sheets are loaded: 32px frames at a whole 4×,
   // standing on the same table line as the procedural one
@@ -79,9 +81,9 @@ export function mount(cv, bus, { tier = 0 } = {}) {
       let f = null;
       if (S.phase === "hold") {
         const jump = S.held && !view.calm && S.p > 0.25 && ((S.t >> (S.p > 0.7 ? 1 : 2)) % 3 === 0);
-        f = jump ? chestOpening(tier, "candle", RATTLE) : chestClosed(tier, "candle");
-      } else if (S.failed) f = chestClosed(tier, "candle");
-      else f = chestOpening(tier, "candle", Math.min(OPEN_FRAMES - 1, OPEN_FROM + Math.floor(S.anim / (view.calm ? 1 : 6))));
+        f = fz(jump ? chestOpening(tier, "candle", RATTLE) : chestClosed(tier, "candle"));
+      } else if (S.failed) f = fz(chestClosed(tier, "candle"));
+      else f = fz(chestOpening(tier, "candle", Math.min(OPEN_FRAMES - 1, OPEN_FROM + Math.floor(S.anim / (view.calm ? 1 : 6)))));
       ctx.drawImage(f, dx, dy, CHEST_W * DS, f.height * DS);
     } else {
       ctx.drawImage(body, x, by, CHEST.w * SC, CHEST.h * SC);
@@ -115,7 +117,7 @@ export function mount(cv, bus, { tier = 0 } = {}) {
 
     ctx.font = FONT; ctx.textAlign = "center";
     ctx.fillStyle = INK.warm;
-    ctx.fillText(CHESTS.names[tier] + " CHEST", CW / 2, 22);
+    ctx.fillText((season ? "FROSTED " : "") + CHESTS.names[tier] + " CHEST", CW / 2, 22);
     if (S.phase === "hold") {
       ctx.fillStyle = INK.warmHi;
       ctx.fillText(S.line || "HOLD TO BREAK THE SEAL", CW / 2, 224);

@@ -114,6 +114,7 @@ export function useGameState() {
   }, []);
   const setFrame = useCallback(id => choose({ frame: id }), [choose]);
   const setSelectedTitle = useCallback(label => choose({ selectedTitle: label }), [choose]);
+  const setProfileFx = useCallback(id => choose({ profileFx: id }), [choose]);
   const setBio = useCallback(bio => choose({ bio: String(bio).slice(0, 120) }), [choose]);
   const setPinnedIds = useCallback(next => {
     const cur = snapRef.current?.pinnedIds ?? null;
@@ -200,12 +201,13 @@ export function useGameState() {
     scrollCap: snap?.scrollCap || 8,
     inkMax: snap?.inkMax || 520, wellLevel: snap?.wellLevel || 0, streak: snap?.streak || 0, tomes: snap?.tomes || ["primer"],
     dailyReady: !!snap?.dailyReady, dailyIn: snap?.dailyIn || 0, craving: snap?.craving || null,
-    journal: snap?.journal || { c: {}, m: {}, shiny: 0, best: 0 },
+    journal: snap?.journal || { c: {}, m: {}, s: {}, shiny: 0, best: 0 },
     frame: snap?.frame || "stone", fr: FRAMES[snap?.frame] || FRAMES.stone,
     bio: snap?.bio || "", selectedTitle: snap?.selectedTitle || "",
     pinnedIds: snap?.pinnedIds ?? null, iconCoin: snap?.iconCoin ?? null, setIconCoin,
     ownedFrames: snap?.ownedFrames || [], ownedTitles: snap?.ownedTitles || [],
-    setFrame, setSelectedTitle, setBio, setPinnedIds, toggleLock,
+    ownedFx: snap?.ownedFx || [], profileFx: snap?.profileFx || null, event: snap?.event || null,
+    setFrame, setSelectedTitle, setProfileFx, setBio, setPinnedIds, toggleLock,
     autoTop, showcase, pinToSlot, clearPinSlot, togglePin, maxPins: MAX_PINS, news,
   };
 }

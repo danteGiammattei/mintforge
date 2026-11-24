@@ -15,14 +15,16 @@ export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rar
   // the great flame round a fire coin is retired (Nov 2026): its fire
   // burns inside it now. paintAura still knows how, should it come back
   const flames = false;
+  // a frost coin's falling snow (lib/aura.js paintSnow), in front
+  const snow = layer === "front" && !!coin.season;
   const G = 64 + 2 * margin;
 
   useEffect(() => {
     const cv = ref.current;
-    if (!cv || (rarity <= 0 && !shine && !tendrils && !moon && !flames)) return;
+    if (!cv || (rarity <= 0 && !shine && !tendrils && !moon && !flames && !snow)) return;
     const ctx = cv.getContext("2d");
-    const paint = f => paintAura(ctx, coin, rarity, f, margin, shine, tendrils, moon, layer, flames);
-    if ((rarity < 2 && !shine && !tendrils && !moon && !flames) || auraStill()) { paint(auraFrame()); return; }
+    const paint = f => paintAura(ctx, coin, rarity, f, margin, shine, tendrils, moon, layer, flames, snow);
+    if ((rarity < 2 && !shine && !tendrils && !moon && !flames && !snow) || auraStill()) { paint(auraFrame()); return; }
     // a moving aura is first drawn when it comes on screen, not before:
     // a long vault would otherwise draw every one of them at once
     let off = null;
@@ -33,9 +35,9 @@ export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rar
     io.observe(cv);
     return () => { io.disconnect(); off?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coin.seed, coin.shape, rarity, margin, shine, tendrils, moon, flames, layer]);
+  }, [coin.seed, coin.shape, rarity, margin, shine, tendrils, moon, flames, layer, snow]);
 
-  if (layer === "behind" ? !tendrils && !flames : rarity <= 0 && !shine && !tendrils && !moon && !flames) return null;
+  if (layer === "behind" ? !tendrils && !flames : rarity <= 0 && !shine && !tendrils && !moon && !flames && !snow) return null;
   return (
     <canvas ref={ref} width={G} height={G} aria-hidden style={{
       position: "absolute", left: -margin * k, top: -margin * k, width: G * k, height: G * k,

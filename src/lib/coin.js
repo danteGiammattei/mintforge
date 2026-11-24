@@ -459,10 +459,11 @@ export const SPACE_LOOP = 16;                 // frames in the void's loop
 export const warmCoin = coin => { try { paintCoin(coin); } catch { /* drawn later instead */ } };
 
 function paintCoin(coin, back = false, phase = 0) {
-  const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.sign ?? ""}:${coin.shiny ? 1 : 0}:${back ? 1 : 0}:${phase}`;
+  const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.sign ?? ""}:${coin.shiny ? 1 : 0}:${coin.season || ""}:${back ? 1 : 0}:${phase}`;
   if (painted.has(key)) return painted.get(key);
   const out = coin.metalIdx === METAL.astral && coin.sign != null ? paintAstral(coin, back) : paintFresh(coin, back, phase);
   if (coin.shiny && coin.metalIdx === METAL.astral && coin.sign != null) shine(out.getContext("2d"), coin);
+  if (coin.season) frost(out.getContext("2d"), coin);
   if (painted.size > 900) painted.delete(painted.keys().next().value);
   painted.set(key, out);
   return out;
@@ -575,6 +576,35 @@ function shine(c, coin) {
     }
     c.restore();
   }
+}
+
+/* Frost (a coin of the Long Night, shared/events.js): a cold breath over
+ * the whole face, rime crystals along the rim, and snow settled thick on
+ * its top edge, as if it had lain out all night. Fixed per coin; the
+ * falling snow round it is drawn by lib/aura.js. */
+const SNOW = [244, 249, 255], RIME = [196, 226, 255], BREATH = [200, 228, 255];
+function frost(g, coin) {
+  const img = g.getImageData(0, 0, SZ, SZ), d = img.data;
+  const inn = (x, y) => x >= 0 && y >= 0 && x < SZ && y < SZ && d[(y * SZ + x) * 4 + 3] > 96;
+  const hash = (x, y) => { let n = (x * 374761393 + y * 668265263 + (coin.seed >>> 0)) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+  const mixTo = (i, c, k) => { for (let j = 0; j < 3; j++) d[i + j] = Math.round(d[i + j] + (c[j] - d[i + j]) * k); };
+  const out = new Uint8Array(SZ * SZ);           // what lies outside, by pixel, before we touch it
+  for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) out[y * SZ + x] = inn(x, y) ? 0 : 1;
+  const outside = (x, y) => x < 0 || y < 0 || x >= SZ || y >= SZ || out[y * SZ + x] === 1;
+  for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
+    if (out[y * SZ + x]) continue;
+    const i = (y * SZ + x) * 4, h = hash(x, y);
+    mixTo(i, BREATH, 0.14);                                                 // the cold over everything
+    const up1 = outside(x, y - 1), up2 = outside(x, y - 2), up3 = outside(x, y - 3);
+    const edge = up1 || outside(x - 1, y) || outside(x + 1, y) || outside(x, y + 1);
+    const top = y < SZ * 0.55;                                              // snow only settles on the upper rim
+    if (top && up1) mixTo(i, SNOW, 0.95);
+    else if (top && up2 && h < 0.8) mixTo(i, SNOW, 0.85);
+    else if (top && up3 && h < 0.35) mixTo(i, SNOW, 0.7);
+    else if (edge && h < 0.5) mixTo(i, RIME, 0.75);                          // rime round the rest of the rim
+    else if (!edge && h < 0.012) mixTo(i, SNOW, 0.6);                        // a few flakes caught on the face
+  }
+  g.putImageData(img, 0, 0);
 }
 
 export function drawCoin(canvas, coin, px, opts = {}) {
