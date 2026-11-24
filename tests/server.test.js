@@ -788,6 +788,8 @@ test("the Magi's gifts: a present's rare named coin, mythic, kept out of the kin
     const one = s.coins.find(c => c.relic);
     await assert.rejects(go("gamble", { game: "toss", coinIds: [one.id] }));
     await assert.rejects(go("restrike", { coinId: one.id }));
+    await assert.rejects(go("sell", { coinIds: [one.id] }));            // and it is not for sale
+    assert.ok((await loadState(db, pid)).coins.some(c => c.id === one.id));
   } finally { RELICS.magi.chance = was; }
 });
 

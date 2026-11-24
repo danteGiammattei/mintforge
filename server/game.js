@@ -387,9 +387,9 @@ const placeholders = (n, from) => Array.from({ length: n }, (_, i) => `?${i + fr
 async function sell(db, pid, body) {
   const ids = [...new Set((Array.isArray(body.coinIds) ? body.coinIds : []).filter(idOk))].slice(0, 200);
   if (!ids.length) throw new Refusal("Nothing to sell");
-  // locked coins and dusty ones are simply not matched, so not sold
+  // locked coins, dusty ones and the Magi's gifts are simply not matched, so not sold
   const gone = await db.prepare(
-    `DELETE FROM coins WHERE player_id = ?1 AND locked = 0 AND dusty = 0 AND id IN (${placeholders(ids.length, 2)})
+    `DELETE FROM coins WHERE player_id = ?1 AND locked = 0 AND dusty = 0 AND relic IS NULL AND id IN (${placeholders(ids.length, 2)})
      RETURNING id, seed, metal_idx, shiny, rarity, material, season, relic`
   ).bind(pid, ...ids).all();
   const rows = gone.results || [];

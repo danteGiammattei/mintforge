@@ -126,7 +126,7 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
               <PixelIcon name="spark" size={11}/>FORGE
             </button>
           )}
-          {onSell && !coin.locked && (
+          {onSell && !coin.locked && !coin.relic && (
             <button className="btn btn-danger" style={{ flex: "1 1 120px" }} disabled={busy} onClick={() => onSell(coin)}>
               <PixelIcon name="mark" size={11}/>SELL {coinValue(coin).toLocaleString()}
             </button>

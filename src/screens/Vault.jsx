@@ -77,10 +77,10 @@ export default function Vault() {
     return cmp ? [...list].sort(cmp) : list;
   }, [g.coins, filter, sort]);
   const open = g.coins.find(c => c.id === openId) || null;
-  const pickedCoins = g.coins.filter(c => picked.has(c.id) && !c.locked);
-  // what a bulk pick may take: never a locked, pinned or named coin
+  const pickedCoins = g.coins.filter(c => picked.has(c.id) && !c.locked && !c.relic);
+  // what a bulk pick may take: never a locked, pinned or named coin, nor a Magi's gift
   const chosen = new Set((g.pinnedIds || []).filter(Boolean));     // pinned by hand, not the automatic six
-  const spare = shown.filter(c => !c.locked && !chosen.has(c.id) && !c.nick);
+  const spare = shown.filter(c => !c.locked && !c.relic && !chosen.has(c.id) && !c.nick);
   const pickWhere = test => { setPicked(new Set(spare.filter(test).map(c => c.id))); feel("tap"); };
   const pickedTotal = pickedCoins.reduce((s, c) => s + coinValue(c), 0);
 
@@ -173,7 +173,7 @@ export default function Vault() {
             <div className="grid-coins">
               {shown.map(coin => (
                 <CoinTile key={coin.id} coin={coin} pinned={pinnedSet.has(coin.id)}
-                          selected={selecting && picked.has(coin.id)} disabled={selecting && coin.locked} onClick={() => tap(coin)}/>
+                          selected={selecting && picked.has(coin.id)} disabled={selecting && (coin.locked || !!coin.relic)} onClick={() => tap(coin)}/>
               ))}
             </div>
           </>
