@@ -37,7 +37,8 @@ export default function CoinCanvas({ coin, size, hideShine = false, aura = true,
     <div style={{ position: "relative", width: size, height: size, display: "inline-block", flexShrink: 0 }}>
       {aura && coin.metalIdx === METAL.eldritch && <Aura coin={coin} size={size} margin={auraMargin + 16} rare layer="behind" shine={false}/>}
       <canvas ref={canvasRef} aria-hidden style={{ position: "relative", imageRendering: "pixelated", display: "block", width: size, height: size }}/>
-      {(aura || shiny || coin.season) && <Aura coin={coin} size={size} margin={auraMargin} shine={shiny} rare={aura}/>}
+      {/* a frost coin's hat rises past the coin, so it gets a little more room */}
+      {(aura || shiny || coin.season) && <Aura coin={coin} size={size} margin={coin.season ? auraMargin + 6 : auraMargin} shine={shiny} rare={aura}/>}
     </div>
   );
 }

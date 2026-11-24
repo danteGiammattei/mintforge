@@ -122,7 +122,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
-  if (snow) paintSnow(put, G, seed, frame, face, inside);
+  if (snow) { paintSnow(put, G, seed, frame, face, inside); paintHat(put, G, face); }
   if (rarity <= 0) {
     const f = frame % LOOP;
     if (flames) replay(d, G, `edge:${seed}:${shapeOf(coin)}:${M}:${f}`, p => paintBlazeEdge(p, inner, seed, f));
@@ -484,6 +484,50 @@ function paintSnow(put, G, seed, frame, face, dist) {
     const big = k % 3 === 0;
     put(x, y, FLAKE, big ? 0.95 : 0.8);
     if (big) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, FLAKE, 0.45);
+  }
+}
+
+/* A coin of the Long Night wears a Santa hat: a white fur band laid
+ * along its top rim, following the rim's own curve, and the red hat
+ * rising from it, leaning right, its tip drooping over to a white
+ * pom-pom. Lit like the coins, from the upper left. It sits on the
+ * aura's layer, so it can rise past the coin into the margin above. */
+const HAT = { hi: [214, 64, 54], mid: [168, 36, 32], lo: [110, 20, 20], edge: [72, 12, 14],
+              fur: [244, 246, 250], furLo: [196, 202, 214] };
+function paintHat(put, G, face) {
+  const cx = G / 2, top = new Map();
+  for (const p of face) if (!top.has(p.x) || p.y < top.get(p.x)) top.set(p.x, p.y);
+  const t0 = top.get(Math.round(cx)) ?? Math.min(...top.values());
+  const L = Math.round(cx - 15), R = Math.round(cx + 12);
+  // where the band sits, column by column: on the rim if the rim is there, else level
+  const rim = x => (top.has(x) ? Math.max(top.get(x), t0 - 1) : t0 + 2);
+  const base = Math.min(...Array.from({ length: R - L + 1 }, (_, i) => rim(L + i))) + 1;
+  // the hat: a cone from the band up to its peak, leaning right
+  const peak = { x: cx + 11, y: base - 13 };
+  for (let y = peak.y; y <= base; y++) {
+    const k = (y - peak.y) / (base - peak.y || 1);
+    const a = Math.round(peak.x + (L - peak.x) * k), b = Math.round(peak.x + (R - peak.x) * k);
+    for (let x = a; x <= b; x++) {
+      const u = (x - a) / Math.max(1, b - a);
+      const c = x === a || x === b ? HAT.edge : u < 0.3 ? HAT.hi : u < 0.75 ? HAT.mid : HAT.lo;
+      put(x, y, c, 1);
+    }
+  }
+  // the tip, flopped over to the right and down
+  for (const [dx, dy] of [[1, 0], [2, 0], [3, 1], [4, 1], [5, 2], [6, 2], [6, 3], [7, 4], [7, 5]]) {
+    put(peak.x + dx, peak.y + dy, HAT.mid, 1); put(peak.x + dx, peak.y + dy - 1, dx < 4 ? HAT.hi : HAT.mid, 1);
+    put(peak.x + dx, peak.y + dy + 1, HAT.lo, 1);
+  }
+  // its pom-pom
+  const pp = { x: peak.x + 8, y: peak.y + 8 };
+  for (let y = -3; y <= 3; y++) for (let x = -3; x <= 3; x++) {
+    if (x * x + y * y > 9) continue;
+    put(pp.x + x, pp.y + y, x + y > 1 ? HAT.furLo : HAT.fur, 1);
+  }
+  // the fur band, three deep, following the rim, lumpy
+  for (let x = L - 1; x <= R + 1; x++) {
+    const y0 = Math.min(rim(x), base + 3) - 2;
+    for (let k = 0; k < 5; k++) put(x, y0 + k, k === 4 || (x * 5 + k) % 7 === 0 ? HAT.furLo : HAT.fur, 1);
   }
 }
 
