@@ -38,7 +38,7 @@ export default function PixelBanner({ frame, height = 112, dim = false, fx = nul
       <canvas ref={ref} hidden={!!painted} width={BW} height={BH} aria-hidden
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", imageRendering: "pixelated", filter: dim ? "grayscale(.5) brightness(.6)" : "none" }}/>
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(5,6,9,0) 40%, rgba(5,6,9,.7) 100%)" }}/>
-      {fx && <ProfileFx fx={fx} height={height}/>}
+      {fx && <ProfileFx fx={fx}/>}
       {children}
     </div>
   );

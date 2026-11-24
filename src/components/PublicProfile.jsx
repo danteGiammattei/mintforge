@@ -1,4 +1,5 @@
 import PixelBanner from "./PixelBanner.jsx";
+import ProfileFx from "./ProfileFx.jsx";
 import CabinetFrame, { gradeInk } from "./CabinetFrame.jsx";
 import SignBadges from "./SignBadges.jsx";
 import { CoinTile } from "../screens/Vault.jsx";
@@ -16,9 +17,11 @@ export const KINDS_TOTAL = METALS.length * (MAX_RARITY + 1);
 
 export default function PublicProfile({ frame, fx = null, username, level, title, bio, coins, kinds, shiny, signs = [], tomes = ["primer"], cabinet, showcase, onCoin, empty, children }) {
   return (
-    <>
+    // a profile effect is worn over the banner and behind everything else
+    <div style={{ position: "relative" }}>
+      {fx && <ProfileFx fx={fx}/>}
       <PixelBanner frame={frame} fx={fx} height={96}/>
-      <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ position: "relative", padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
         <div>
           <div className="t-title t-plain" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{username}</div>
           <div className="t-label">LV {level} · <TitleText label={title}/></div>
@@ -55,6 +58,6 @@ export default function PublicProfile({ frame, fx = null, username, level, title
         ) : empty}
         {children}
       </div>
-    </>
+    </div>
   );
 }
