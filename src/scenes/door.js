@@ -35,10 +35,11 @@
  *  be. His posture is the only meter.
  * ══════════════════════════════════════════════════════════════════════ */
 
+import { present } from "../lib/presentArt.js";
 import { RAMP } from "../lib/pixelform.js";
 import {
   goblinHand, goblinHandPoint, GOBLIN_HAND, playerHand, PLAYER_HAND,
-  tiedScroll, TIED, chest as chestSprite, pouch, frosted,
+  tiedScroll, TIED, chest as chestSprite, pouch,
 } from "../lib/forms.js";
 import { auraFrame, LOOP as AURA_LOOP, PAD as AURA_PAD, TOP as AURA_TOP } from "../lib/spriteAura.js";
 import { playerHandArt, loadPlayerHand, HAND_ART } from "../lib/playerHandArt.js";
@@ -137,12 +138,36 @@ function drawLantern() {
   ctx.globalAlpha = 1;
 }
 
-/* The Long Night (bus.season() "frost26"): snow falling beyond the
- * door, lying in a drift on his side of the threshold, and a wreath of
- * holly hung on our side of the wall, by what light reaches it. */
+/* The Long Night (bus.season() "frost26"), Christmas at the door. Out
+ * beyond him, far off through the slot: snow falling on dark pines and a
+ * log cabin, a fire lit in its window and smoke from its chimney. On our
+ * side, by what light reaches it: a garland of pine strung with warm
+ * lights across the top, a holly wreath with a candy cane hooked on it,
+ * and presents stacked against the wall's foot. */
 const SNOWFALL = Array.from({ length: 34 }, (_, i) => ({ x: (i * 13.37) % 1, y: (i * 71.3) % 422, v: 0.25 + ((i * 7) % 10) / 22, ph: i * 1.3 }));
 function drawWinter() {
   if (!bus.season?.()) return;
+  const flick = view.calm ? 1 : 0.85 + 0.15 * Math.sin(S.t * 0.13) * Math.sin(S.t * 0.07 + 1);
+  // far off, at the slot's foot: the pines and the cabin, under snow
+  const FY = 300;
+  px(GX, FY, GW, 12, "#1a2234"); px(GX, FY, GW, 1, "#8a96ac");                      // the snowfield
+  for (const [tx, th] of [[GX + 3, 16], [GX + 11, 22], [GX + 34, 19], [GX + 41, 13]]) {
+    for (let k = 0; k < th; k++) {
+      const w = Math.max(1, Math.round((k / th) * 7));
+      px(tx - (w >> 1), FY - th + k, w, 1, k % 4 === 0 ? "#6a7890" : "#121a26");    // dark pine, snow on its tiers
+    }
+  }
+  const cx0 = GX + 18, cy0 = FY - 11;
+  px(cx0, cy0, 13, 11, "#2a1e16"); for (let k = 0; k < 7; k++) px(cx0 - 1 + k, cy0 - 1 - k, 15 - 2 * k, 1, k === 0 ? "#2a1e16" : "#9aa8c0");   // walls, a snowy roof
+  for (let y = cy0 + 2; y < FY; y += 3) px(cx0, y, 13, 1, "#1c140e");                // the logs
+  px(cx0 + 9, cy0 - 8, 2, 4, "#1c140e");                                               // the chimney
+  const fire = flick;                                                                    // the fire, in the window
+  px(cx0 + 3, cy0 + 3, 4, 3, "rgb(" + Math.round(200 * fire + 40) + "," + Math.round(120 * fire + 20) + ",40)");
+  ctx.globalAlpha = 0.25 * fire; px(cx0 + 1, cy0 + 1, 8, 7, "#e0a050"); ctx.globalAlpha = 1;
+  for (let i = 0; i < 6; i++) {                                                          // its smoke, rising
+    const t = ((S.t * 0.25 + i * 9) % 54) / 54, sx = cx0 + 10 + Math.sin(t * 6 + i) * 2 + t * 3, sy = cy0 - 9 - t * 40;
+    ctx.globalAlpha = 0.35 * (1 - t); px(sx, sy, 2, 1, "#8a8478"); ctx.globalAlpha = 1;
+  }
   // the snow, through the slot only: it is falling outside, beyond him
   for (const f of SNOWFALL) {
     const y = view.calm ? f.y : (f.y + S.t * f.v) % H;
@@ -151,24 +176,38 @@ function drawWinter() {
     ctx.globalAlpha = 0.25 + 0.6 * k; px(x, y, 1, 1, "#e8f0ff");
   }
   ctx.globalAlpha = 1;
-  // the drift, where his floor meets the slot's foot
-  for (let x = GX; x < GX + GW; x++) {
-    const h = 3 + Math.round(2 * Math.sin(x * 0.4) + Math.sin(x * 1.3));
-    px(x, 312 - h, 1, h, "#9aa8c0"); px(x, 312 - h, 1, 1, "#c8d4e8");
+  // the garland, swagged across the top, its little lights warm
+  for (const [a, b2] of [[8, 70], [70, 125], [125, 188]]) {
+    for (let x = a; x <= b2; x++) {
+      const t = (x - a) / (b2 - a), y = 6 + Math.round(Math.sin(t * Math.PI) * 9);
+      px(x, y, 1, 3, (x % 3) ? "#1c3424" : "#2c5034");
+      if ((x - a) % 9 === 4) {
+        const on = view.calm ? 1 : 0.6 + 0.4 * Math.sin(S.t * 0.08 + x);
+        ctx.globalAlpha = 0.3 * on; px(x - 2, y, 5, 5, "#e0a050"); ctx.globalAlpha = 1;
+        px(x, y + 3, 1, 2, ["#e8b860", "#d8584e", "#7ab0e0", "#8ad08a"][(x >> 3) % 4]);
+      }
+    }
   }
   // the wreath, on the wall to the left of the door, in the slot's light
   const wx = 36, wy = 156, R = 11;
   for (let a = 0; a < 64; a++) {
     const t = a / 64 * Math.PI * 2;
     for (const r of [R - 2, R - 1, R, R + 1]) {
-      const x = wx + Math.cos(t) * r, y = wy + Math.sin(t) * r, lit = Math.cos(t) > 0.2;    // lit from the slot, to its right
+      const x = wx + Math.cos(t) * r, y = wy + Math.sin(t) * r, lit = Math.cos(t) > 0.2;
       px(x, y, 1, 1, ((a * 7 + r) % 5 === 0) ? (lit ? "#3e6a44" : "#22382a") : (lit ? "#2c5034" : "#16261c"));
     }
   }
   for (const [bx, by] of [[wx - 8, wy - 6], [wx + 9, wy - 3], [wx + 5, wy + 8], [wx - 6, wy + 7], [wx + 1, wy - 11]]) {
-    px(bx, by, 2, 2, "#7a1e1c"); px(bx, by, 1, 1, "#b8403a");                   // berries
+    px(bx, by, 2, 2, "#7a1e1c"); px(bx, by, 1, 1, "#b8403a");
   }
-  px(wx - 3, wy + 10, 7, 3, "#7a1e1c"); px(wx - 1, wy + 13, 1, 4, "#7a1e1c"); px(wx + 1, wy + 13, 1, 5, "#5e1614");   // the bow
+  px(wx - 3, wy + 10, 7, 3, "#7a1e1c"); px(wx - 1, wy + 13, 1, 4, "#7a1e1c"); px(wx + 1, wy + 13, 1, 5, "#5e1614");
+  // a candy cane hooked over it
+  for (let k = 0; k < 14; k++) px(wx + 8, wy - 4 + k, 2, 1, k % 4 < 2 ? "#c8c0b8" : "#8a2420");
+  px(wx + 9, wy - 6, 2, 1, "#8a2420"); px(wx + 11, wy - 5, 1, 2, "#c8c0b8"); px(wx + 11, wy - 3, 1, 1, "#8a2420");
+  // presents stacked at the foot of the wall, half in the dark
+  ctx.globalAlpha = 0.7;
+  ctx.drawImage(present(0), 4, 268); ctx.drawImage(present(1), 26, 276); ctx.drawImage(present(2), 14, 246);
+  ctx.globalAlpha = 1;
 }
 
 function drawDust() {
@@ -424,7 +463,7 @@ function drawDrawer() {
  * the bottom of the frame — toward us, into the satchel. */
 function drawArriving(cx) {
   const a = S.arriving; if (!a) return;
-  const sp = a.kind === "chest" ? (a.season ? frosted(chestSprite(a.tier, "slot")) : chestSprite(a.tier, "slot")) : pouch("slot");
+  const sp = a.kind === "chest" ? (a.season ? present(a.tier) : chestSprite(a.tier, "slot")) : pouch("slot");
   const w = sp.width, h = sp.height;
   const k1 = ease(Math.min(1, a.k / 0.45)), k2 = ease(Math.max(0, (a.k - 0.6) / 0.4));
   const x = Math.round(lerp(cx - 6, GX + (GW - w) / 2, k1));
@@ -482,7 +521,7 @@ function stepGive() {
       const got = S.res?.chests || [];
       endGive();
       for (const c of got) S.queue.push({ kind: "chest", tier: c.tier, season: c.season || null, what: { type: "chest", ...c },
-        line: c.season ? "THAT IS ENOUGH. A CHEST COMES THROUGH, WHITE WITH FROST" : "THAT IS ENOUGH. HE PUSHES A CHEST THROUGH THE GAP" });
+        line: c.season ? "THAT IS ENOUGH. HE PUSHES A PRESENT THROUGH THE GAP, TIED WITH RIBBON" : "THAT IS ENOUGH. HE PUSHES A CHEST THROUGH THE GAP" });
     }
   } else if (S.phase === "refuse") {
     S.ourK = Math.max(0, S.ourK - 0.03);

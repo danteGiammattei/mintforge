@@ -101,7 +101,27 @@ function drawRoom(flick) {
     plot(X + 4, Y - 1, 5, 3, "#2a4a2e"); plot(X + 6, Y - 2, 1, 1, "#3e6a44");            // a holly leaf
     plot(X + 8, Y + 1, 2, 2, "#8a2420"); plot(X + 8, Y + 1, 1, 1, "#c8483e");              // and its berries
     plot(X + 10, Y, 2, 2, "#8a2420"); plot(X + 10, Y, 1, 1, "#c8483e");
+    // a candy cane laid beside it
+    for (let i = 0; i < 22; i++) plot(X - 26 + i, Y + 1, 1, 2, (i % 4) < 2 ? "#d8d0c4" : "#a8302a");
+    plot(X - 27, Y - 1, 1, 2, "#a8302a"); plot(X - 26, Y - 2, 2, 1, "#d8d0c4"); plot(X - 24, Y - 1, 1, 1, "#a8302a");
   }
+}
+
+/* on the Long Night, a mug of hot cocoa to the right of the sheet,
+ * steaming in the candlelight */
+function drawCocoa() {
+  if (!bus.season?.()) return;
+  const X = 178, Y = 150;
+  plot(X, Y, 11, 12, "#7a2418"); plot(X, Y, 2, 12, "#a8402e"); plot(X + 9, Y, 2, 12, "#4e140e");      // the mug, lit from the left
+  plot(X + 11, Y + 3, 3, 1, "#5e1810"); plot(X + 13, Y + 3, 1, 5, "#5e1810"); plot(X + 11, Y + 7, 3, 1, "#5e1810");   // its handle
+  plot(X + 1, Y, 9, 2, "#3a2014"); plot(X + 2, Y, 3, 1, "#e8dcc8"); plot(X + 6, Y, 2, 1, "#f4ece0");   // cocoa, and marshmallows
+  plot(X - 1, Y + 12, 13, 1, "#120e08");                                                                   // its shadow
+  for (let i = 0; i < 5; i++) {                                                                            // the steam
+    const t = view.calm ? (i / 5) : ((S.t * 0.6 + i * 11) % 55) / 55;
+    const sx = X + 3 + i % 3 * 2 + Math.sin(t * 7 + i) * 1.5, sy = Y - 2 - t * 22;
+    ctx.globalAlpha = 0.28 * (1 - t); plot(sx, sy, 1, 2, "#d8d0c4");
+  }
+  ctx.globalAlpha = 1;
 }
 
 /* ─── the sheet, pinned flat ──────────────────────────────────────────
@@ -506,6 +526,7 @@ function frame() {
   drawRoom(flick);
   feather(ctx, SURROUND, 16);
   ctx.drawImage(sheetLayer, SHEET.x - 2, SHEET.y - 2);
+  drawCocoa();
   drawStrokes();
   drawChrome();
   if (S.phase !== "draw") { S.sealT++; drawSeal(); }
