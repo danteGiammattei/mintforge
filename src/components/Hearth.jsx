@@ -119,53 +119,80 @@ function paintRoom() {
 }
 const CANDLES = [14, 22, 137, 145];
 
-// the fire's heat, 0..36, rising and cooling: classic and cheap
-const PAL = [[0, 0, 0, 0], [40, 8, 6, 120], [70, 14, 8, 170], [110, 22, 10, 210], [150, 36, 12, 235], [186, 54, 14], [214, 76, 16], [232, 104, 20], [242, 134, 28], [248, 164, 44], [252, 196, 74], [255, 222, 120], [255, 242, 186], [255, 252, 232]];
-const hot = v => PAL[Math.min(PAL.length - 1, Math.floor(v / 36 * (PAL.length - 1) + 0.5))];
-function makeFire() {
-  const { w, h } = FIRE, heat = new Float32Array(w * h);
-  return () => {
-    // the coals along the bottom, hottest in the middle
-    for (let x = 0; x < w; x++) {
-      const m = 1 - Math.abs(x - w / 2) / (w / 2);
-      heat[(h - 1) * w + x] = m > 0.2 ? Math.min(36, 22 + m * 20 + Math.random() * 10) : 0;
+/* The fire: drawn, not simulated. A row of tongues, each a pointed
+ * flame that sways from its root and breathes taller and shorter on its
+ * own beat, filled in flat bands from a deep orange edge to a pale core,
+ * the way a painter would; a lick breaks off a tip now and then. */
+const TONGUES = [
+  // centre x, half-width at the root, height, its beat
+  [-25, 8, 13, 1.3], [-16, 12, 22, 1.1], [-6, 14, 31, 0.9], [4, 15, 37, 1.0], [13, 12, 27, 1.2], [21, 10, 19, 1.4], [28, 7, 11, 1.6],
+];
+const BANDS = [[176, 52, 18], [226, 96, 24], [246, 146, 38], [252, 204, 76], [255, 242, 180]];
+const ROOT = 127;                                                     // the fire stands on the logs
+function fireAt(t) {
+  const { x: fx, w } = FIRE, mid = fx + w / 2;
+  const shapes = TONGUES.map(([dx, hw, ht, beat], i) => ({
+    cx: mid + dx, hw,
+    h: ht * (0.82 + 0.13 * Math.sin(t * 0.55 * beat + i * 1.7) + 0.06 * Math.sin(t * 1.4 * beat + i)),
+    sway: Math.sin(t * 0.35 * beat + i * 2.1) * (2 + ht / 12),
+  }));
+  // depth into the fire, 0 at an edge; the deepest tongue wins
+  const depth = (x, y) => {
+    let best = -1;
+    for (const f of shapes) {
+      const u = (ROOT - y) / f.h; if (u < 0 || u >= 1) continue;
+      // full and round low down, drawn to a point at the tip
+      const c = f.cx + f.sway * u * u, half = f.hw * Math.pow(1 - u, 1.1) * Math.min(1, 0.75 + u * 2.5);
+      const d = 1 - Math.abs(x + 0.5 - c) / half;
+      if (d > 0) best = Math.max(best, d * Math.pow(1 - u, 0.45));
     }
-    for (let y = 1; y < h; y++) for (let x = 0; x < w; x++) {
-      const src = heat[y * w + x], edge = Math.abs(x - w / 2) / (w / 2);
-      const drift = Math.round(Math.random() * 2 - 1.2);
-      const cool = Math.random() * (0.9 + edge * edge * 4.2) * (Math.random() < 0.08 ? 3 : 1);
-      const to = (y - 1) * w + Math.max(0, Math.min(w - 1, x + drift));
-      heat[to] = Math.max(0, src - cool);
-    }
-    return heat;
+    return best;
   };
+  // licks broken off the tallest tongues, rising and gone
+  const licks = shapes.filter((_, i) => i >= 2 && i <= 4).map((f, i) => {
+    const p = (t * 0.9 + i * 3.3) % 6;
+    return p < 2.5 ? { x: Math.round(f.cx + f.sway + Math.sin(t + i) * 1.5), y: Math.round(ROOT - f.h - 2 - p * 3), big: p < 1.2 } : null;
+  }).filter(Boolean);
+  return { depth, licks };
 }
+const band = d => BANDS[d < 0.12 ? 0 : d < 0.3 ? 1 : d < 0.5 ? 2 : d < 0.72 ? 3 : 4];
 
-function frameOf(base, step, t) {
+// a dark room: the fire is its light, the candles a little more
+const AMBIENT = [0.16, 0.17, 0.26], WARM = [1.15, 0.78, 0.48];
+function frameOf(base, t) {
   const img = new ImageData(new Uint8ClampedArray(base.data), W, H), d = img.data;
-  const heat = step(), { x: fx, y: fy, w, h } = FIRE;
-  const flick = 0.82 + Math.sin(t * 0.9) * 0.06 + Math.random() * 0.12;
-  // the fire's light on the firebox and the hearth, warm, falling away
-  const lx = fx + w / 2, ly = fy + h - 6;
-  for (let y = BOX.y0; y < H; y++) for (let x = 0; x < W; x++) {
-    const inBox = x >= BOX.x0 && x <= BOX.x1 && y <= BOX.y1, onHearth = y >= 138;
-    if (!inBox && !onHearth) continue;
-    const r = Math.hypot((x - lx) * 0.8, y - ly), a = Math.max(0, 1 - r / (inBox ? 58 : 70)) * flick * (inBox ? 0.9 : 0.45) * (base.front[y * W + x] ? 0.3 : 1);
-    if (a <= 0) continue;
-    const i = (y * W + x) * 4;
-    d[i] = Math.min(255, d[i] + 150 * a); d[i + 1] = Math.min(255, d[i + 1] + 70 * a); d[i + 2] = Math.min(255, d[i + 2] + 18 * a);
+  const flick = 0.9 + Math.sin(t * 0.9) * 0.05 + Math.sin(t * 2.3) * 0.04 + Math.random() * 0.05;
+  const lx = FIRE.x + FIRE.w / 2, ly = ROOT - 12;
+  const cand = CANDLES.map((cx, n) => 0.85 + Math.sin(t * 1.7 + n * 2) * 0.15);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4, inBox = x >= BOX.x0 && x <= BOX.x1 && y >= BOX.y0 && y <= BOX.y1;
+    const r = Math.hypot((x - lx) * 0.85, (y - ly) * (y > ly ? 1.4 : 1));
+    let k = Math.pow(Math.max(0, 1 - r / 120), 1.6) * flick * (inBox ? 1.5 : 1.15);
+    for (let n = 0; n < CANDLES.length; n++) { const cr = Math.hypot(x - CANDLES[n], y - 48); if (cr < 18) k += (1 - cr / 18) ** 2 * 0.45 * cand[n]; }
+    for (let c = 0; c < 3; c++) d[i + c] = Math.min(255, d[i + c] * (AMBIENT[c] + k * WARM[c]));
   }
-  // the flames, over the logs' back and the back wall
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const v = heat[y * w + x]; if (v < 2) continue;
-    const c = hot(v), i = ((fy + y) * W + fx + x) * 4, a = (c[3] ?? 255) / 255;
-    const py = fy + y; if (py > 127 || base.front[py * W + fx + x]) continue;   // the logs stay in front of their own fire
-    d[i] = d[i] + (c[0] - d[i]) * a; d[i + 1] = d[i + 1] + (c[1] - d[i + 1]) * a; d[i + 2] = d[i + 2] + (c[2] - d[i + 2]) * a;
+  // the fire itself, lit by nothing but itself
+  const { depth, licks } = fireAt(t);
+  for (let y = FIRE.y - 8; y <= ROOT; y++) for (let x = FIRE.x - 4; x < FIRE.x + FIRE.w + 4; x++) {
+    if (base.front[y * W + x]) continue;                                // the logs and stockings stay in front
+    const v = depth(x, y); if (v < 0) continue;
+    const c = band(v), i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2];
+  }
+  for (const l of licks) for (const [dx, dy, c] of l.big ? [[0, 0, BANDS[2]], [0, -1, BANDS[1]], [1, 0, BANDS[1]], [0, 1, BANDS[1]]] : [[0, 0, BANDS[1]]]) {
+    const x = l.x + dx, y = l.y + dy; if (y < BOX.y0 + 3 || base.front[y * W + x]) continue;
+    const i = (y * W + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2];
+  }
+  // the coals under the logs, glowing between the grate's bars
+  for (let x = 46; x < 114; x++) for (let y = 127; y <= 130; y++) {
+    if (base.front[y * W + x]) continue;
+    const i = (y * W + x) * 4, hot = (Math.sin(x * 0.9 + t * 0.6) + Math.sin(x * 0.37 - t * 0.4)) > 0.2;
+    const c = y === 127 ? BANDS[3] : hot ? BANDS[2] : BANDS[0];
+    if (d[i] + d[i + 1] + d[i + 2] < 160 || y === 127) { d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; }
   }
   // embers drifting up
   for (let k = 0; k < 5; k++) {
-    const ph = h32(k * 71), ey = Math.round(fy + h - ((t * (0.8 + ph) * 3 + ph * 60) % 50)), ex = Math.round(fx + w / 2 + (h32(k * 13) - 0.5) * 40 + Math.sin(t * 0.7 + k) * 3);
-    if (ey > BOX.y0 + 3 && ey < fy + h - 4) { const i = (ey * W + ex) * 4; d[i] = 255; d[i + 1] = 190; d[i + 2] = 80; }
+    const ph = h32(k * 71), ey = Math.round(ROOT - 20 - ((t * (0.8 + ph) * 2.5 + ph * 60) % 30)), ex = Math.round(lx + (h32(k * 13) - 0.5) * 36 + Math.sin(t * 0.7 + k) * 3);
+    if (ey > BOX.y0 + 3) { const i = (ey * W + ex) * 4; d[i] = 255; d[i + 1] = 190; d[i + 2] = 80; }
   }
   // the candle flames: two pixels and a tip that leans
   CANDLES.forEach((cx, n) => {
@@ -181,10 +208,9 @@ export default function Hearth({ relics = [] }) {
   const cv = useRef(null);
   useEffect(() => {
     const c = cv.current; if (!c) return;
-    const ctx = c.getContext("2d"), base = paintRoom(), step = makeFire();
-    for (let i = 0; i < 40; i++) step();                                 // let it catch before it is seen
+    const ctx = c.getContext("2d"), base = paintRoom();
     let t = 0;
-    const tick = () => { t += 1; ctx.putImageData(frameOf(base, step, t), 0, 0); };
+    const tick = () => { t += 1; ctx.putImageData(frameOf(base, t), 0, 0); };
     tick();
     if (auraStill()) return;
     let off = null;
@@ -202,7 +228,8 @@ export default function Hearth({ relics = [] }) {
         return (
           <div key={id} aria-hidden style={{
             position: "absolute", left: `${((sx - GLOBE / 2) / W) * 100}%`, top: `${((SHELF + 1 - GLOBE) / H) * 100}%`, width: `${(GLOBE / W) * 100}%`,
-            opacity: has ? 1 : 0.4, filter: has ? "none" : "brightness(0)",
+            // in the room's own half-light, warmed by the fire below
+            opacity: has ? 1 : 0.4, filter: has ? "brightness(.62) sepia(.28) saturate(1.2)" : "brightness(0)",
           }}>
             <Fit><CoinCanvas coin={{ seed: 7, metalIdx: set.metal, rarity: 5, relic: id, shape: "round" }} size={64} aura={false}/></Fit>
           </div>

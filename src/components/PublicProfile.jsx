@@ -45,7 +45,6 @@ export default function PublicProfile({ festive = false, relics = [], cabFrame =
             <span className="t-label">TOMES {TOMES.filter(t => !t.event && tomes.includes(t.id)).length} / {TOMES.filter(t => !t.event).length}</span>
           </div>
         {signs.length > 0 && <SignBadges signs={signs}/>}
-        {festive && <Hearth relics={relics}/>}
         {showcase.length > 0 ? (
           <CabinetFrame rank={cabFrame == null ? cabinet?.rank || 0 : Math.min(cabFrame, cabinet?.rank || 0)} score={cabinet?.score} pad={6} dress={festive ? XMAS_FRAME : null}>
             <div>
@@ -59,6 +58,7 @@ export default function PublicProfile({ festive = false, relics = [], cabFrame =
             </div>
           </CabinetFrame>
         ) : empty}
+        {festive && <Hearth relics={relics}/>}
         {children}
       </div>
     </div>
