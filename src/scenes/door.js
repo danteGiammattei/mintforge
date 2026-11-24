@@ -141,9 +141,10 @@ function drawLantern() {
 /* The Long Night (bus.season() "frost26"), Christmas at the door. Out
  * beyond him, far off through the slot: snow falling on dark pines and a
  * log cabin, a fire lit in its window and smoke from its chimney. On our
- * side, by what light reaches it: a garland of pine strung with warm
- * lights across the top, a holly wreath with a candy cane hooked on it,
- * and presents stacked against the wall's foot. */
+ * side, by what light reaches it: a holly wreath with a candy cane
+ * hooked on it, and presents stacked against the wall's foot. Framing it
+ * all, over the room's dark so they always show that the season is on
+ * (drawEventFrame): a string of lights across the top, snow along the foot. */
 const SNOWFALL = Array.from({ length: 34 }, (_, i) => ({ x: (i * 13.37) % 1, y: (i * 71.3) % 422, v: 0.25 + ((i * 7) % 10) / 22, ph: i * 1.3 }));
 function drawWinter() {
   if (!bus.season?.()) return;
@@ -176,18 +177,6 @@ function drawWinter() {
     ctx.globalAlpha = 0.25 + 0.6 * k; px(x, y, 1, 1, "#e8f0ff");
   }
   ctx.globalAlpha = 1;
-  // the garland, swagged across the top, its little lights warm
-  for (const [a, b2] of [[8, 70], [70, 125], [125, 188]]) {
-    for (let x = a; x <= b2; x++) {
-      const t = (x - a) / (b2 - a), y = 6 + Math.round(Math.sin(t * Math.PI) * 9);
-      px(x, y, 1, 3, (x % 3) ? "#1c3424" : "#2c5034");
-      if ((x - a) % 9 === 4) {
-        const on = view.calm ? 1 : 0.6 + 0.4 * Math.sin(S.t * 0.08 + x);
-        ctx.globalAlpha = 0.3 * on; px(x - 2, y, 5, 5, "#e0a050"); ctx.globalAlpha = 1;
-        px(x, y + 3, 1, 2, ["#e8b860", "#d8584e", "#7ab0e0", "#8ad08a"][(x >> 3) % 4]);
-      }
-    }
-  }
   // the wreath, on the wall to the left of the door, in the slot's light
   const wx = 36, wy = 156, R = 11;
   for (let a = 0; a < 64; a++) {
@@ -211,6 +200,33 @@ function drawWinter() {
   if (big) { ctx.drawImage(present(2), 4, 256); ctx.drawImage(present(0), -6, 268); ctx.drawImage(present(1), 20, 276); }
   else { ctx.drawImage(present(0), 4, 268); ctx.drawImage(present(1), 26, 276); ctx.drawImage(present(2), 14, 246); }
   ctx.globalAlpha = 1;
+}
+
+const BULBS = ["#ff5a4a", "#ffd060", "#5ab0ff", "#6ae07a", "#ff8ad8"];
+function drawEventFrame() {
+  if (!bus.season?.()) return;
+  // the wire, swagged between hooks along the top edge
+  const sag = x => 3 + Math.round(Math.sin(((x % 49) / 49) * Math.PI) * 5);
+  for (let x = 0; x < W; x++) px(x, sag(x), 1, 1, "#1a2018");
+  for (let x = 0; x < W; x += 49) px(x, 0, 1, 4, "#1a2018");
+  // a bulb every eleven pixels, twinkling in a slow chase
+  for (let i = 0, x = 5; x < W; i++, x += 11) {
+    const y = sag(x) + 1, c = BULBS[i % BULBS.length];
+    const on = view.calm ? 1 : 0.55 + 0.45 * Math.max(0, Math.sin(S.t * 0.05 - i * 0.9));
+    ctx.globalAlpha = 0.22 * on; px(x - 3, y - 1, 8, 8, c); ctx.globalAlpha = 0.4 * on; px(x - 1, y, 4, 5, c);
+    ctx.globalAlpha = 1;
+    px(x, y, 2, 1, "#20261c");                                                 // its cap
+    px(x, y + 1, 2, 3, c); ctx.globalAlpha = 0.35 + 0.65 * on; px(x, y + 1, 1, 1, "#ffffff"); ctx.globalAlpha = 1;
+  }
+  // snow banked along the foot of the screen, lumpy, lit cold
+  for (let x = 0; x < W; x++) {
+    const h = 6 + Math.round(2 * Math.sin(x * 0.11) + 1.5 * Math.sin(x * 0.37 + 1) + (((x * 7) % 5) === 0 ? 1 : 0));
+    px(x, H - h, 1, h, "#a8b6cc"); px(x, H - h, 1, 1, "#eef4ff"); if (h > 6) px(x, H - h + 1, 1, 1, "#d8e2f0");
+  }
+  if (!view.calm) for (let k = 0; k < 3; k++) {                                // a glint or two in it
+    const gx = (k * 67 + (S.t >> 4) * 23) % W, gy = H - 4 - (k % 2) * 2;
+    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(S.t * 0.2 + k); px(gx, gy, 1, 1, "#ffffff"); ctx.globalAlpha = 1;
+  }
 }
 
 function drawDust() {
@@ -676,6 +692,7 @@ function frame() {
   vg.addColorStop(0, "rgba(0,0,0,0)"); vg.addColorStop(1, "rgba(0,0,0,0.74)");
   ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
   feather(ctx, SURROUND);
+  drawEventFrame();
   drawLine();
   drawDrawer();
 
