@@ -5,30 +5,28 @@
  *    node tools/gifts.mjs "C:\Users\you\Downloads\PixelLootGiftboxes.rar"
  *    node tools/gifts.mjs path/to/the/unpacked/GiftsPixelAnimationPack
  *
- *  The event's presents (shared/events.js) use five of the animated gift
- *  boxes from cofe-man's Gifts Pixel Animation Pack (cofe-man.itch.io).
+ *  The event's presents (shared/events.js) use a dozen of the animated gift
+ *  boxes from cofe-man's Gifts Pixel Animation Pack (cofe-man.itch.io),
+ *  each present showing one of them at random.
  *  It is someone else's art, so it is kept out of this public repo, in
  *  public/sprites/gifts/, which git ignores: run this once on the machine
  *  you build and deploy from and the build carries them to the site.
  *  Without them the game draws presents of its own (lib/presentArt.js).
  *
- *  One strip per chest tier, 10 frames of 48×40: closed, a squash, a
- *  stretch, the lid off, the sides falling open.
+ *  One strip per design, gift0.png to gift11.png, 10 frames of 48×40:
+ *  closed, a squash, a stretch, the lid off, the sides falling open.
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, copyFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { mkdtempSync, mkdirSync, copyFileSync, existsSync, readdirSync, statSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// by chest tier: the pack's colour folder and row
+// the designs: the pack's colour folder and row, in Christmas colours
 const PICK = [
-  ["red", 3],       // 0  red, gold ribbon
-  ["green", 1],     // 1  green, red ribbon
-  ["red", 19],      // 2  red and white stripes
-  ["blue", 51],     // 3  blue, white stars
-  ["yellow", 1],    // 4  gold, red ribbon
+  ["red", 3], ["green", 1], ["red", 19], ["blue", 51], ["yellow", 1], ["red", 10],
+  ["green", 11], ["green", 20], ["beige", 46], ["blue", 33], ["red", 28], ["green", 38],
 ];
 
 const src = process.argv[2];
@@ -64,9 +62,10 @@ if (!ready) { console.error("No Ready_Gifts folder in there. Is this the Gifts P
 
 const out = join(dirname(fileURLToPath(import.meta.url)), "..", "public", "sprites", "gifts");
 mkdirSync(out, { recursive: true });
-PICK.forEach(([colour, row], tier) => {
+for (const f of readdirSync(out)) if (/^(tier|gift)\d+\.png$/.test(f)) rmSync(join(out, f));   // last run's
+PICK.forEach(([colour, row], i) => {
   const from = join(ready, `boxs_${colour}`, `gifts_${colour}${row}.png`);
   if (!existsSync(from)) { console.error("Missing", from); process.exit(1); }
-  copyFileSync(from, join(out, `tier${tier}.png`));
+  copyFileSync(from, join(out, `gift${i}.png`));
 });
-console.log(`Presents in place: ${out} (tier0.png to tier4.png). Rebuild, and the event uses them.`);
+console.log(`Presents in place: ${out} (gift0.png to gift${PICK.length - 1}.png). Rebuild, and the event uses them.`);

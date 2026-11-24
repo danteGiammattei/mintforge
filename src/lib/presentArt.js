@@ -5,14 +5,16 @@
  * the chests, by the candle low on the left: the left edge catches warm,
  * the right falls away.
  *
- * Paper and ribbon by the chest's tier, the finer the dearer:
- *   0 red, gold ribbon · 1 green, red ribbon · 2 candy stripe, green
- *   ribbon · 3 midnight blue with stars, silver ribbon · 4 gold, red
+ * Which wrapping a present wears is chance, nothing to do with what is
+ * inside: each is chosen from its id (`look`, a chest id or a number), so
+ * one present looks the same wherever it is seen. Ours come in five:
+ *   red, gold ribbon · green, red ribbon · candy stripe, green ribbon ·
+ *   midnight blue with stars, silver ribbon · gold, red ribbon
  *
- * presentParts(tier) → { box, lid }  separate, for the opening (the lid
+ * presentParts(look) → { box, lid }  separate, for the opening (the lid
  *                                      lifts off); both 32 wide, the lid
  *                                      carrying the bow, so 16 tall
- * present(tier)      → one canvas, closed: for tiles and slots; the painted
+ * present(look)      → one canvas, closed: for tiles and slots; the painted
  *                      present (48 × 40) once loaded, else ours (32 × 32) */
 
 export const PRESENT = { w: 32, h: 32, lidH: 16, boxY: 16 };
@@ -32,8 +34,16 @@ const canvas = (w, h) => { const c = document.createElement("canvas"); c.width =
 // one tone of three, by how far along the width a pixel is from the candle
 const shade = (tones, x, w, lift = 0) => tones[Math.max(0, Math.min(2, (x < 2 ? 2 : x > w - 4 ? 0 : 1) + lift))];
 
-function paint(tier) {
-  const P = PAPER[Math.max(0, Math.min(PAPER.length - 1, tier | 0))];
+// a look to a whole number: numbers stand for themselves, ids are hashed
+function lookOf(look) {
+  if (typeof look === "number") return Math.abs(look | 0);
+  let h = 2166136261;
+  for (const ch of String(look)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return (h >>> 0);
+}
+
+function paint(i) {
+  const P = PAPER[i % PAPER.length];
   const box = canvas(32, 16), lid = canvas(32, 16);
   const b = box.getContext("2d"), l = lid.getContext("2d");
   const dot = (g, x, y, c) => { g.fillStyle = c; g.fillRect(x, y, 1, 1); };
@@ -86,17 +96,18 @@ function paint(tier) {
  * the left reaches and cold away from it, with snow lying on whatever
  * faces up. Missing, the drawn presents above stand in. */
 export const GIFT = { w: 48, h: 40, frames: 10, lidOff: 3 };
-const graded = [];                 // by tier: ten canvases, or null
+const GIFT_DESIGNS = 12;           // gift0.png to gift11.png, as tools/gifts.mjs writes them
+let graded = [];                   // the designs that loaded: ten canvases each
 let giftsLoading = null;
 export function loadGifts() {
   if (giftsLoading) return giftsLoading;
   if (typeof Image === "undefined") return (giftsLoading = Promise.resolve(false));
-  giftsLoading = Promise.all(PAPER.map((_, tier) => new Promise(ok => {
+  giftsLoading = Promise.all(Array.from({ length: GIFT_DESIGNS }, (_, i) => new Promise(ok => {
     const im = new Image();
-    im.onload = () => { graded[tier] = grade(im); ok(true); };
-    im.onerror = () => ok(false);
-    im.src = `/sprites/gifts/tier${tier}.png`;
-  }))).then(r => r.every(Boolean));
+    im.onload = () => ok(grade(im));
+    im.onerror = () => ok(null);
+    im.src = `/sprites/gifts/gift${i}.png`;
+  }))).then(r => { graded = r.filter(Boolean); return graded.length > 0; });
   return giftsLoading;
 }
 function grade(im) {
@@ -126,20 +137,20 @@ function grade(im) {
   }
   return out;
 }
-/* frame f of tier's painted present, or null while (or if) there is none */
-export const giftFrame = (tier, f) => graded[Math.max(0, Math.min(PAPER.length - 1, tier | 0))]?.[Math.max(0, Math.min(GIFT.frames - 1, f | 0))] || null;
+/* frame f of a present's painted design, or null while (or if) there are none */
+export const giftFrame = (look, f) => graded.length ? graded[lookOf(look) % graded.length][Math.max(0, Math.min(GIFT.frames - 1, f | 0))] : null;
 loadGifts();
 
-export function presentParts(tier) {
-  const key = tier | 0;
+export function presentParts(look) {
+  const key = lookOf(look) % PAPER.length;
   if (!kept.has(key)) kept.set(key, paint(key));
   return kept.get(key);
 }
 
 const whole = new Map();
-export function present(tier) {
-  const key = tier | 0;
-  const painted = giftFrame(key, 0);
+export function present(look) {
+  const painted = giftFrame(look, 0);
+  const key = lookOf(look) % PAPER.length;
   if (painted) return painted;
   if (whole.has(key)) return whole.get(key);
   const { box, lid } = presentParts(key), c = canvas(32, 32), g = c.getContext("2d");

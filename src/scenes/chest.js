@@ -25,7 +25,7 @@ export const SURROUND = [8, 7, 5];
 export const CW = 195, CH = 260;
 const SC = 3;                         // sprites are drawn at 3×, never between
 
-export function mount(cv, bus, { tier = 0, season = null } = {}) {
+export function mount(cv, bus, { tier = 0, season = null, look = 0 } = {}) {
   const S = {
     t: 0, p: 0, held: false,
     phase: "hold",                    // hold | breaking | risen
@@ -38,7 +38,7 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
   const bx = Math.round((CW - CHEST.w * SC) / 2), by = 92;
   // on the Long Night it is a present (lib/presentArt.js): its lid, bow
   // and all, lifts off the box and is gone
-  const gift = season ? presentParts(tier) : null;
+  const gift = season ? presentParts(look) : null;
   // the drawn chest, when its sheets are loaded: 32px frames at a whole 4×,
   // standing on the same table line as the procedural one
   const drawn = !gift && !!chestClosed(tier, "candle"), DS = 3;
@@ -77,7 +77,7 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
       ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
     }
 
-    const painted = gift && giftFrame(tier, 0);
+    const painted = gift && giftFrame(look, 0);
     if (painted) {
       // the painted present (lib/presentArt.js): held, it squashes and
       // stretches against its ribbon; let go of, it bursts open, the lid
@@ -86,7 +86,7 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
       if (S.phase === "hold") f = S.held && !view.calm && S.p > 0.25 ? [0, 1, 0, 2][(S.t >> (S.p > 0.7 ? 1 : 2)) % 4] : 0;
       else if (S.failed) f = 0;
       else f = Math.min(GIFT.frames - 1, 2 + Math.floor(S.anim / (view.calm ? 1 : 7)));
-      const im = giftFrame(tier, f), GS = 3;
+      const im = giftFrame(look, f), GS = 3;
       ctx.drawImage(im, Math.round((CW - GIFT.w * GS) / 2) + shake, 150 + 6 - GIFT.h * GS, GIFT.w * GS, GIFT.h * GS);
     } else if (gift) {
       // the box stands on the table; held, the lid strains and hops on
@@ -136,7 +136,7 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
 
     // and the coin, which is all dirt
     if (S.phase !== "hold" && S.coin) {
-      const rise = drawn ? (view.calm ? 6 : 26) : gift ? (giftFrame(tier, 0) ? 14 : 20) : 30;    // once the lid is up
+      const rise = drawn ? (view.calm ? 6 : 26) : gift ? (giftFrame(look, 0) ? 14 : 20) : 30;    // once the lid is up
       const k = ease(Math.min(1, Math.max(0, (S.anim - rise) / 50)));
       if (S.anim > rise) {
         const sp = dirtClod(S.coin.seed);

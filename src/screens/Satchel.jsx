@@ -35,7 +35,7 @@ function Ceremony({ chest, onDone, onClose }) {
       if (r.title) celebrate({ kind: "title", label: PREMIUM_TITLES.find(t => t.id === r.title.id)?.label || r.title.name, from: "chest" });
       if (r.effect) celebrate({ kind: "fx", id: r.effect });
     }, say: ui.say, feel,
-  }, { tier: chest.tier, season: chest.season || null }), [chest.id]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, { tier: chest.tier, season: chest.season || null, look: chest.id }), [chest.id]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="veil appear" style={{ zIndex: 450, flexDirection: "column", gap: 12, padding: "env(safe-area-inset-top) 0 max(12px, env(safe-area-inset-bottom))", background: `rgb(${SURROUND})` }}>
       <div className="scene" style={{ width: "100%", background: "transparent" }}>
@@ -101,7 +101,7 @@ export default function Satchel() {
                         aria-label={c.season ? "A present. Open it." : `${CHESTS.names[c.tier]} chest. Open it.`}>
                   {/* sheets differ in height: stand every chest on the same floor */}
                   <div style={{ height: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                    <Sprite make={() => (c.season ? present(c.tier) : chestSprite(c.tier, "candle"))} dep={c.tier + (c.season || "") + giftsIn} scale={c.season && !giftsIn ? 3 : 2}/>
+                    <Sprite make={() => (c.season ? present(c.id) : chestSprite(c.tier, "candle"))} dep={c.tier + (c.season || "") + giftsIn} scale={c.season && !giftsIn ? 3 : 2}/>
                   </div>
                   <span aria-hidden style={c.season ? { color: "#d8584e" } : undefined}>{c.season ? "PRESENT" : CHESTS.names[c.tier]}</span>
                 </button>

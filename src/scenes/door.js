@@ -466,7 +466,7 @@ function drawDrawer() {
  * the bottom of the frame — toward us, into the satchel. */
 function drawArriving(cx) {
   const a = S.arriving; if (!a) return;
-  const sp = a.kind === "chest" ? (a.season ? present(a.tier) : chestSprite(a.tier, "slot")) : pouch("slot");
+  const sp = a.kind === "chest" ? (a.season ? present(a.what?.id ?? a.tier) : chestSprite(a.tier, "slot")) : pouch("slot");
   const w = sp.width, h = sp.height;
   const k1 = ease(Math.min(1, a.k / 0.45)), k2 = ease(Math.max(0, (a.k - 0.6) / 0.4));
   const x = Math.round(lerp(cx - 6, GX + (GW - w) / 2, k1));
