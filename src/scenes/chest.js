@@ -14,7 +14,8 @@
  *    bus.feel(name)    sound + haptics hook
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { chestParts, CHEST, dirtClod, frosted } from "../lib/forms.js";
+import { chestParts, CHEST, dirtClod } from "../lib/forms.js";
+import { presentParts, PRESENT } from "../lib/presentArt.js";
 import { chestClosed, chestOpening, chestHeight, CHEST_W, OPEN_FRAMES, RATTLE, OPEN_FROM } from "../lib/chestArt.js";
 import { CHESTS } from "../../shared/tuning.js";
 import { stage, FONT, INK, lerp, ease, feather } from "./kit.js";
@@ -33,13 +34,14 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
   };
   const { ctx, view, stop } = stage(cv, { w: CW, h: CH, step: frame });
   const plot = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, w | 0, h | 0); };
-  // a chest of the Long Night comes frosted (lib/forms.js frosted)
-  const fz = season ? frosted : x => x;
-  const parts = chestParts(tier, "candle"), body = fz(parts.body), lid = fz(parts.lid);
+  const parts = chestParts(tier, "candle"), body = parts.body, lid = parts.lid;
   const bx = Math.round((CW - CHEST.w * SC) / 2), by = 92;
+  // on the Long Night it is a present (lib/presentArt.js): its lid, bow
+  // and all, lifts off the box and is gone
+  const gift = season ? presentParts(tier) : null;
   // the drawn chest, when its sheets are loaded: 32px frames at a whole 4×,
   // standing on the same table line as the procedural one
-  const drawn = !!chestClosed(tier, "candle"), DS = 3;
+  const drawn = !gift && !!chestClosed(tier, "candle"), DS = 3;
   const dyBase = by + CHEST.h * SC - chestHeight(tier) * DS + 6;
   let alive = true;
 
@@ -75,15 +77,32 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
       ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
     }
 
-    if (drawn) {
+    if (gift) {
+      // the box stands on the table; held, the lid strains and hops on
+      // its ribbon; broken, it rises off, tipping, and fades
+      const PW = PRESENT.w * SC, px = Math.round((CW - PW) / 2) + shake, boxY = 150 + 6 - 16 * SC;
+      ctx.drawImage(gift.box, px, boxY, PW, 16 * SC);
+      let ly = boxY - 16 * SC, la = 1, tilt = 0;
+      if (S.phase === "hold") { if (S.held && !view.calm && S.p > 0.25 && ((S.t >> (S.p > 0.7 ? 1 : 2)) % 3 === 0)) ly -= SC; }
+      else if (!S.failed) { const k = ease(Math.min(1, S.anim / 34)); ly -= Math.round(k * 60); la = 1 - k * k; tilt = k * 0.35; }
+      if (la > 0.02) {
+        ctx.save(); ctx.globalAlpha = la; ctx.translate(px + PW / 2, ly + 16 * SC); ctx.rotate(-tilt);
+        ctx.drawImage(gift.lid, -PW / 2, -16 * SC, PW, 16 * SC); ctx.restore();
+      }
+      if (S.phase === "hold" && S.p > 0.3) {                // light at the seam
+        ctx.globalAlpha = Math.min(1, (S.p - 0.3) * 1.6);
+        plot(px + 2 * SC, boxY - 1, PW - 4 * SC, 2, "#ecc46e");
+        ctx.globalAlpha = 1;
+      }
+    } else if (drawn) {
       // held: the lid jumps against the lock, more often as the seal
       // strains; broken: it swings up through the open frames
       let f = null;
       if (S.phase === "hold") {
         const jump = S.held && !view.calm && S.p > 0.25 && ((S.t >> (S.p > 0.7 ? 1 : 2)) % 3 === 0);
-        f = fz(jump ? chestOpening(tier, "candle", RATTLE) : chestClosed(tier, "candle"));
-      } else if (S.failed) f = fz(chestClosed(tier, "candle"));
-      else f = fz(chestOpening(tier, "candle", Math.min(OPEN_FRAMES - 1, OPEN_FROM + Math.floor(S.anim / (view.calm ? 1 : 6)))));
+        f = jump ? chestOpening(tier, "candle", RATTLE) : chestClosed(tier, "candle");
+      } else if (S.failed) f = chestClosed(tier, "candle");
+      else f = chestOpening(tier, "candle", Math.min(OPEN_FRAMES - 1, OPEN_FROM + Math.floor(S.anim / (view.calm ? 1 : 6))));
       ctx.drawImage(f, dx, dy, CHEST_W * DS, f.height * DS);
     } else {
       ctx.drawImage(body, x, by, CHEST.w * SC, CHEST.h * SC);
@@ -106,7 +125,7 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
 
     // and the coin, which is all dirt
     if (S.phase !== "hold" && S.coin) {
-      const rise = drawn ? (view.calm ? 6 : 26) : 30;    // once the lid is up
+      const rise = drawn ? (view.calm ? 6 : 26) : gift ? 20 : 30;    // once the lid is up
       const k = ease(Math.min(1, Math.max(0, (S.anim - rise) / 50)));
       if (S.anim > rise) {
         const sp = dirtClod(S.coin.seed);
@@ -117,10 +136,10 @@ export function mount(cv, bus, { tier = 0, season = null } = {}) {
 
     ctx.font = FONT; ctx.textAlign = "center";
     ctx.fillStyle = INK.warm;
-    ctx.fillText((season ? "FROSTED " : "") + CHESTS.names[tier] + " CHEST", CW / 2, 22);
+    ctx.fillText(gift ? "A PRESENT FOR THE LONG NIGHT" : CHESTS.names[tier] + " CHEST", CW / 2, 22);
     if (S.phase === "hold") {
       ctx.fillStyle = INK.warmHi;
-      ctx.fillText(S.line || "HOLD TO BREAK THE SEAL", CW / 2, 224);
+      ctx.fillText(S.line || (gift ? "HOLD TO PULL THE RIBBON" : "HOLD TO BREAK THE SEAL"), CW / 2, 224);
       plot(48, 234, 99, 5, "#1d1812");
       plot(48, 234, Math.round(99 * S.p), 5, "#bb9030");
     } else if (S.phase === "risen") {

@@ -376,47 +376,6 @@ export function chest(tier = 0, light = "candle") {
   });
 }
 
-/* ─── frosted ─────────────────────────────────────────────────────────
- * Any sprite left out on the Long Night (shared/events.js): a cold tint
- * over it, snow settled on every surface that faces up, rime along its
- * other edges and a few icicles hanging from the undersides. Kept per
- * source canvas, so a chest's every frame frosts once. */
-const frostKept = new WeakMap();
-export function frosted(src) {
-  if (!src) return src;
-  if (frostKept.has(src)) return frostKept.get(src);
-  const w = src.width, h = src.height;
-  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
-  const c = cv.getContext("2d"); c.drawImage(src, 0, 0);
-  const img = c.getImageData(0, 0, w, h), d = img.data, a0 = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) a0[i] = d[i * 4 + 3] > 96 ? 1 : 0;
-  const solid = (x, y) => x >= 0 && y >= 0 && x < w && y < h && a0[y * w + x] === 1;
-  const mix = (i, r, g, b, k) => { d[i] += (r - d[i]) * k; d[i + 1] += (g - d[i + 1]) * k; d[i + 2] += (b - d[i + 2]) * k; };
-  const hash = (x, y) => { let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    if (!solid(x, y)) continue;
-    const i = (y * w + x) * 4, hh = hash(x, y);
-    mix(i, 180, 214, 248, 0.34);                                             // the cold over it all
-    if (!solid(x, y - 1) || !solid(x, y - 2)) mix(i, 244, 249, 255, 0.95);   // snow lying on what faces up
-    else if (!solid(x, y - 3) && hh < 0.85) mix(i, 236, 244, 255, 0.9);
-    else if (!solid(x, y - 4) && hh < 0.4) mix(i, 228, 240, 255, 0.8);
-    else if ((!solid(x - 1, y) || !solid(x + 1, y)) && hh < 0.65) mix(i, 196, 226, 255, 0.8);   // rime on the sides
-    else if (hh < 0.04) mix(i, 236, 246, 255, 0.7);                          // frost flowers here and there
-  }
-  c.putImageData(img, 0, 0);
-  // icicles under the undersides, now and then
-  c.fillStyle = "rgba(214,236,255,0.9)";
-  for (let x = 0; x < w; x++) for (let y = h - 2; y > 0; y--) {
-    if (solid(x, y) && !solid(x, y + 1)) {
-      const hh = hash(x * 7, y * 3);
-      if (hh < 0.3) { const len = 1 + Math.floor(hash(x, y * 11) * 4); c.fillRect(x, y + 1, 1, Math.min(len, h - y - 1)); }
-      break;
-    }
-  }
-  frostKept.set(src, cv);
-  return cv;
-}
-
 /* ─── a coin nobody has seen yet ──────────────────────────────────────
  * Deliberately NOT a coin: a clod of dirt the size of one. What is under
  * it is drawn by lib/coin.js when it is brushed, and by nothing else. */

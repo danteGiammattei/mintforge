@@ -7,7 +7,8 @@ import Sprite from "../ui/Sprite.jsx";
 import AuraSprite from "../components/AuraSprite.jsx";
 import BrushReveal from "../components/BrushReveal.jsx";
 import RevealBanner from "../components/RevealBanner.jsx";
-import { tiedScroll, chest as chestSprite, dirtClod, frosted } from "../lib/forms.js";
+import { tiedScroll, chest as chestSprite, dirtClod } from "../lib/forms.js";
+import { present } from "../lib/presentArt.js";
 import { mount as mountChest, SURROUND } from "../scenes/chest.js";
 import { RARITY } from "../../shared/sigil.js";
 import { CHESTS } from "../../shared/tuning.js";
@@ -39,7 +40,7 @@ function Ceremony({ chest, onDone, onClose }) {
     <div className="veil appear" style={{ zIndex: 450, flexDirection: "column", gap: 12, padding: "env(safe-area-inset-top) 0 max(12px, env(safe-area-inset-bottom))", background: `rgb(${SURROUND})` }}>
       <div className="scene" style={{ width: "100%", background: "transparent" }}>
         <canvas ref={ref} tabIndex={0} autoFocus role="button"
-                aria-label={`A ${chest.season ? "frosted " : ""}${CHESTS.names[chest.tier].toLowerCase()} chest. Hold to break the seal.`}
+                aria-label={chest.season ? "A present. Hold to pull the ribbon." : `A ${CHESTS.names[chest.tier].toLowerCase()} chest. Hold to break the seal.`}
                 style={{ touchAction: "none", display: "block", outlineOffset: 4 }}/>
       </div>
       <button className="btn btn-ghost" style={{ marginBottom: 16 }} onClick={onClose}>NOT NOW</button>
@@ -93,13 +94,13 @@ export default function Satchel() {
           {g.chests.length > 0 && (
             <div className="grid-3">
               {g.chests.map(c => (
-                <button key={c.id} className="tile" style={{ borderTopColor: c.season ? "#a8d8ff" : "var(--candle)" }} onClick={() => { feel("tap"); setOpening(c); }}
-                        aria-label={`${c.season ? "Frosted " : ""}${CHESTS.names[c.tier]} chest. Open it.`}>
+                <button key={c.id} className="tile" style={{ borderTopColor: c.season ? "#d8584e" : "var(--candle)" }} onClick={() => { feel("tap"); setOpening(c); }}
+                        aria-label={c.season ? "A present. Open it." : `${CHESTS.names[c.tier]} chest. Open it.`}>
                   {/* sheets differ in height: stand every chest on the same floor */}
                   <div style={{ height: 100, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-                    <Sprite make={() => (c.season ? frosted(chestSprite(c.tier, "candle")) : chestSprite(c.tier, "candle"))} dep={c.tier + (c.season || "")} scale={2}/>
+                    <Sprite make={() => (c.season ? present(c.tier) : chestSprite(c.tier, "candle"))} dep={c.tier + (c.season || "")} scale={c.season ? 3 : 2}/>
                   </div>
-                  <span aria-hidden style={c.season ? { color: "#a8d8ff" } : undefined}>{c.season ? "FROSTED" : CHESTS.names[c.tier]}</span>
+                  <span aria-hidden style={c.season ? { color: "#d8584e" } : undefined}>{c.season ? "PRESENT" : CHESTS.names[c.tier]}</span>
                 </button>
               ))}
             </div>

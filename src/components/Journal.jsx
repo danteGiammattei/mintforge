@@ -95,7 +95,7 @@ export default function Journal() {
               })}
             </div>
             <p className="t-dim" style={{ margin: "8px 0 0", fontSize: 12 }}>
-              {g.event?.id === e.id ? "FROSTED CHESTS COME THROUGH THE GAP UNTIL 5 JANUARY. THE BETTER THE SCROLLS, THE BETTER THE CHEST." : "NO MORE WILL BE MADE."}
+              {g.event?.id === e.id ? "PRESENTS COME THROUGH THE GAP UNTIL 5 JANUARY. THE BETTER THE SCROLLS, THE BETTER THE PRESENT." : "NO MORE WILL BE MADE."}
             </p>
           </section>
         );

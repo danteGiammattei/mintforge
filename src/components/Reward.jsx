@@ -196,7 +196,7 @@ function Body({ r }) {
 }
 
 const HEADS = {
-  fx:    ["A PROFILE EFFECT", "IT WAS IN THE FROSTED CHEST"],
+  fx:    ["A PROFILE EFFECT", "IT WAS IN THE PRESENT"],
   well:  ["A DEEPER WELL", "IT SITS ON YOUR DESK NOW"],
   title: ["A NEW TITLE", "HE PUSHED IT THROUGH THE GAP"],
   frame: ["A NEW BANNER", "HE PUSHED IT THROUGH THE GAP"],
@@ -221,7 +221,7 @@ function Card({ r, onClose }) {
   const [head0, sub0] = HEADS[r.kind];
   const sub = r.kind === "signs" && r.signs.length > 1 ? "THE SKY PAYS WHAT IT OWES" : sub0;
   const head = r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
-  const subline = r.from === "level" ? "" : r.from === "chest" ? "IT WAS IN THE FROSTED CHEST"
+  const subline = r.from === "level" ? "" : r.from === "chest" ? "IT WAS IN THE PRESENT"
                 : r.kind === "daily" && g.event ? `A GIFT FOR ${g.event.name}` : sub;
   // something wearable can be put on from here
   const wear = r.kind === "title" ? { on: g.selectedTitle === r.label, go: () => g.setSelectedTitle(r.label) }
