@@ -179,12 +179,12 @@ export const GAMBLE = {
   toss:     { coins: 1, win: 0.5 },                 // tier up, or lost
   crucible: { coins: 3, win: 0.38 },                // three of one metal: all tier up, or keep one
   roulette: [
-    { outcome: "lose",    label: "LOSE",    weight: 50 },
-    { outcome: "same",    label: "SAME",    weight: 12 },
-    { outcome: "up1",     label: "TIER UP", weight: 20 },
-    { outcome: "x2",      label: "x2 BACK", weight: 10 },
-    { outcome: "up2",     label: "TIER +2", weight: 6  },
-    { outcome: "jackpot", label: "JACKPOT", weight: 2  },
+    { outcome: "lose",    label: "LOSE",    weight: 40 },
+    { outcome: "same",    label: "SAME",    weight: 14 },
+    { outcome: "up1",     label: "TIER UP", weight: 24 },
+    { outcome: "x2",      label: "x2 BACK", weight: 12 },
+    { outcome: "up2",     label: "TIER +2", weight: 7  },
+    { outcome: "jackpot", label: "JACKPOT", weight: 3  },
   ],
   // A coin dropped through eight rows of pegs, bouncing left or right at
   // each with even odds, lands in one of nine slots. Odds follow from the
