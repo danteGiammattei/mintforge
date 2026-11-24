@@ -1,6 +1,6 @@
 import PixelBanner from "./PixelBanner.jsx";
 import ProfileFx from "./ProfileFx.jsx";
-import CabinetFrame, { gradeInk } from "./CabinetFrame.jsx";
+import CabinetFrame, { gradeInk, XMAS_FRAME } from "./CabinetFrame.jsx";
 import SignBadges from "./SignBadges.jsx";
 import { CoinTile } from "../screens/Vault.jsx";
 import { TitleText } from "../screens/Friends.jsx";
@@ -15,7 +15,7 @@ import { TomeCover } from "./TomeCover.jsx";
  * so what you see of yourself is what they see. */
 export const KINDS_TOTAL = METALS.length * (MAX_RARITY + 1);
 
-export default function PublicProfile({ frame, fx = null, username, level, title, bio, coins, kinds, shiny, signs = [], tomes = ["primer"], cabinet, showcase, onCoin, empty, children }) {
+export default function PublicProfile({ festive = false, frame, fx = null, username, level, title, bio, coins, kinds, shiny, signs = [], tomes = ["primer"], cabinet, showcase, onCoin, empty, children }) {
   return (
     // a profile effect is worn over the banner and behind everything else
     <div style={{ position: "relative" }}>
@@ -45,7 +45,7 @@ export default function PublicProfile({ frame, fx = null, username, level, title
           </div>
         {signs.length > 0 && <SignBadges signs={signs}/>}
         {showcase.length > 0 ? (
-          <CabinetFrame rank={cabinet?.rank || 0} score={cabinet?.score} pad={6}>
+          <CabinetFrame rank={cabinet?.rank || 0} score={cabinet?.score} pad={6} dress={festive ? XMAS_FRAME : null}>
             <div>
               <div className="between" style={{ marginBottom: 8, gap: 8 }}>
                 <span className="t-label">CABINET</span>

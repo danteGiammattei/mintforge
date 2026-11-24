@@ -36,6 +36,8 @@ const ART = [
   { src: "/sprites/frames/eldritch.png", k: 34, band: 22, bleed: 10, plaque: { lo: [16, 26, 26], mid: [48, 64, 64], hi: [84, 104, 104], ink: [112, 216, 136] }, fx: "grasp" },
   { src: "/sprites/frames/astral.png",   k: 21, band: 12, bleed: 6, room: 5, plaque: { lo: [176, 150, 104], mid: [242, 232, 204], hi: [255, 250, 236], ink: [58, 52, 84] }, fx: "halo" },
 ];
+// the Long Night's garland (Dante's own art), over every cabinet while it runs
+export const XMAS_FRAME = { src: "/sprites/frames/xmas.png", k: 30, band: 19, plaque: { lo: [120, 26, 22], mid: [176, 44, 32], hi: [226, 96, 64], ink: [250, 238, 214] } };
 const SPILL = 12;                                // screen pixels a frame may reach past its box for free
 
 /* the colour a grade's name is written in: the coin rarities', with
@@ -365,9 +367,9 @@ function paint(ctx, w, h, rank, glint) {
 const PLAQUE = [null, null, null, null, { lo: [120, 82, 28], mid: [198, 148, 52], hi: [244, 204, 88], ink: [42, 26, 8] }, { lo: [120, 82, 28], mid: [198, 148, 52], hi: [244, 204, 88], ink: [42, 26, 8] }];
 const css = c => `rgb(${c.join(",")})`;
 
-export default function CabinetFrame({ rank = 0, score = null, children, pad = 0 }) {
+export default function CabinetFrame({ rank = 0, score = null, children, pad = 0, dress = null }) {
   const box = useRef(null), cv = useRef(null);
-  const art = ART[rank];
+  const art = dress || ART[rank];
   useEffect(() => {
     const el = box.current, c = cv.current; if (!el || !c) return;
     let w = 0, h = 0, off = null, base = null, live = true;

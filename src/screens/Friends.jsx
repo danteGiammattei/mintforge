@@ -34,6 +34,7 @@ function PlayerRow({ p, onOpen, right }) {
 }
 
 function ProfileCard({ soc }) {
+  const ev = useGame().event;
   const v = soc.viewing, d = v.data;
   const [coin, setCoin] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -50,7 +51,7 @@ function ProfileCard({ soc }) {
         {v.loading && <p style={{ padding: 16, margin: 0 }} role="status">LOOKING THEM UP</p>}
         {v.error && <p className="t-blood" style={{ padding: 16, margin: 0 }} role="alert">{v.error}</p>}
         {d && (
-          <PublicProfile frame={d.frame} fx={d.profileFx} username={d.username} level={lvl(d.xp)} title={d.title} bio={d.bio}
+          <PublicProfile festive={!!ev} frame={d.frame} fx={d.profileFx} username={d.username} level={lvl(d.xp)} title={d.title} bio={d.bio}
                          coins={d.coinCount} kinds={d.kinds} shiny={d.shinyCount} signs={d.signs || []} tomes={d.tomes || ["primer"]} cabinet={d.cabinet}
                          showcase={d.showcase.map(hydrate)} onCoin={setCoin}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
