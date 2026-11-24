@@ -1,0 +1,12 @@
+# The clock: settles run-out auctions every minute (index.js).
+name = "mintforge-clock"
+main = "index.js"
+compatibility_date = "2025-04-01"
+
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mintforge"
+database_id = "fb56dbbd-68e1-4ec1-83c4-eb475918f718"
