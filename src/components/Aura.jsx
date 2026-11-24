@@ -9,7 +9,7 @@ import { coinRarity } from "../lib/coin.js";
  * while on screen. `rare: false` leaves out the rarity, keeping the shine. */
 export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rare = true, layer = "front" }) {
   const ref = useRef();
-  const rarity = rare ? coinRarity(coin) : 0, k = Math.max(1, Math.round(size / 64));
+  const rarity = rare ? coinRarity(coin) : 0, k = size >= 64 ? Math.round(size / 64) : size / 64;   // a small coin, a small glow
   const tendrils = rare && coin.metalIdx === METAL.eldritch;
   const moon = rare && coin.metalIdx === METAL.astral && layer === "front";
   // the great flame round a fire coin is retired (Nov 2026): its fire
