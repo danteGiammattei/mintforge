@@ -9,14 +9,15 @@ import { coinRarity } from "../lib/coin.js";
  * while on screen. `rare: false` leaves out the rarity, keeping the shine. */
 export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rare = true, layer = "front" }) {
   const ref = useRef();
-  const rarity = rare ? coinRarity(coin) : 0, k = size >= 64 ? Math.round(size / 64) : size / 64;   // a small coin, a small glow
+  // a Magi's globe wears no ring of fire: the snow inside it is its show
+  const rarity = rare && !coin.relic ? coinRarity(coin) : 0, k = size >= 64 ? Math.round(size / 64) : size / 64;   // a small coin, a small glow
   const tendrils = rare && coin.metalIdx === METAL.eldritch;
   const moon = rare && coin.metalIdx === METAL.astral && layer === "front";
   // the great flame round a fire coin is retired (Nov 2026): its fire
   // burns inside it now. paintAura still knows how, should it come back
   const flames = false;
   // a frost coin's falling snow (lib/aura.js paintSnow), in front
-  const snow = layer === "front" && !!coin.season;
+  const snow = layer !== "front" ? false : coin.relic ? "globe" : !!coin.season;
   const G = 64 + 2 * margin;
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rar
     io.observe(cv);
     return () => { io.disconnect(); off?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coin.seed, coin.shape, rarity, margin, shine, tendrils, moon, flames, layer, snow]);
+  }, [coin.seed, coin.shape, coin.relic, rarity, margin, shine, tendrils, moon, flames, layer, snow]);
 
   if (layer === "behind" ? !tendrils && !flames : rarity <= 0 && !shine && !tendrils && !moon && !flames && !snow) return null;
   return (

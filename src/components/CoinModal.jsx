@@ -67,7 +67,7 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
 
   const rows = [
     ["RARITY", r.name, r.color], ["METAL", m.name, m.hl],
-    ["SHAPE", SHAPE_NAMES[shapeOf(coin)] || shapeOf(coin)], ["CONDITION", coin.cond],
+    ["SHAPE", coin.relic ? "Snow globe" : SHAPE_NAMES[shapeOf(coin)] || shapeOf(coin)], ["CONDITION", coin.cond],
     ["WEIGHT", `${coin.wt}G`], ["VALUE", coinValue(coin).toLocaleString(), "var(--candle)"],
   ];
 

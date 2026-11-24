@@ -31,13 +31,13 @@ export default function CoinCanvas({ coin, size, hideShine = false, aura = true,
     io.observe(cv);
     return () => { io.disconnect(); off?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coin.seed, coin.metalIdx, coin.material, coin.sign, coin.shape, coin.season, shiny, size, drifts]);
+  }, [coin.seed, coin.metalIdx, coin.material, coin.sign, coin.shape, coin.season, coin.relic, shiny, size, drifts]);
 
   return (
     <div style={{ position: "relative", width: size, height: size, display: "inline-block", flexShrink: 0 }}>
       {aura && coin.metalIdx === METAL.eldritch && <Aura coin={coin} size={size} margin={auraMargin + 16} rare layer="behind" shine={false}/>}
       <canvas ref={canvasRef} aria-hidden style={{ position: "relative", imageRendering: "pixelated", display: "block", width: size, height: size }}/>
-      {(aura || shiny || coin.season) && <Aura coin={coin} size={size} margin={auraMargin} shine={shiny} rare={aura}/>}
+      {(aura || shiny || coin.season || coin.relic) && <Aura coin={coin} size={size} margin={auraMargin} shine={shiny} rare={aura}/>}
     </div>
   );
 }

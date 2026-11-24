@@ -455,77 +455,83 @@ function paintAstral(coin, back) {
 }
 
 /* ─── the Magi's gifts (shared/events.js RELICS) ──────────────────────
- * Not a generated face: a round coin in its own metal, a raised emblem
- * in the middle (the crown of gold, the censer of frankincense, the jar
- * of myrrh) under the small star they followed, and its name along the
- * bottom. Lit from the upper left like every coin. */
+ * Not a generated face: a snow globe. The gift's emblem stands in a
+ * drift inside the glass, under the star they followed, in a night
+ * tinted to the gift; the base is in the gift's own metal, set with
+ * stones. The snow falling inside is the aura's (lib/aura.js
+ * paintGlobeSnow), so it moves. The back is the same globe, from behind. */
+export const GLOBE = { cx: 31.5, cy: 27.5, r: 23, floor: 44 };
 const RELIC_ART = {
   crown: {
     rows: ["#....#....#", "##..###..##", "###.###.###", "###########", "##o##o##o##", "###########", "###########"],
-    metal: { rim: [92, 64, 14], band: [[150, 108, 30], [214, 168, 60], [248, 214, 120]], field: [[96, 66, 18], [126, 90, 26], [160, 118, 38], [188, 142, 50]],
-             hi: [255, 232, 150], mid: [228, 182, 74], lo: [150, 104, 28], gem: [214, 48, 44], star: [255, 246, 214] },
+    metal: { rim: [92, 64, 14], band: [[150, 108, 30], [214, 168, 60], [248, 214, 120]], hi: [255, 232, 150], mid: [228, 182, 74], lo: [150, 104, 28], gem: [214, 48, 44], sky: [[22, 26, 54], [44, 40, 74]] },
   },
   censer: {
     rows: ["...s...s...", "..s...s....", "....#.#....", "...#...#...", "..#.....#..", ".#########.", "###########", ".#########.", "..#######..", "....###....", "...#####..."],
-    metal: { rim: [70, 72, 82], band: [[150, 152, 160], [196, 198, 204], [236, 236, 238]], field: [[62, 66, 80], [82, 88, 104], [104, 112, 130], [128, 136, 152]],
-             hi: [244, 240, 226], mid: [206, 200, 182], lo: [138, 132, 116], gem: [214, 220, 236], star: [255, 252, 236] },
+    metal: { rim: [70, 72, 82], band: [[150, 152, 160], [196, 198, 204], [236, 236, 238]], hi: [244, 240, 226], mid: [206, 200, 182], lo: [138, 132, 116], gem: [214, 220, 236], sky: [[18, 30, 48], [36, 58, 80]] },
   },
   jar: {
     rows: ["...#####...", "....###....", "..#.###.#..", ".#.#####.#.", "..#######..", ".#########.", ".####o####.", ".#########.", "..#######..", "...#####...", "....###...."],
-    metal: { rim: [60, 24, 18], band: [[118, 50, 32], [164, 80, 50], [206, 120, 80]], field: [[56, 20, 16], [76, 30, 22], [98, 42, 30], [122, 56, 38]],
-             hi: [240, 190, 140], mid: [196, 128, 82], lo: [122, 64, 40], gem: [120, 20, 40], star: [255, 236, 206] },
+    metal: { rim: [60, 24, 18], band: [[118, 50, 32], [164, 80, 50], [206, 120, 80]], hi: [240, 190, 140], mid: [196, 128, 82], lo: [122, 64, 40], gem: [120, 20, 40], sky: [[30, 18, 40], [58, 34, 58]] },
   },
 };
+const mixC = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 function paintRelic(coin, back) {
   const rel = relicOf(coin.relic), art = RELIC_ART[rel.emblem], P = art.metal;
   const off = document.createElement("canvas"); off.width = SZ; off.height = SZ;
   const g = off.getContext("2d"), img = g.createImageData(SZ, SZ), d = img.data;
-  const set = (x, y, c) => { if (x < 0 || y < 0 || x >= SZ || y >= SZ) return; const i = (y * SZ + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
-  const mid = SZ / 2, R = SZ / 2 - 1;
-  for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
-    const dx = x + 0.5 - mid, dy = y + 0.5 - mid, r = Math.hypot(dx, dy);
+  const set = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (back) x = SZ - 1 - x; if (x < 0 || y < 0 || x >= SZ || y >= SZ) return; const i = (y * SZ + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
+  const { cx, cy, r: R, floor } = GLOBE;
+  const inG = (x, y, r = R - 1.5) => Math.hypot(x - cx, y - cy) < r;
+  // the glass, and the night inside it in three bands, dithered where they meet
+  for (let y = 0; y < 52; y++) for (let x = 0; x < SZ; x++) {
+    const r = Math.hypot(x - cx, y - cy);
     if (r > R) continue;
-    const lit = -(dx + dy) / (r || 1);                                      // toward the upper left
-    if (r > R - 1) set(x, y, P.rim);
-    else if (r > R - 4) set(x, y, P.band[lit > 0.35 ? 2 : lit > -0.35 ? 1 : 0]);
-    else if (r > R - 5) set(x, y, P.rim);
-    else {
-      // the field, stepped light to dark across it, dithered where it steps
-      const q = Math.min(3.999, Math.max(0, (lit * 0.5 + 0.5) * 3 + (1 - r / R) * 1.2));
-      let b = Math.floor(q); if (q - b > 0.7 && (x + y) % 2 && b < 3) b++;
-      set(x, y, P.field[b]);
-      if (Math.abs(r - (R - 8)) < 0.5 && (x + y) % 3 === 0 && (back || y < 40)) set(x, y, P.band[1]);     // a dotted ring inside
-    }
+    if (r > R - 1) { set(x, y, [10, 14, 26]); continue; }
+    const q = Math.min(2.999, Math.max(0, (y - 4) / 15));
+    let bnd = Math.floor(q); if (q - bnd > 0.72 && (x + y) % 2 && bnd < 2) bnd++;
+    let c = mixC(P.sky[0], P.sky[1], bnd / 2);
+    if (r > R - 3) c = mixC(c, [120, 150, 190], 0.18);                  // the glass is thicker at its edge
+    set(x, y, c);
   }
-  const raise = (px, py, col) => { set(px + 1, py + 1, P.rim); set(px, py, col); };   // raised, with a shadow down-right
-  // the emblem, doubled, in the middle (on the back, larger and alone)
-  const k = back ? 3 : 2, w = art.rows[0].length * k, h = art.rows.length * k;
-  const ex = Math.round(mid - w / 2), ey = back ? Math.round(mid - h / 2) : Math.round(mid - h / 2) - 2;
-  for (let pass = 0; pass < 2; pass++) art.rows.forEach((row, ry) => [...row].forEach((ch, rx) => {
+  // the star, high in the glass
+  for (const [dx, dy, c] of [[0, 0, [255, 250, 220]], [1, 0, P.hi], [-1, 0, P.hi], [0, 1, P.hi], [0, -1, P.hi]]) set(32 + dx, 11 + dy, c);
+  // the gift, standing in the snow, a shadow to its lower right
+  const rows = art.rows, k = 2, w = rows[0].length * k, h = rows.length * k;
+  const ex = Math.round(32 - w / 2), ey = floor - 2 - h;
+  for (let pass = 0; pass < 2; pass++) rows.forEach((row, ry) => [...row].forEach((ch, rx) => {
     if (ch === ".") return;
+    const c = ch === "o" ? P.gem : ch === "s" ? [200, 210, 225] : (rx / row.length + ry / rows.length < 0.7 ? P.hi : rx > row.length * 0.7 ? P.lo : P.mid);
     for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) {
       const px = ex + rx * k + a, py = ey + ry * k + b;
-      if (pass === 0) { if (ch !== "s") set(px + 1, py + 1, P.rim); continue; }
-      const c = ch === "o" ? P.gem : ch === "s" ? P.band[2] : (rx / row.length + ry / art.rows.length < 0.7 ? P.hi : rx > row.length * 0.7 ? P.lo : P.mid);
-      set(px, py, c);
+      if (pass === 0) { if (ch !== "s") set(px + 1, py + 1, P.rim); } else set(px, py, c);
     }
   }));
-  if (!back) {
-    // the star they followed, above
-    const sx = Math.round(mid) - 1, sy = 8;
-    raise(sx, sy, P.star); for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, -2]]) raise(sx + ax, sy + ay, P.hi);
-    // and the gift's name around the bottom edge, a coin's legend: each
-    // letter upright, set along the curve, with a shadow under it
-    const name = [...rel.name].map(ch => ch === "I" ? ["#", "#", "#", "#", "#"] : LETTERS[ch]).filter(Boolean);
-    const nw = name.reduce((n, gl) => n + gl[0].length + 1, -1), rr = 40;
-    for (const [col, dy] of [[P.rim, 1], [P.hi, 0]]) {
-      let s0 = -nw / 2;
-      for (const gl of name) {
-        const w = gl[0].length, c = s0 + w / 2;
-        const x0 = Math.round(mid + s0), y0 = 48 - Math.round(c * c / (2 * rr));
-        for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < w; gx++) if (gl[gy][gx] === "#") set(x0 + gx, y0 + gy + dy, col);
-        s0 += w + 1;
-      }
+  // the drift across the globe's floor
+  for (let y = floor - 2; y < 52; y++) for (let x = 0; x < SZ; x++) {
+    if (!inG(x, y)) continue;
+    const top = floor - 1 + Math.round(Math.sin(x * 0.55) * 1.2 + (Math.abs(x - 32) > 9 ? 0 : 1));
+    if (y < top) continue;
+    set(x, y, y === top ? [250, 252, 255] : y < top + 3 ? [224, 232, 246] : [184, 198, 224]);
+  }
+  // the light on the glass: a curved streak upper left, a glint upper right
+  for (let a = 200; a <= 250; a += 2) {
+    const t = a * Math.PI / 180;
+    set(cx + Math.cos(t) * 18.5, cy + Math.sin(t) * 18.5, [214, 232, 255]);
+    if (a > 214 && a < 238) set(cx + Math.cos(t) * 17.5, cy + Math.sin(t) * 17.5, [170, 196, 236]);
+  }
+  set(cx + 12, cy - 12, [214, 232, 255]); set(cx + 13, cy - 11, [170, 196, 236]);
+  // the base, in the gift's metal, lit from the left, a groove set with stones
+  for (let y = 48; y < 63; y++) {
+    const hw = y < 51 ? 15 : 15 + Math.min(5, (y - 51) * 0.6);
+    const x0 = Math.round(32 - hw), x1 = Math.round(32 + hw) - 1;
+    for (let x = x0; x <= x1; x++) {
+      const edge = x === x0 || x === x1 || y === 62, u = (x - x0) / (x1 - x0 + 1);
+      let c = edge ? P.rim : P.band[(back ? 1 - u : u) < 0.3 ? 2 : (back ? 1 - u : u) < 0.75 ? 1 : 0];
+      if (y === 48) c = P.rim;
+      else if (y === 49 && !edge) c = P.band[2];
+      else if ((y === 55 || y === 56) && !edge) c = y === 55 && x % 4 === 0 ? P.gem : P.rim;
+      set(x, y, c);
     }
   }
   g.putImageData(img, 0, 0);

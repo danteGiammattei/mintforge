@@ -29,7 +29,7 @@
  *  hold still.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { drawCoin, shapeOf } from "./coin.js";
+import { drawCoin, shapeOf, GLOBE } from "./coin.js";
 import { RARITIES } from "./data.js";
 
 export const AURA_FPS = 8;
@@ -122,7 +122,8 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
-  if (snow) paintSnow(put, G, seed, frame, face, inside);
+  if (snow === "globe") paintGlobeSnow(put, M, seed, frame);
+  else if (snow) paintSnow(put, G, seed, frame, face, inside);
   if (rarity <= 0) {
     const f = frame % LOOP;
     if (flames) replay(d, G, `edge:${seed}:${shapeOf(coin)}:${M}:${f}`, p => paintBlazeEdge(p, inner, seed, f));
@@ -490,6 +491,17 @@ function paintSnow(put, G, seed, frame, face, dist) {
     const big = k % 3 === 0;
     put(x, y, FLAKE, big ? 1 : 0.9);
     if (big) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, FLAKE, 0.6);
+  }
+}
+
+/* Snow inside a Magi's snow globe (lib/coin.js paintRelic, GLOBE):
+ * slow, swaying, only inside the glass and above the drift. */
+function paintGlobeSnow(put, M, seed, frame) {
+  const { cx, cy, r, floor } = GLOBE;
+  for (let i = 0; i < 16; i++) {
+    const sp = 0.18 + h32(seed + i * 7) * 0.22, ph = h32(seed + i * 13) * 40;
+    const y = 6 + ((ph + frame * sp) % 38), x = 12 + h32(seed + i * 29) * 40 + Math.sin((frame * 0.5 + i * 9) * 0.18) * 2;
+    if (Math.hypot(x - cx, y - cy) < r - 3 && y < floor - 2) put(x + M, y + M, FLAKE, i % 4 ? 0.85 : 1);
   }
 }
 
