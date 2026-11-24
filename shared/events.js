@@ -23,7 +23,7 @@ export const EVENTS = [
     name: "THE LONG NIGHT",
     from: "2026-12-01", to: "2027-01-05",
     season: "frost26",
-    chestShare: 0.25,                 // of the chests released while it runs
+    chestShare: 1 / 3,                // of the chests released while it runs
     // the chest's coin is rolled as from a chest this many tiers better,
     // by grade (the best scroll's rarity), never past the void chest
     coinLift: [0, 0, 1, 1, 2, 3],
