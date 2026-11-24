@@ -594,15 +594,15 @@ function frost(g, coin) {
   for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
     if (out[y * SZ + x]) continue;
     const i = (y * SZ + x) * 4, h = hash(x, y);
-    mixTo(i, BREATH, 0.14);                                                 // the cold over everything
+    mixTo(i, BREATH, 0.2);                                                  // the cold over everything
     const up1 = outside(x, y - 1), up2 = outside(x, y - 2), up3 = outside(x, y - 3);
     const edge = up1 || outside(x - 1, y) || outside(x + 1, y) || outside(x, y + 1);
     const top = y < SZ * 0.55;                                              // snow only settles on the upper rim
     if (top && up1) mixTo(i, SNOW, 0.95);
     else if (top && up2 && h < 0.8) mixTo(i, SNOW, 0.85);
     else if (top && up3 && h < 0.35) mixTo(i, SNOW, 0.7);
-    else if (edge && h < 0.5) mixTo(i, RIME, 0.75);                          // rime round the rest of the rim
-    else if (!edge && h < 0.012) mixTo(i, SNOW, 0.6);                        // a few flakes caught on the face
+    else if (edge && h < 0.75) mixTo(i, RIME, 0.85);                         // rime round the rest of the rim
+    else if (!edge && h < 0.03) mixTo(i, SNOW, 0.75);                        // flakes caught on the face
   }
   g.putImageData(img, 0, 0);
 }

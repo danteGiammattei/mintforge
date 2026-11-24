@@ -75,14 +75,13 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
     <div className="veil appear" style={{ zIndex: 500 }} onClick={onClose}>
       <div className="sheet rise" role="dialog" aria-modal="true" aria-label={`${r.name} ${m.name} coin, ${coinName(coin)}`}
            style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }} onClick={e => e.stopPropagation()}>
-        {/* a frost coin's hat rises past the coin: room for it above */}
-        <div style={{ cursor: "grab", userSelect: "none", touchAction: "none", paddingTop: coin.season ? SIZE * 0.14 : 0 }}
+        <div style={{ cursor: "grab", userSelect: "none", touchAction: "none" }}
              onPointerDown={onStart} onPointerMove={onMove} onPointerUp={onEnd} onPointerCancel={onEnd}>
           <div style={{ transform: `perspective(560px) rotateY(${rot.y}deg) rotateX(${-rot.x}deg)` }}>
             <div style={{ position: "relative", width: SIZE, height: SIZE }}>
               {coin.metalIdx === METAL.eldritch && <Aura coin={coin} size={SIZE} margin={26} layer="behind" shine={false}/>}
               <canvas ref={cvRef} aria-hidden style={{ position: "relative", imageRendering: "pixelated", display: "block", width: SIZE, height: SIZE }}/>
-              <Aura coin={coin} size={SIZE} margin={coin.season ? 18 : 12}/>
+              <Aura coin={coin} size={SIZE} margin={12}/>
             </div>
           </div>
         </div>

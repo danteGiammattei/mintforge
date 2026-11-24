@@ -122,7 +122,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
-  if (snow) { paintSnow(put, G, seed, frame, face, inside); paintHat(put, G, face); }
+  if (snow) paintSnow(put, G, seed, frame, face, inside);
   if (rarity <= 0) {
     const f = frame % LOOP;
     if (flames) replay(d, G, `edge:${seed}:${shapeOf(coin)}:${M}:${f}`, p => paintBlazeEdge(p, inner, seed, f));
@@ -468,76 +468,28 @@ function paintMoon(put, G, M, inside, seed, frame) {
  * small crosses, over the coin and the air round it. The snow lying on
  * its upper rim is painted again here, over the aura's ring, so a
  * coin's glow never melts it. */
-const FLAKE = [244, 249, 255];
+const FLAKE = [244, 249, 255], SNOW_LO = [200, 214, 236];
 function paintSnow(put, G, seed, frame, face, dist) {
   const out = (x, y) => y < 0 || dist[y * G + x] !== 0;
+  // the cap: settled thick along the upper rim and down its shoulders,
+  // four or five deep where it drifts, its lower edge lumpy
   for (const p of face) {
-    if (p.y > G * 0.55) continue;
-    if (out(p.x, p.y - 1) || out(p.x, p.y - 2)) put(p.x, p.y, FLAKE, 1);
-    else if (out(p.x, p.y - 3) && h32(seed + p.x * 31 + p.y) < 0.6) put(p.x, p.y, FLAKE, 0.85);
+    if (p.y > G * 0.62) continue;
+    const h = h32(seed + p.x * 31 + p.y), drift = 4 + ((h32(seed * 7 + p.x) * 3) | 0);
+    let d = 0; while (d < 6 && !out(p.x, p.y - d - 1)) d++;      // how far below the rim's edge
+    if (d < 2) put(p.x, p.y, FLAKE, 1);
+    else if (d < drift - 1) put(p.x, p.y, d === drift - 2 ? SNOW_LO : FLAKE, 0.95);
+    else if (d < drift && h < 0.55) put(p.x, p.y, SNOW_LO, 0.85);
   }
-  for (let k = 0; k < 9; k++) {
+  // and more falling past it: half again as many flakes, a third of them crosses
+  for (let k = 0; k < 15; k++) {
     const hx = h32(seed + k * 17), hs = h32(seed * 3 + k * 29), hp = h32(seed * 5 + k * 41);
     const speed = 0.7 + hs * 0.9, span = G + 6;
     const y = ((hp * span + frame * speed) % span) - 3;
     const x = hx * G + Math.sin((frame + k * 5) * 0.3) * 1.5;
     const big = k % 3 === 0;
-    put(x, y, FLAKE, big ? 0.95 : 0.8);
-    if (big) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, FLAKE, 0.45);
-  }
-}
-
-/* A coin of the Long Night wears a Santa hat, sat on it like a hat on a
- * head and slanted off to the side: a white fur band across the upper
- * part of the coin, tipped down to the right, the red hat rising from
- * it and leaning right, its tip flopped over and hanging down past the
- * coin's edge to a white pom-pom. Laid out upright in its own frame and
- * turned, every pixel sampled back into that frame, so its edges stay
- * hard at any tilt. Lit from the upper left. On the aura's layer, so it
- * can reach into the margin round the coin. */
-const HAT = { hi: [214, 64, 54], mid: [168, 36, 32], lo: [112, 22, 22], edge: [70, 12, 14],
-              fur: [244, 246, 250], furLo: [190, 198, 212] };
-const TILT = 0.42;                                           // radians, right side down
-function paintHat(put, G, face) {
-  let top = G;
-  for (const p of face) if (Math.abs(p.x - G / 2) < 6 && p.y < top) top = p.y;
-  // the band's middle: a little left of centre, well down onto the coin
-  const ox = G / 2 - 4, oy = top + 9, c = Math.cos(TILT), s = Math.sin(TILT);
-  const BW = 18, BH = 3, CH = 18;                            // band half-width, half-height; cone height
-  // the flopped tip: a quadratic curve from the cone's peak, over and down
-  const P0 = [7, BH + CH], P1 = [18, BH + CH + 3], P2 = [22, BH + CH - 9];
-  const curve = t => [(1 - t) ** 2 * P0[0] + 2 * (1 - t) * t * P1[0] + t * t * P2[0], (1 - t) ** 2 * P0[1] + 2 * (1 - t) * t * P1[1] + t * t * P2[1]];
-  const TIP = Array.from({ length: 13 }, (_, i) => curve(i / 12));
-  const what = (u, v) => {                                   // u along the band, v up from it
-    if ((u - P2[0]) ** 2 + (v - P2[1] + 1) ** 2 <= 11) return u - P2[0] + (v - P2[1]) > 1 ? HAT.fur : u - P2[0] - (v - P2[1]) > 2 ? HAT.furLo : HAT.fur;
-    if (Math.abs(v) <= BH) {
-      const end = BW + 1.2 - Math.abs(v) * 0.3;
-      if (Math.abs(u) <= end) return v < -BH + 1.2 ? HAT.furLo : ((Math.round(u) * 5 + Math.round(v)) % 7 === 0 ? HAT.furLo : HAT.fur);
-      return null;
-    }
-    if (v > BH && v <= BH + CH) {
-      const k = (v - BH) / CH, mid = k * 7, half = (BW - 1) * (1 - k) ** 0.85 + 1.2;
-      const d = u - mid;
-      if (Math.abs(d) <= half) {
-        const w = (d + half) / (2 * half);
-        return Math.abs(d) > half - 1 ? HAT.edge : w < 0.32 ? HAT.hi : w < 0.72 ? HAT.mid : HAT.lo;
-      }
-    }
-    for (let i = 0; i < TIP.length; i++) {
-      const [tu, tv] = TIP[i], r = 2.6 - i * 0.08;
-      if ((u - tu) ** 2 + (v - tv) ** 2 <= r * r) return (v - tv) > 0.8 ? HAT.hi : (v - tv) < -1 ? HAT.lo : HAT.mid;
-    }
-    return null;
-  };
-  const R = 34;
-  for (let y = Math.max(0, Math.floor(oy - R)); y < Math.min(G, oy + R); y++) {
-    for (let x = Math.max(0, Math.floor(ox - R)); x < Math.min(G, ox + R); x++) {
-      // back into the hat's own frame: undo the turn (screen y is down, v is up)
-      const dx = x + 0.5 - ox, dy = y + 0.5 - oy;
-      const u = dx * c + dy * s, v = -(-dx * s + dy * c);
-      const col = what(u, v);
-      if (col) put(x, y, col, 1);
-    }
+    put(x, y, FLAKE, big ? 1 : 0.9);
+    if (big) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, FLAKE, 0.6);
   }
 }
 
