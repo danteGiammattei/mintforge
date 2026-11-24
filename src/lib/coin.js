@@ -19,7 +19,7 @@ import {
   RARITIES,   TITLES, TITLE_LEVELS,
 } from "./data.js";
 import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP, MATERIAL, ASTRAL } from "../../shared/tuning.js";
-import { SEASONS } from "../../shared/events.js";
+import { SEASONS, relicOf } from "../../shared/events.js";
 
 /* ─── RUNE TRANSLATOR ─────────────────────────────────────────────────── */
 const RL = { A:"ᚨ",B:"ᛒ",C:"ᚲ",D:"ᛞ",E:"ᛖ",F:"ᚠ",G:"ᚷ",H:"ᚺ",I:"ᛁ",J:"ᛃ",K:"ᚲ",L:"ᛚ",M:"ᛗ",N:"ᚾ",O:"ᛟ",P:"ᛈ",R:"ᚱ",S:"ᛊ",T:"ᛏ",U:"ᚢ",V:"ᚡ",W:"ᚹ",X:"ᛪ",Y:"ᚤ",Z:"ᛉ" };
@@ -375,6 +375,8 @@ const LETTERS = {
   O: [".#.", "#.#", "#.#", "#.#", ".#."], P: ["##.", "#.#", "##.", "#..", "#.."], Q: [".#.", "#.#", "#.#", "##.", ".##"],
   R: ["##.", "#.#", "##.", "#.#", "#.#"], S: [".##", "#..", ".#.", "..#", "##."], T: ["###", ".#.", ".#.", ".#.", ".#."],
   U: ["#.#", "#.#", "#.#", "#.#", "###"], V: ["#.#", "#.#", "#.#", "#.#", ".#."],
+  D: ["##.", "#.#", "#.#", "#.#", "##."], F: ["###", "#..", "##.", "#..", "#.."], H: ["#.#", "#.#", "###", "#.#", "#.#"],
+  K: ["#.#", "#.#", "##.", "#.#", "#.#"], Y: ["#.#", "#.#", ".#.", ".#.", ".#."],
 };
 export const SKY = {
   out: [11, 28, 38], frame: [251, 246, 210], frameMid: [226, 216, 160], frameDark: [176, 160, 108],
@@ -452,6 +454,84 @@ function paintAstral(coin, back) {
   return off;
 }
 
+/* ─── the Magi's gifts (shared/events.js RELICS) ──────────────────────
+ * Not a generated face: a round coin in its own metal, a raised emblem
+ * in the middle (the crown of gold, the censer of frankincense, the jar
+ * of myrrh) under the small star they followed, and its name along the
+ * bottom. Lit from the upper left like every coin. */
+const RELIC_ART = {
+  crown: {
+    rows: ["#....#....#", "##..###..##", "###.###.###", "###########", "##o##o##o##", "###########", "###########"],
+    metal: { rim: [92, 64, 14], band: [[150, 108, 30], [214, 168, 60], [248, 214, 120]], field: [[96, 66, 18], [126, 90, 26], [160, 118, 38], [188, 142, 50]],
+             hi: [255, 232, 150], mid: [228, 182, 74], lo: [150, 104, 28], gem: [214, 48, 44], star: [255, 246, 214] },
+  },
+  censer: {
+    rows: ["...s...s...", "..s...s....", "....#.#....", "...#...#...", "..#.....#..", ".#########.", "###########", ".#########.", "..#######..", "....###....", "...#####..."],
+    metal: { rim: [70, 72, 82], band: [[150, 152, 160], [196, 198, 204], [236, 236, 238]], field: [[62, 66, 80], [82, 88, 104], [104, 112, 130], [128, 136, 152]],
+             hi: [244, 240, 226], mid: [206, 200, 182], lo: [138, 132, 116], gem: [214, 220, 236], star: [255, 252, 236] },
+  },
+  jar: {
+    rows: ["...#####...", "....###....", "..#.###.#..", ".#.#####.#.", "..#######..", ".#########.", ".####o####.", ".#########.", "..#######..", "...#####...", "....###...."],
+    metal: { rim: [60, 24, 18], band: [[118, 50, 32], [164, 80, 50], [206, 120, 80]], field: [[56, 20, 16], [76, 30, 22], [98, 42, 30], [122, 56, 38]],
+             hi: [240, 190, 140], mid: [196, 128, 82], lo: [122, 64, 40], gem: [120, 20, 40], star: [255, 236, 206] },
+  },
+};
+function paintRelic(coin, back) {
+  const rel = relicOf(coin.relic), art = RELIC_ART[rel.emblem], P = art.metal;
+  const off = document.createElement("canvas"); off.width = SZ; off.height = SZ;
+  const g = off.getContext("2d"), img = g.createImageData(SZ, SZ), d = img.data;
+  const set = (x, y, c) => { if (x < 0 || y < 0 || x >= SZ || y >= SZ) return; const i = (y * SZ + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
+  const mid = SZ / 2, R = SZ / 2 - 1;
+  for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
+    const dx = x + 0.5 - mid, dy = y + 0.5 - mid, r = Math.hypot(dx, dy);
+    if (r > R) continue;
+    const lit = -(dx + dy) / (r || 1);                                      // toward the upper left
+    if (r > R - 1) set(x, y, P.rim);
+    else if (r > R - 4) set(x, y, P.band[lit > 0.35 ? 2 : lit > -0.35 ? 1 : 0]);
+    else if (r > R - 5) set(x, y, P.rim);
+    else {
+      // the field, stepped light to dark across it, dithered where it steps
+      const q = Math.min(3.999, Math.max(0, (lit * 0.5 + 0.5) * 3 + (1 - r / R) * 1.2));
+      let b = Math.floor(q); if (q - b > 0.7 && (x + y) % 2 && b < 3) b++;
+      set(x, y, P.field[b]);
+      if (Math.abs(r - (R - 8)) < 0.5 && (x + y) % 3 === 0 && (back || y < 40)) set(x, y, P.band[1]);     // a dotted ring inside
+    }
+  }
+  const raise = (px, py, col) => { set(px + 1, py + 1, P.rim); set(px, py, col); };   // raised, with a shadow down-right
+  // the emblem, doubled, in the middle (on the back, larger and alone)
+  const k = back ? 3 : 2, w = art.rows[0].length * k, h = art.rows.length * k;
+  const ex = Math.round(mid - w / 2), ey = back ? Math.round(mid - h / 2) : Math.round(mid - h / 2) - 2;
+  for (let pass = 0; pass < 2; pass++) art.rows.forEach((row, ry) => [...row].forEach((ch, rx) => {
+    if (ch === ".") return;
+    for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) {
+      const px = ex + rx * k + a, py = ey + ry * k + b;
+      if (pass === 0) { if (ch !== "s") set(px + 1, py + 1, P.rim); continue; }
+      const c = ch === "o" ? P.gem : ch === "s" ? P.band[2] : (rx / row.length + ry / art.rows.length < 0.7 ? P.hi : rx > row.length * 0.7 ? P.lo : P.mid);
+      set(px, py, c);
+    }
+  }));
+  if (!back) {
+    // the star they followed, above
+    const sx = Math.round(mid) - 1, sy = 8;
+    raise(sx, sy, P.star); for (const [ax, ay] of [[1, 0], [-1, 0], [0, 1], [0, -1], [2, 0], [-2, 0], [0, -2]]) raise(sx + ax, sy + ay, P.hi);
+    // and the gift's name around the bottom edge, a coin's legend: each
+    // letter upright, set along the curve, with a shadow under it
+    const name = [...rel.name].map(ch => ch === "I" ? ["#", "#", "#", "#", "#"] : LETTERS[ch]).filter(Boolean);
+    const nw = name.reduce((n, gl) => n + gl[0].length + 1, -1), rr = 40;
+    for (const [col, dy] of [[P.rim, 1], [P.hi, 0]]) {
+      let s0 = -nw / 2;
+      for (const gl of name) {
+        const w = gl[0].length, c = s0 + w / 2;
+        const x0 = Math.round(mid + s0), y0 = 48 - Math.round(c * c / (2 * rr));
+        for (let gy = 0; gy < 5; gy++) for (let gx = 0; gx < w; gx++) if (gl[gy][gx] === "#") set(x0 + gx, y0 + gy + dy, col);
+        s0 += w + 1;
+      }
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return off;
+}
+
 const painted = new Map();
 export const SPACE_LOOP = 16;                 // frames in the void's loop
 // paint a coin into the cache ahead of time (lib/preload.js), so the
@@ -459,10 +539,11 @@ export const SPACE_LOOP = 16;                 // frames in the void's loop
 export const warmCoin = coin => { try { paintCoin(coin); } catch { /* drawn later instead */ } };
 
 function paintCoin(coin, back = false, phase = 0) {
-  const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.sign ?? ""}:${coin.shiny ? 1 : 0}:${coin.season || ""}:${back ? 1 : 0}:${phase}`;
+  const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.sign ?? ""}:${coin.shiny ? 1 : 0}:${coin.season || ""}:${coin.relic || ""}:${back ? 1 : 0}:${phase}`;
   if (painted.has(key)) return painted.get(key);
-  const out = coin.metalIdx === METAL.astral && coin.sign != null ? paintAstral(coin, back) : paintFresh(coin, back, phase);
-  if (coin.shiny && coin.metalIdx === METAL.astral && coin.sign != null) shine(out.getContext("2d"), coin);
+  const relic = relicOf(coin.relic);
+  const out = relic ? paintRelic(coin, back) : coin.metalIdx === METAL.astral && coin.sign != null ? paintAstral(coin, back) : paintFresh(coin, back, phase);
+  if (coin.shiny && (relic || (coin.metalIdx === METAL.astral && coin.sign != null))) shine(out.getContext("2d"), coin);
   if (coin.season) frost(out.getContext("2d"), coin);
   if (painted.size > 900) painted.delete(painted.keys().next().value);
   painted.set(key, out);
