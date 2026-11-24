@@ -7,6 +7,8 @@ import { unlockedTitles, coinRarity } from "../lib/coin.js";
 import { journalCounts, cabinetScore } from "../../shared/economy.js";
 import { FRAMES, PREMIUM_TITLE_BY_ID, TITLES, TITLE_LEVELS } from "../lib/data.js";
 import CoinModal from "../components/CoinModal.jsx";
+import CabinetFrame, { gradeInk } from "../components/CabinetFrame.jsx";
+import { CABINET_SCORE } from "../../shared/tuning.js";
 import PixelBanner from "../components/PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import PublicProfile from "../components/PublicProfile.jsx";
@@ -55,6 +57,37 @@ function CabinetSlots({ g }) {
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+/* The cabinet's frame: each grade's frame is earned by reaching that
+ * grade, and any earned one below it can be worn instead. */
+const FRAME_NAMES = ["WOOD", "STONE", "GOLD", "VOID", "OBSIDIAN", "ELDRITCH", "ASTRAL"];
+function CabinetFrames({ g }) {
+  const { rank } = cabinetScore(g.showcase.map(c => c && { metalIdx: c.metalIdx, rarity: coinRarity(c), shiny: c.shiny, season: c.season }));
+  const worn = g.cabFrame == null ? rank : Math.min(g.cabFrame, rank);
+  return (
+    <section className="panel" style={{ padding: 12 }} aria-label="Cabinet frame">
+      <h2 className="t-title" style={{ margin: "0 0 12px" }}>CABINET FRAME</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+        {CABINET_SCORE.grades.map(([need], i) => {
+          const locked = i > rank;
+          return (
+            <button key={i} className="tile" disabled={locked} aria-pressed={worn === i} style={{ padding: "14px 10px 8px", gap: 8, overflow: "hidden" }}
+                    onClick={() => g.setCabFrame(i === rank ? null : i)}
+                    aria-label={locked ? `${FRAME_NAMES[i]}, earned at a cabinet score of ${need}` : FRAME_NAMES[i]}>
+              <div style={{ width: "100%", opacity: locked ? 0.35 : 1, filter: locked ? "grayscale(1)" : "none" }}>
+                <CabinetFrame rank={i}><div style={{ height: 40 }}/></CabinetFrame>
+              </div>
+              <span aria-hidden style={{ color: locked ? undefined : gradeInk(i), position: "relative", zIndex: 2, marginTop: 6 }}>{locked ? `${need.toLocaleString()}` : FRAME_NAMES[i]}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="t-label" style={{ margin: "12px 0 0" }}>
+        {g.event ? "THE GARLAND HANGS OVER EVERY CABINET UNTIL 5 JANUARY. " : ""}A FRAME IS EARNED BY THE CABINET'S SCORE.
+      </p>
     </section>
   );
 }
@@ -135,6 +168,7 @@ function EditProfile({ g, onDone }) {
       )}
 
       <CabinetSlots g={g}/>
+      <CabinetFrames g={g}/>
 
       <section className="panel" style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }} aria-label="Settings">
         <h2 className="t-title" style={{ margin: 0 }}>SETTINGS</h2>
@@ -156,7 +190,7 @@ function You({ g }) {
   return (
     <>
       <section className="panel" style={{ overflow: "hidden" }} aria-label="Your profile, as others see it">
-        <PublicProfile festive={!!g.event} frame={g.frame} fx={g.profileFx} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
+        <PublicProfile festive={!!g.event} cabFrame={g.cabFrame} frame={g.frame} fx={g.profileFx} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
                        coins={g.coins.length} kinds={journalCounts(g.journal).kinds} shiny={g.coins.filter(c => c.shiny).length}
                        signs={[...new Set(g.coins.filter(c => c.sign != null).map(c => c.sign))]}
                        tomes={g.tomes}

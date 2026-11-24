@@ -11,7 +11,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay } from "../shared/economy.js";
-import { SCRIBE, ASTRAL } from "../shared/tuning.js";
+import { SCRIBE, ASTRAL, CABINET_SCORE } from "../shared/tuning.js";
 import { heldSigns } from "./signs.js";
 import { STARTER, cravedPage } from "../shared/tomes.js";
 import { eventOn, RELICS, relicOf } from "../shared/events.js";
@@ -164,7 +164,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     xp: ps.xp, level: levelOf(ps.xp), marks: ps.marks || 0,
     frame: ps.frame, bio: ps.bio || "", selectedTitle: currentTitle(ps.selected_title),
     pinnedIds: ps.pinned_ids ? JSON.parse(ps.pinned_ids) : null,
-    iconCoin: stats.iconCoin || null,
+    iconCoin: stats.iconCoin || null, cabFrame: Number.isInteger(stats.cabFrame) ? stats.cabFrame : null,
     ownedFrames: parseList(ps.owned_frames), ownedTitles: parseList(ps.owned_titles),
     ownedFx: parseList(ps.owned_fx), profileFx: ps.profile_fx || null,
     coins: all.filter(r => !r.dusty).map(coinOut),
@@ -240,6 +240,15 @@ export async function patchCosmetics(db, pid, body) {
     else if (typeof s.profileFx === "string") {
       if (!parseList(ps.owned_fx).includes(s.profileFx)) throw new Refusal("That effect is not yours to wear", 403);
       set("profile_fx", s.profileFx);
+    }
+  }
+  // the cabinet's frame: a grade at or below the cabinet's own (it is
+  // shown no higher than the grade the coins earn, wherever it is drawn),
+  // or null for the cabinet's own
+  if ("cabFrame" in s) {
+    if (s.cabFrame === null) sets.push(`stats = json_remove(COALESCE(stats, '{}'), '$.cabFrame')`);
+    else if (Number.isInteger(s.cabFrame) && s.cabFrame >= 0 && s.cabFrame < CABINET_SCORE.grades.length) {
+      binds.push(s.cabFrame); sets.push(`stats = json_set(COALESCE(stats, '{}'), '$.cabFrame', ?${binds.length})`);
     }
   }
   // the coin chosen as the app's icon (lib/appIcon.js), or null for none

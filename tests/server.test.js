@@ -790,3 +790,13 @@ test("the Magi's gifts: a present's rare named coin, mythic, kept out of the kin
     await assert.rejects(go("restrike", { coinId: one.id }));
   } finally { RELICS.magi.chance = was; }
 });
+
+test("the cabinet frame worn: a grade's number, or none for the cabinet's own; nonsense ignored", async () => {
+  const { db, pid } = await world();
+  await patchCosmetics(db, pid, { state: { cabFrame: 2 } });
+  assert.equal((await loadState(db, pid)).cabFrame, 2);
+  await patchCosmetics(db, pid, { state: { cabFrame: 99 } });
+  assert.equal((await loadState(db, pid)).cabFrame, 2);
+  await patchCosmetics(db, pid, { state: { cabFrame: null } });
+  assert.equal((await loadState(db, pid)).cabFrame, null);
+});

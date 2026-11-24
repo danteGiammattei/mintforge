@@ -123,6 +123,7 @@ export function useGameState() {
     choose({ pinnedIds: typeof next === "function" ? next(cur) : next });
   }, [choose]);
   const setIconCoin = useCallback(id => choose({ iconCoin: id }), [choose]);
+  const setCabFrame = useCallback(n => choose({ cabFrame: n }), [choose]);
   const toggleLock = useCallback(id => {
     const c = snapRef.current?.coins.find(x => x.id === id);
     if (!c) return;
@@ -206,7 +207,7 @@ export function useGameState() {
     journal: snap?.journal || { c: {}, m: {}, s: {}, shiny: 0, best: 0 },
     frame: snap?.frame || "stone", fr: FRAMES[snap?.frame] || FRAMES.stone,
     bio: snap?.bio || "", selectedTitle: snap?.selectedTitle || "",
-    pinnedIds: snap?.pinnedIds ?? null, iconCoin: snap?.iconCoin ?? null, setIconCoin,
+    pinnedIds: snap?.pinnedIds ?? null, iconCoin: snap?.iconCoin ?? null, setIconCoin, cabFrame: snap?.cabFrame ?? null, setCabFrame,
     ownedFrames: snap?.ownedFrames || [], ownedTitles: snap?.ownedTitles || [],
     ownedFx: snap?.ownedFx || [], profileFx: snap?.profileFx || null, event: snap?.event || null,
     setFrame, setSelectedTitle, setProfileFx, setBio, setPinnedIds, toggleLock,

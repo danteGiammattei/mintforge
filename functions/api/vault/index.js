@@ -15,7 +15,7 @@ export const onRequestGet = ({ request, env }) => guarded(async () => {
  * the body is refused rather than ignored, so an old client fails loudly
  * instead of believing it saved. Value changes go through /api/act. */
 const ALLOWED_TOP = new Set(["state", "lock"]);
-const ALLOWED_STATE = new Set(["frame", "bio", "selectedTitle", "pinnedIds", "iconCoin", "profileFx"]);
+const ALLOWED_STATE = new Set(["frame", "bio", "selectedTitle", "pinnedIds", "iconCoin", "profileFx", "cabFrame"]);
 
 export const onRequestPost = ({ request, env }) => guarded(async () => {
   const auth = await getAuth(request, env);

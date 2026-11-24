@@ -23,7 +23,7 @@ export async function onRequestGet({ request, env, params }) {
             COALESCE(player_state.bio, '') AS bio,
             player_state.selected_title AS title,
             player_state.pinned_ids, player_state.journal,
-            player_state.tomes, player_state.profile_fx
+            player_state.tomes, player_state.profile_fx, player_state.stats
        FROM players
        LEFT JOIN player_state ON player_state.player_id = players.id
       WHERE players.username = ?1 COLLATE NOCASE`
@@ -64,6 +64,7 @@ export async function onRequestGet({ request, env, params }) {
     xp: player.xp,
     frame: player.frame,
     profileFx: player.profile_fx || null,
+    cabFrame: (() => { try { const f = JSON.parse(player.stats || "{}").cabFrame; return Number.isInteger(f) ? f : null; } catch { return null; } })(),
     createdAt: player.created_at,
     isSelf: player.id === auth.player.id,
     isFriend: !!friendRow,
