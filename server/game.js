@@ -26,11 +26,11 @@ import {
   levelOf, offerScroll, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
   resolveToss, resolveCrucible, resolveRoulette, resolvePlinko, forgeCost, restrikeCost,
-  inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz, placeAstral,
+  inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz, placeAstral, MAX_RARITY,
 } from "../shared/economy.js";
 import { heldSigns } from "./signs.js";
 import { pageOf, tomeFromChest, cravedPage } from "../shared/tomes.js";
-import { eventOn, eventChest, eventChestHolds, eventById, SEASONS } from "../shared/events.js";
+import { eventOn, eventChest, eventChestHolds, eventById, SEASONS, RELICS, relicOf } from "../shared/events.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
@@ -276,7 +276,10 @@ async function daily(db, pid, stats, statsText, now, tz) {
 /* ─── the journal ─────────────────────────────────────────────────────
  * A statement that records one coin as found. Kinds only ever count up. */
 export function journalStmt(db, pid, c) {
-  const k = `$.c."${c.metalIdx}:${c.rarity ?? 0}"`;
+  // one of an event's named coins is counted on its own page ($.r."magi:1"),
+  // not among the kinds of coin; only known ones, written into the path
+  const rel = relicOf(c.relic) ? c.relic : null;
+  const k = rel ? `$.r."${rel}"` : `$.c."${c.metalIdx}:${c.rarity ?? 0}"`;
   // a material is also counted on its own page, by name ($.m); only
   // known names, since they are written into the path
   const mat = MATERIAL.byTier.includes(c.material) ? c.material : null;
@@ -289,7 +292,8 @@ export function journalStmt(db, pid, c) {
         json_set(journal,
           '$.c', json(COALESCE(json_extract(journal, '$.c'), '{}')),
           '$.m', json(COALESCE(json_extract(journal, '$.m'), '{}')),
-          '$.s', json(COALESCE(json_extract(journal, '$.s'), '{}'))),
+          '$.s', json(COALESCE(json_extract(journal, '$.s'), '{}')),
+          '$.r', json(COALESCE(json_extract(journal, '$.r'), '{}'))),
         '${k}', COALESCE(json_extract(journal, '${k}'), 0) + 1,${mk ? `
         '${mk}', COALESCE(json_extract(journal, '${mk}'), 0) + 1,` : ""}${sk ? `
         '${sk}', COALESCE(json_extract(journal, '${sk}'), 0) + 1,` : ""}
@@ -315,8 +319,10 @@ async function open(db, pid, body, { now, rand }) {
   // event's title or its profile effect (shared/events.js)
   const ev = ch.season && SEASONS[ch.season] ? eventById(SEASONS[ch.season].event) : null;
   const holds = ev ? eventChestHolds(ev, ch.tier, ch.grade, { tomes: tomesOf(ps.tomes), titles: parseList(ps.owned_titles), effects: parseList(ps.owned_fx) }, rand) : null;
-  const rolled = rollCoin(holds ? holds.coinTier : ch.tier, rand);
+  let rolled = rollCoin(holds ? holds.coinTier : ch.tier, rand);
   if (ev) rolled.season = ch.season;
+  // or, rarely, one of the event's named coins: always mythic, no frost
+  if (holds?.relic) rolled = { ...rolled, metalIdx: RELICS[relicOf(holds.relic).set].metal, rarity: MAX_RARITY, material: null, season: null, relic: holds.relic };
   if (!tome && holds?.tome) tome = holds.tome;          // the event's own tome, from its present
   const id = "c_" + randomHex(8);
   // an astral coin takes a sign its owner lacks (and if two chests race
@@ -327,9 +333,9 @@ async function open(db, pid, body, { now, rand }) {
     try {
       await db.batch([
         db.prepare(
-          `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material, sign, season)
-           VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, 1, ?8, ?9, ?10)`
-        ).bind(id, pid, c.seed, c.metalIdx, c.shiny ? 1 : 0, c.rarity, now, c.material || null, c.sign ?? null, c.season || null),
+          `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material, sign, season, relic)
+           VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, 1, ?8, ?9, ?10, ?11)`
+        ).bind(id, pid, c.seed, c.metalIdx, c.shiny ? 1 : 0, c.rarity, now, c.material || null, c.sign ?? null, c.season || null, c.relic || null),
         db.prepare(`UPDATE player_state SET xp = xp + ?2 WHERE player_id = ?1`).bind(pid, XP.open),
         ...(tome ? [db.prepare(
           `UPDATE player_state SET tomes = json_insert(tomes, '$[#]', ?2)
@@ -344,7 +350,7 @@ async function open(db, pid, body, { now, rand }) {
       break;
     } catch (e) { if (tries >= 2 || !/UNIQUE/i.test(String(e?.message))) throw e; }
   }
-  return { tier: ch.tier, coin: { id, seed: c.seed, metalIdx: c.metalIdx, shiny: c.shiny, locked: false, rarity: c.rarity, ...(c.season ? { season: c.season } : {}) },
+  return { tier: ch.tier, coin: { id, seed: c.seed, metalIdx: c.metalIdx, shiny: c.shiny, locked: false, rarity: c.rarity, ...(c.season ? { season: c.season } : {}), ...(c.relic ? { relic: c.relic } : {}) },
            xp: XP.open, ...(tome ? { tome } : {}),
            ...(holds?.title ? { title: describeReward({ type: "title", id: holds.title }) } : {}),
            ...(holds?.effect ? { effect: holds.effect } : {}) };
@@ -354,13 +360,13 @@ async function brush(db, pid, body, { now }) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const c = await db.prepare(
     `UPDATE coins SET dusty = 0, acquired_at = ?3 WHERE id = ?1 AND player_id = ?2 AND dusty = 1
-     RETURNING id, seed, metal_idx, shiny, locked, rarity, material, sign, season`
+     RETURNING id, seed, metal_idx, shiny, locked, rarity, material, sign, season, relic`
   ).bind(body.coinId, pid, now).first();
   if (!c) throw new Refusal("That coin is already clean", 404);
   const xp = xpForBrush({ rarity: c.rarity, metalIdx: c.metal_idx, shiny: !!c.shiny });
   await db.batch([
     db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${bump("brushed")} WHERE player_id = ?1`).bind(pid, xp),
-    journalStmt(db, pid, { seed: c.seed, metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity, material: c.material, season: c.season }),
+    journalStmt(db, pid, { seed: c.seed, metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity, material: c.material, season: c.season, relic: c.relic }),
   ]);
   return { coin: coinOut(c), xp };       // a new star sign's bonus is paid by the state load (server/state.js)
 }
@@ -373,6 +379,7 @@ const hydrate = r => {
   if (r.rarity != null) c.rarity = r.rarity;
   if (MATERIAL.byTier.includes(r.material) && r.material) c.material = r.material;
   if (r.season && SEASONS[r.season]) c.season = r.season;
+  if (relicOf(r.relic)) c.relic = r.relic;
   return c;
 };
 const placeholders = (n, from) => Array.from({ length: n }, (_, i) => `?${i + from}`).join(",");
@@ -383,7 +390,7 @@ async function sell(db, pid, body) {
   // locked coins and dusty ones are simply not matched, so not sold
   const gone = await db.prepare(
     `DELETE FROM coins WHERE player_id = ?1 AND locked = 0 AND dusty = 0 AND id IN (${placeholders(ids.length, 2)})
-     RETURNING id, seed, metal_idx, shiny, rarity, material, season`
+     RETURNING id, seed, metal_idx, shiny, rarity, material, season, relic`
   ).bind(pid, ...ids).all();
   const rows = gone.results || [];
   if (!rows.length) throw new Refusal("None of those can be sold", 409);
@@ -436,10 +443,11 @@ async function forge(db, pid, body, { rand }) {
 async function restrike(db, pid, body, { rand }) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const c = await db.prepare(
-    `SELECT id, seed, metal_idx, shiny, rarity, material, season FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
+    `SELECT id, seed, metal_idx, shiny, rarity, material, season, relic FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
   ).bind(body.coinId, pid).first();
   if (!c) throw new Refusal("That coin is gone", 404);
   if (c.metal_idx === ASTRAL.metal) throw new Refusal("An astral coin bears its sign, not a face", 409);
+  if (c.relic) throw new Refusal("That coin bears its own mark, not a face", 409);
   const old = c.seed >>> 0, rarity = c.rarity ?? deriveRarity(old);
   const shape = mkCoin(old, 1, c.metal_idx).shape;
   let seed = old;
@@ -510,7 +518,7 @@ async function gamble(db, pid, body, { now, rand }) {
   if (ids.length !== g.coins) throw new Refusal(`Stake ${g.coins} coin${g.coins > 1 ? "s" : ""}`);
 
   const found = await db.prepare(
-    `SELECT id, metal_idx, season FROM coins WHERE player_id = ?1 AND locked = 0 AND dusty = 0 AND id IN (${placeholders(ids.length, 2)})`
+    `SELECT id, metal_idx, season FROM coins WHERE player_id = ?1 AND locked = 0 AND dusty = 0 AND relic IS NULL AND id IN (${placeholders(ids.length, 2)})`
   ).bind(pid, ...ids).all();
   const staked = ids.map(id => (found.results || []).find(r => r.id === id));
   if (staked.some(r => !r)) throw new Refusal("A staked coin is locked or gone", 409);

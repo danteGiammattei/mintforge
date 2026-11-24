@@ -30,8 +30,32 @@ export const EVENTS = [
     tome: { id: "almanac", chance: [0.08, 0.1, 0.14, 0.2, 0.28, 0.35] },
     title: { id: "long_night", chance: [0.03, 0.05, 0.08, 0.12, 0.18, 0.25] },
     effect: { id: "frostfall", chance: [0, 0.005, 0.015, 0.03, 0.06, 0.12] },
+    relics: "magi",
   },
 ];
+
+/* An event's set of named coins: each drawn with its own emblem
+ * (lib/coin.js paintRelic), always mythic, `chance` of any of the event's
+ * presents holding one (which, at random). The first time a player finds
+ * each pays `firstBonus` marks, and finding the whole set pays `setBonus`
+ * once more (server/state.js payRelics). They are one of a kind, so the
+ * tavern, war and the restrike will not take them. A relic is written
+ * "set:index", e.g. "magi:1". */
+export const RELICS = {
+  magi: {
+    event: "longnight26", name: "THE MAGI'S GIFTS", chance: 0.01,
+    firstBonus: 5000, setBonus: 20000, metal: 3,
+    coins: [
+      { name: "GOLD",         emblem: "crown" },
+      { name: "FRANKINCENSE", emblem: "censer" },
+      { name: "MYRRH",        emblem: "jar" },
+    ],
+  },
+};
+export const relicOf = r => {
+  const [set, i] = String(r || "").split(":"), s = RELICS[set], c = s?.coins[+i];
+  return c ? { set, index: +i, ...c, of: s } : null;
+};
 
 /* What each season does to a coin: its sale value and cabinet score
  * multiply; `label` is how the coin names it. */
@@ -62,7 +86,10 @@ export const eventChest = (ev, rand) => !!ev && rand() < ev.chestShare;
  * own chest tier, lifted by grade, is `coinTier`. */
 export function eventChestHolds(ev, tier, grade, owned, rand) {
   const g = Math.max(0, Math.min(5, grade | 0));
-  const out = { coinTier: Math.min(4, tier + (ev.coinLift[g] || 0)), tome: null, title: null, effect: null };
+  const out = { coinTier: Math.min(4, tier + (ev.coinLift[g] || 0)), tome: null, title: null, effect: null, relic: null };
+  // now and then, in place of the frost coin, one of the event's named coins
+  const set = ev.relics && RELICS[ev.relics];
+  if (set && rand() < set.chance) out.relic = `${ev.relics}:${Math.floor(rand() * set.coins.length)}`;
   if (ev.tome && !(owned.tomes || []).includes(ev.tome.id) && rand() < ev.tome.chance[g]) out.tome = ev.tome.id;
   if (!owned.titles.includes(ev.title.id) && rand() < ev.title.chance[g]) out.title = ev.title.id;
   if (!owned.effects.includes(ev.effect.id) && rand() < ev.effect.chance[g]) out.effect = ev.effect.id;

@@ -14,7 +14,7 @@ import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay } 
 import { SCRIBE, ASTRAL } from "../shared/tuning.js";
 import { heldSigns } from "./signs.js";
 import { STARTER, cravedPage } from "../shared/tomes.js";
-import { eventOn } from "../shared/events.js";
+import { eventOn, RELICS, relicOf } from "../shared/events.js";
 import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
 
@@ -28,15 +28,18 @@ export const coinOut = r => ({
   ...(r.material ? { material: r.material } : {}),
   ...(r.sign != null ? { sign: r.sign } : {}),
   ...(r.season ? { season: r.season } : {}),
+  ...(r.relic ? { relic: r.relic } : {}),
 });
 
 /* The journal as stored, topped up with what the player holds right now —
  * so coins from before the journal existed count without a backfill. */
 export function journalOut(stored, coins) {
-  const j = parseObj(stored), c = { ...(j.c || {}) }, m = { ...(j.m || {}) }, s = { ...(j.s || {}) }, held = {}, heldM = {};
+  const j = parseObj(stored), c = { ...(j.c || {}) }, m = { ...(j.m || {}) }, s = { ...(j.s || {}) }, rel = { ...(j.r || {}) }, held = {}, heldM = {};
   let shinyHeld = 0;
   for (const r of coins) {
     if (r.dusty) continue;
+    // a named coin is on its own page, not among the kinds
+    if (relicOf(r.relic)) { rel[r.relic] = Math.max(rel[r.relic] || 0, 1); if (r.shiny) shinyHeld++; continue; }
     const k = `${r.metal_idx}:${r.rarity ?? 0}`;
     held[k] = (held[k] || 0) + 1;
     if (r.shiny) shinyHeld++;
@@ -45,7 +48,7 @@ export function journalOut(stored, coins) {
   }
   for (const [k, n] of Object.entries(held)) c[k] = Math.max(c[k] || 0, n);
   for (const [k, n] of Object.entries(heldM)) m[k] = Math.max(m[k] || 0, n);
-  return { c, m, s, shiny: Math.max(j.shiny || 0, shinyHeld), best: j.best || 0 };
+  return { c, m, s, r: rel, shiny: Math.max(j.shiny || 0, shinyHeld), best: j.best || 0 };
 }
 
 /* Astral coins from before the signs (migration 016) get one each, the
@@ -96,6 +99,39 @@ async function paySigns(db, pid, ps, rows) {
   return paid.map(sign => ({ sign, marks: ASTRAL.firstBonus }));
 }
 
+/* ─── the first-find bonus for an event's named coins ─────────────────
+ * RELICS[set].firstBonus marks the first time a player has each of a
+ * set's coins (brushed: a dusty one waits, so the popup never spoils a
+ * reveal), and setBonus once more when the set is whole. Found ever is
+ * the journal's $.r with what is held; paid is $.relicsPaid, a bitmask per
+ * set, the set's own bonus the bit past its coins. Each payment is its own
+ * guarded statement, so two loads at once pay it once. */
+async function payRelics(db, pid, ps, rows) {
+  const j = parseObj(ps.journal), paid = parseObj(j.relicsPaid), out = [], stmts = [];
+  for (const [set, def] of Object.entries(RELICS)) {
+    let found = 0;
+    def.coins.forEach((_, i) => { if ((j.r || {})[`${set}:${i}`]) found |= 1 << i; });
+    for (const r of rows) { const rel = relicOf(r.relic); if (rel && rel.set === set && !r.dusty) found |= 1 << rel.index; }
+    const had = paid[set] | 0, whole = (1 << def.coins.length) - 1, setBit = 1 << def.coins.length;
+    def.coins.forEach((c, i) => {
+      if ((found & (1 << i)) && !(had & (1 << i))) { stmts.push([set, 1 << i, def.firstBonus]); out.push({ relic: `${set}:${i}`, marks: def.firstBonus }); }
+    });
+    if ((found & whole) === whole && !(had & setBit)) { stmts.push([set, setBit, def.setBonus]); out.push({ set, marks: def.setBonus }); }
+  }
+  if (!stmts.length) return [];
+  let res;
+  try {
+    res = await db.batch(stmts.map(([set, bit, marks]) => db.prepare(
+      `UPDATE player_state SET marks = marks + ?4,
+         journal = json_set(journal, '$.relicsPaid.' || ?2, COALESCE(json_extract(journal, '$.relicsPaid.' || ?2), 0) | ?3)
+       WHERE player_id = ?1 AND (COALESCE(json_extract(journal, '$.relicsPaid.' || ?2), 0) & ?3) = 0`
+    ).bind(pid, set, bit, marks)));
+  } catch { return []; }                                       // try again next load
+  const got = out.filter((_, k) => res[k]?.meta?.changes);
+  ps.marks = (ps.marks || 0) + got.reduce((n, g) => n + g.marks, 0);
+  return got;
+}
+
 /* the tomes a player has: always the primer, whatever the row says */
 export const tomesOf = raw => { const t = parseList(raw); return t.includes(STARTER) ? t : [STARTER, ...t]; };
 
@@ -109,7 +145,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
          FROM player_state s JOIN players ON players.id = s.player_id
         WHERE s.player_id = ?1`
     ).bind(pid).first(),
-    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material, sign, season FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
+    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material, sign, season, relic FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
     db.prepare(`SELECT id, rarity, seed FROM scrolls WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
     db.prepare(`SELECT id, tier, season FROM chests WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
   ]);
@@ -117,6 +153,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   const all = coins.results || [];
   await signOldAstrals(db, pid, all);
   const signBonus = await paySigns(db, pid, ps, all);
+  const relicBonus = await payRelics(db, pid, ps, all);
   const stats = parseObj(ps.stats);
   delete stats.lastVisitAt;
   const daily = stats.daily || {};
@@ -151,6 +188,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     event: (e => e && { id: e.id, name: e.name, season: e.season, to: e.to })(eventOn(localDay(now, tz))),   // the page he wants today: { tome, page }
     // star signs paid for just now, for the popup
     ...(signBonus.length ? { signBonus } : {}),
+    ...(relicBonus.length ? { relicBonus } : {}),
   };
 }
 

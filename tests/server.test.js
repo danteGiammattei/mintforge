@@ -1,5 +1,5 @@
 import { test } from "node:test";
-import { EVENTS, SEASONS, eventOn } from "../shared/events.js";
+import { EVENTS, SEASONS, eventOn, RELICS } from "../shared/events.js";
 import assert from "node:assert/strict";
 import { makeDb, seeded, scripted } from "./d1.js";
 import { world, driver, circle, line, scribble } from "./helpers.js";
@@ -22,8 +22,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 021 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql"]);
+test("migrations 009 and 011 to 022 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -752,4 +752,41 @@ test("a profile effect can be worn only once owned", async () => {
   assert.equal((await loadState(db, pid)).profileFx, "frostfall");
   await patchCosmetics(db, pid, { state: { profileFx: null } });
   assert.equal((await loadState(db, pid)).profileFx, null);
+});
+
+test("the Magi's gifts: a present's rare named coin, mythic, kept out of the kinds, paid for once each and once for the set", async () => {
+  const { db, pid } = await world();
+  const go = driver(db, pid, seeded(11), Date.parse("2026-12-10T10:00:00Z"));
+  const was = RELICS.magi.chance;
+  RELICS.magi.chance = 1;                                     // every present holds one, for the test
+  try {
+    const found = new Set();
+    let marks0 = (await loadState(db, pid)).marks, n = 0;
+    for (; found.size < 3 && n < 40; n++) {
+      db.raw.prepare(`INSERT INTO chests (id, player_id, tier, created_at, season, grade) VALUES (?, ?, 1, ?, 'frost26', 2)`).run("k_m" + n, pid, n);
+      const o = await go("open", { chestId: "k_m" + n });
+      const c = o.result.coin;
+      assert.ok(/^magi:[012]$/.test(c.relic), JSON.stringify(c));
+      assert.equal(c.rarity, 5);
+      assert.ok(!c.season, "a named coin wears no frost");
+      const b = await go("brush", { coinId: c.id });
+      const first = !found.has(c.relic);
+      found.add(c.relic);
+      const s = b.state.marks != null ? b.state : await loadState(db, pid);
+      const bonus = b.state.relicBonus || [];
+      assert.equal(bonus.filter(b => b.relic).length, first ? 1 : 0, "each pays once, the first time");
+      if (found.size === 3 && first) assert.ok(bonus.some(b => b.set === "magi" && b.marks === RELICS.magi.setBonus), "the set pays when whole");
+      assert.equal(s.marks - marks0, bonus.reduce((t, b) => t + b.marks, 0));
+      marks0 = s.marks;
+    }
+    assert.equal(found.size, 3);
+    const s = await loadState(db, pid);
+    assert.equal(Object.keys(s.journal.r).length, 3);
+    assert.ok(!Object.keys(s.journal.c).some(k => k === "3:5" && !s.coins.some(c => c.metalIdx === 3 && c.rarity === 5 && !c.relic)), "not counted among the kinds");
+    assert.ok(!(await loadState(db, pid)).relicBonus, "nothing paid twice");
+    // the tavern and war will not take one
+    const one = s.coins.find(c => c.relic);
+    await assert.rejects(go("gamble", { game: "toss", coinIds: [one.id] }));
+    await assert.rejects(go("restrike", { coinId: one.id }));
+  } finally { RELICS.magi.chance = was; }
 });

@@ -119,9 +119,10 @@ async function invite(db, pid, body, now) {
   if (!g) throw new Refusal("You can only challenge a friend", 403);
   if (g.id === pid) throw new Refusal("You cannot play yourself");
   if (await busy(db, pid)) throw new Refusal("You are already at a table", 409);
-  const c = await db.prepare(`SELECT id, seed, rarity, locked, dusty, sign FROM coins WHERE id = ?1 AND player_id = ?2`).bind(body.coinId, pid).first();
+  const c = await db.prepare(`SELECT id, seed, rarity, locked, dusty, sign, relic FROM coins WHERE id = ?1 AND player_id = ?2`).bind(body.coinId, pid).first();
   if (!c || c.dusty) throw new Refusal("That coin is not yours to stake", 404);
   if (c.locked) throw new Refusal("That coin is locked", 409);
+  if (c.relic) throw new Refusal("That coin is one of a kind; it is not for the table", 409);
   if (c.sign != null && (await heldSigns(db, g.id)).has(c.sign)) throw new Refusal(`${friend} already holds ${ASTRAL.signs[c.sign]}`, 409);
 
   const id = "w_" + randomHex(8);
@@ -143,9 +144,10 @@ async function join(db, pid, body, now, rand) {
   if (t.guest_id !== pid || t.status !== "invited" || t.expires_at <= now) throw new Refusal("That challenge has lapsed", 409);
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   if (await busy(db, pid, t.id)) throw new Refusal("You are already at a table", 409);
-  const c = await db.prepare(`SELECT id, seed, rarity, locked, dusty, sign FROM coins WHERE id = ?1 AND player_id = ?2`).bind(body.coinId, pid).first();
+  const c = await db.prepare(`SELECT id, seed, rarity, locked, dusty, sign, relic FROM coins WHERE id = ?1 AND player_id = ?2`).bind(body.coinId, pid).first();
   if (!c || c.dusty) throw new Refusal("That coin is not yours to stake", 404);
   if (c.locked) throw new Refusal("That coin is locked", 409);
+  if (c.relic) throw new Refusal("That coin is one of a kind; it is not for the table", 409);
   // nobody may win a star sign they already hold
   const hostSign = parse(t.host_coin)?.sign;
   if (c.sign != null && (await heldSigns(db, t.host_id)).has(c.sign)) throw new Refusal(`They already hold ${ASTRAL.signs[c.sign]}`, 409);

@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS coins (
   material        TEXT,                               -- a twin in another material (migration 015)
   sign            INTEGER,                            -- an astral coin's star sign, 0-11 (migration 016)
   season          TEXT,                               -- an event's mark, e.g. 'frost26' (migration 021)
+  relic           TEXT,                               -- one of an event's named coins, e.g. 'magi:1' (migration 022)
   PRIMARY KEY (player_id, id),
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
