@@ -309,14 +309,15 @@ async function open(db, pid, body, { now, rand }) {
   ]);
   if (!ch) throw new Refusal("That chest is gone", 404);
   // now and then a tome, tucked in with the coin
-  const tome = tomeFromChest(ch.tier, tomesOf(ps.tomes), CHESTS.tomeChance, rand);
+  let tome = tomeFromChest(ch.tier, tomesOf(ps.tomes), CHESTS.tomeChance, rand);
   // an event's chest: its coin is of the season, rolled as from a finer
   // chest the better the scroll that paid for it, and it may hold the
   // event's title or its profile effect (shared/events.js)
   const ev = ch.season && SEASONS[ch.season] ? eventById(SEASONS[ch.season].event) : null;
-  const holds = ev ? eventChestHolds(ev, ch.tier, ch.grade, { titles: parseList(ps.owned_titles), effects: parseList(ps.owned_fx) }, rand) : null;
+  const holds = ev ? eventChestHolds(ev, ch.tier, ch.grade, { tomes: tomesOf(ps.tomes), titles: parseList(ps.owned_titles), effects: parseList(ps.owned_fx) }, rand) : null;
   const rolled = rollCoin(holds ? holds.coinTier : ch.tier, rand);
   if (ev) rolled.season = ch.season;
+  if (!tome && holds?.tome) tome = holds.tome;          // the event's own tome, from its present
   const id = "c_" + randomHex(8);
   // an astral coin takes a sign its owner lacks (and if two chests race
   // for the last free one, the index refuses the second: pick again)

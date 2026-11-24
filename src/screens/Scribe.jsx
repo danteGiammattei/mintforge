@@ -24,14 +24,15 @@ const keepSeen = n => { try { localStorage.setItem(SEEN_KEY, String(n)); } catch
  * which page, and the lectern (to the desk's left) where they are chosen. */
 
 /* The lectern, sliding in from the left over the desk and back out. */
-function Lectern({ owned, wanted, chosen, choose, onBack }) {
+function Lectern({ owned, wanted, chosen, choose, onBack, event = null }) {
   const ref = useRef(null), scene = useRef(null), live = useRef({ owned, chosen });
-  live.current = { owned, chosen };
+  live.current = { owned, chosen, event };
   const [inPlace, setIn] = useState(false);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     scene.current = mountLectern(ref.current, {
-      tomes: () => TOMES,
+      // an event's tome shows while its event runs, and for good once owned
+      tomes: () => TOMES.filter(t => !t.event || live.current.owned.includes(t.id) || live.current.event === t.event),
       owned: () => live.current.owned,
       chosen: () => live.current.chosen,
       wanted: () => wanted,
@@ -135,7 +136,7 @@ export default function Scribe() {
         <button onClick={() => scene.current?.seal()}>Seal the scroll</button>
         {g.wellLevel < SCRIBE.wells.length - 1 && <button onClick={buyWell}>Buy a deeper inkwell</button>}
       </div>
-      {lectern && <Lectern owned={g.tomes} wanted={g.craving} chosen={{ tome: tome.id, page: pageAt }} choose={(t, p) => setOpen({ tome: t, page: p })} onBack={() => setLectern(false)}/>}
+      {lectern && <Lectern owned={g.tomes} event={g.event?.id || null} wanted={g.craving} chosen={{ tome: tome.id, page: pageAt }} choose={(t, p) => setOpen({ tome: t, page: p })} onBack={() => setLectern(false)}/>}
     </section>
   );
 }

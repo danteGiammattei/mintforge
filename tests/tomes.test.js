@@ -121,3 +121,13 @@ test("a fair copy of the page he wants lifts; a poor one does not", () => {
   const poor = rollScroll(a, [], 1, { page: star, likeness: SIGIL.copy.fair - 0.01, maxMs: Infinity, craved: true });
   assert.ok(!poor.steps.some(st => st.why === "crave"));
 });
+
+test("an event's tome is never in an ordinary chest", () => {
+  const r = (() => { let s = 7; return () => ((s = (s * 16807) % 2147483647) / 2147483647); })();
+  const event = TOMES.filter(t => t.event).map(t => t.id);
+  assert.ok(event.length > 0);
+  for (let i = 0; i < 2000; i++) {
+    const got = tomeFromChest(4, ["primer"], [1, 1, 1, 1, 1], r);
+    assert.ok(!event.includes(got), got);
+  }
+});

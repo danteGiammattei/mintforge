@@ -107,7 +107,7 @@ function play(seed) {
     if (kinds >= 33) mark("journal half");
     if (kinds >= 66) mark("journal");
     if (found.size >= 12) mark("signs");
-    if (tomes.length >= TOMES.length) mark("tomes");
+    if (tomes.length >= TOMES.filter(t => !t.event).length) mark("tomes");
     if (given.length >= 26) mark("gifts");
     const lv = levelOf(xp); if (lv >= 10) mark("level 10"); if (lv >= 20) mark("level 20"); if (lv >= 35) mark("level 35");
     const score = cab.reduce((s2, c) => s2 + cabScore(c), 0);

@@ -5,8 +5,8 @@
  *  player's own calendar (economy.localDay), and while it runs a share
  *  of the chests he hands through the gap are the event's own. Each
  *  such chest is guaranteed a coin of the season (its `season`, kept on
- *  the coin for good, like shine), and may hold the event's title or,
- *  rarely, its profile effect. How good it is follows the finest scroll
+ *  the coin for good, like shine), and may hold the event's tome, its
+ *  title or, rarely, its profile effect. How good it is follows the finest scroll
  *  in the pot that paid for it (`grade`, a rarity 0..5): copy hard pages
  *  well and the chest is better.
  *
@@ -27,6 +27,7 @@ export const EVENTS = [
     // the chest's coin is rolled as from a chest this many tiers better,
     // by grade (the best scroll's rarity), never past the void chest
     coinLift: [0, 0, 1, 1, 2, 3],
+    tome: { id: "almanac", chance: [0.08, 0.1, 0.14, 0.2, 0.28, 0.35] },
     title: { id: "long_night", chance: [0.03, 0.05, 0.08, 0.12, 0.18, 0.25] },
     effect: { id: "frostfall", chance: [0, 0.005, 0.015, 0.03, 0.06, 0.12] },
   },
@@ -61,7 +62,8 @@ export const eventChest = (ev, rand) => !!ev && rand() < ev.chestShare;
  * own chest tier, lifted by grade, is `coinTier`. */
 export function eventChestHolds(ev, tier, grade, owned, rand) {
   const g = Math.max(0, Math.min(5, grade | 0));
-  const out = { coinTier: Math.min(4, tier + (ev.coinLift[g] || 0)), title: null, effect: null };
+  const out = { coinTier: Math.min(4, tier + (ev.coinLift[g] || 0)), tome: null, title: null, effect: null };
+  if (ev.tome && !(owned.tomes || []).includes(ev.tome.id) && rand() < ev.tome.chance[g]) out.tome = ev.tome.id;
   if (!owned.titles.includes(ev.title.id) && rand() < ev.title.chance[g]) out.title = ev.title.id;
   if (!owned.effects.includes(ev.effect.id) && rand() < ev.effect.chance[g]) out.effect = ev.effect.id;
   return out;

@@ -38,9 +38,10 @@ export default function PublicProfile({ frame, fx = null, username, level, title
           <div className="panel" style={{ padding: 8, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center" }} role="img"
                  aria-label={`Tomes: ${TOMES.filter(t => tomes.includes(t.id)).map(t => t.name.toLowerCase()).join(", ")}`}>
-              {TOMES.map(t => <TomeCover key={t.id} tome={t} owned={tomes.includes(t.id)} scale={1}/>)}
+              {/* the five, found or not; an event's tome only once found */}
+              {TOMES.filter(t => !t.event || tomes.includes(t.id)).map(t => <TomeCover key={t.id} tome={t} owned={tomes.includes(t.id)} scale={1}/>)}
             </div>
-            <span className="t-label">TOMES {TOMES.filter(t => tomes.includes(t.id)).length} / {TOMES.length}</span>
+            <span className="t-label">TOMES {TOMES.filter(t => !t.event && tomes.includes(t.id)).length} / {TOMES.filter(t => !t.event).length}</span>
           </div>
         {signs.length > 0 && <SignBadges signs={signs}/>}
         {showcase.length > 0 ? (

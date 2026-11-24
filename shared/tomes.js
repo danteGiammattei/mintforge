@@ -91,6 +91,23 @@ export const TOMES = [
       { id: "binding", name: "THE BINDING",    tier: 5, strokes: [ring(0.5, 0.5, 0.46), poly(0.5, 0.5, 0.46, 5, 2), ring(0.5, 0.5, 0.16, 20), ...rays(0.5, 0.5, 0.16, 0.24, 5, DOWN)] },
     ],
   },
+  /* An event's tome (shared/events.js): found only in its presents, while
+   * it runs, and kept for good. Never in an ordinary chest (tomeFromChest),
+   * and not counted among the five. */
+  {
+    id: "almanac", name: "THE WINTER ALMANAC", tier: 2, event: "longnight26",
+    look: { leather: "#5a1418", trim: "#d8b050", emblem: "tree" },
+    pages: [
+      { id: "snowflake", name: "THE SNOWFLAKE", tier: 3, strokes: [line([0.5, 0.04], [0.5, 0.96]), line([0.1, 0.27], [0.9, 0.73]), line([0.1, 0.73], [0.9, 0.27]), ring(0.5, 0.5, 0.14, 16)] },
+      { id: "nightstar", name: "THE STAR",      tier: 3, strokes: [poly(0.5, 0.44, 0.4, 5, 2), line([0.5, 0.8], [0.5, 0.98])] },
+      { id: "bell",      name: "THE BELL",      tier: 3, strokes: [[[0.2, 0.78], ...arc(0.5, 0.44, 0.26, Math.PI, TAU, 18), [0.8, 0.78]], line([0.1, 0.78], [0.9, 0.78]), ring(0.5, 0.88, 0.07, 12), ring(0.5, 0.12, 0.06, 10)] },
+      { id: "candle",    name: "THE CANDLE",    tier: 3, strokes: [line([0.36, 0.94], [0.36, 0.42], [0.64, 0.42], [0.64, 0.94], [0.36, 0.94]), [[0.59, 0.28], [0.5, 0.06], [0.41, 0.28], ...arc(0.5, 0.28, 0.09, Math.PI, 0, 10)]] },
+      { id: "holly",     name: "THE HOLLY",     tier: 3, strokes: [arc(0.3, 0.38, 0.24, 0, TAU, 24, 0.11), arc(0.7, 0.38, 0.24, 0, TAU, 24, 0.11), ring(0.42, 0.66, 0.08, 12), ring(0.58, 0.66, 0.08, 12), ring(0.5, 0.8, 0.08, 12)] },
+      { id: "cane",      name: "THE CANE",      tier: 3, strokes: [[...arc(0.5, 0.3, 0.2, 0, -Math.PI, 16), [0.3, 0.96]], line([0.24, 0.52], [0.36, 0.46]), line([0.24, 0.68], [0.36, 0.62]), line([0.24, 0.84], [0.36, 0.78])] },
+      { id: "tree",      name: "THE TREE",      tier: 4, strokes: [line([0.5, 0.06], [0.26, 0.36], [0.4, 0.36], [0.18, 0.64], [0.36, 0.64], [0.12, 0.86], [0.88, 0.86], [0.64, 0.64], [0.82, 0.64], [0.6, 0.36], [0.74, 0.36], [0.5, 0.06]), line([0.5, 0.86], [0.5, 0.98])] },
+      { id: "present",   name: "THE PRESENT",   tier: 4, strokes: [line([0.16, 0.42], [0.84, 0.42], [0.84, 0.94], [0.16, 0.94], [0.16, 0.42]), line([0.5, 0.42], [0.5, 0.94]), ring(0.38, 0.3, 0.11, 16), ring(0.62, 0.3, 0.11, 16)] },
+    ],
+  },
 ];
 
 export const TOME_BY_ID = Object.fromEntries(TOMES.map(t => [t.id, t]));
@@ -118,7 +135,7 @@ export function cravedPage(day, pid, owned) {
  * rarer than the chest, the chest's own rarity likelier. */
 export function tomeFromChest(tier, owned, chance, rand) {
   if (rand() >= (chance[tier] || 0)) return null;
-  const can = TOMES.filter(t => t.tier <= tier && t.tier > 0 && !owned.includes(t.id));
+  const can = TOMES.filter(t => t.tier <= tier && t.tier > 0 && !t.event && !owned.includes(t.id));
   if (!can.length) return null;
   const w = can.map(t => 1 + t.tier * 2), tot = w.reduce((a, b) => a + b, 0);
   let r = rand() * tot;
