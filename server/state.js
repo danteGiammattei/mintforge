@@ -11,6 +11,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay } from "../shared/economy.js";
+import { settleDue, takeNotes } from "./auction.js";
 import { SCRIBE, ASTRAL, CABINET_SCORE } from "../shared/tuning.js";
 import { heldSigns } from "./signs.js";
 import { STARTER, cravedPage } from "../shared/tomes.js";
@@ -136,6 +137,9 @@ async function payRelics(db, pid, ps, rows) {
 export const tomesOf = raw => { const t = parseList(raw); return t.includes(STARTER) ? t : [STARTER, ...t]; };
 
 export async function loadState(db, pid, now = Date.now(), tz = 0) {
+  // an auction run out and not yet settled by the clock is settled now,
+  // so a coin won is in the vault this very load
+  await settleDue(db, now, 5);
   // every read at once: one round trip to the database, not two
   const [ps, coins, scrolls, chests] = await Promise.all([
     db.prepare(
@@ -154,6 +158,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   await signOldAstrals(db, pid, all);
   const signBonus = await paySigns(db, pid, ps, all);
   const relicBonus = await payRelics(db, pid, ps, all);
+  const auctionNotes = await takeNotes(db, pid);
   const stats = parseObj(ps.stats);
   delete stats.lastVisitAt;
   const daily = stats.daily || {};
@@ -189,6 +194,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     // star signs paid for just now, for the popup
     ...(signBonus.length ? { signBonus } : {}),
     ...(relicBonus.length ? { relicBonus } : {}),
+    ...(auctionNotes.length ? { auctionNotes } : {}),
   };
 }
 

@@ -36,6 +36,7 @@ import { FRAMES, PREMIUM_TITLES } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
 import { loadState, parseList, parseObj, coinOut, tomesOf } from "./state.js";
 import { stall, buy } from "./stall.js";
+import { auctions, list, bid, withdraw } from "./auction.js";
 import { LISTS, listHash } from "../shared/listhash.js";
 
 const u32 = rand => Math.floor(rand() * 4294967296) >>> 0;
@@ -275,7 +276,7 @@ async function daily(db, pid, stats, statsText, now, tz) {
 
 /* ─── the journal ─────────────────────────────────────────────────────
  * A statement that records one coin as found. Kinds only ever count up. */
-export function journalStmt(db, pid, c) {
+export function journalStmt(db, pid, c, guard = null) {
   // one of an event's named coins is counted on its own page ($.r."magi:1"),
   // not among the kinds of coin; only known ones, written into the path
   const rel = relicOf(c.relic) ? c.relic : null;
@@ -299,7 +300,7 @@ export function journalStmt(db, pid, c) {
         '${sk}', COALESCE(json_extract(journal, '${sk}'), 0) + 1,` : ""}
         '$.shiny', COALESCE(json_extract(journal, '$.shiny'), 0) + ?2,
         '$.best', MAX(COALESCE(json_extract(journal, '$.best'), 0), ?3))
-      WHERE player_id = ?1`
+      WHERE player_id = ?1${guard ? ` AND ${guard}` : ""}`
   ).bind(pid, c.shiny ? 1 : 0, value);
 }
 
@@ -559,7 +560,7 @@ async function gamble(db, pid, body, { now, rand }) {
 
 /* ─── dispatch ────────────────────────────────────────────────────── */
 
-const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, well, stall, buy };
+const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, well, stall, buy, auctions, list, bid, withdraw };
 
 export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, tz = 0 } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;

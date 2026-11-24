@@ -184,3 +184,34 @@ CREATE TABLE IF NOT EXISTS stall_buys (
 -- ── migrations that must only ever run once mark themselves here (017) ──
 CREATE TABLE IF NOT EXISTS migration_marks (id TEXT PRIMARY KEY, at INTEGER);
 INSERT OR IGNORE INTO migration_marks (id, at) VALUES ('017', 0);
+
+-- The tavern's auction house (migration 023; server/auction.js)
+CREATE TABLE IF NOT EXISTS auctions (
+  id           TEXT    PRIMARY KEY,
+  seller_id    INTEGER,
+  coin         TEXT    NOT NULL,
+  start_price  INTEGER NOT NULL,
+  bid          INTEGER,
+  bidder_id    INTEGER,
+  bids         INTEGER NOT NULL DEFAULT 0,
+  created_at   INTEGER NOT NULL,
+  ends_at      INTEGER NOT NULL,
+  settled      INTEGER NOT NULL DEFAULT 0,
+  token        TEXT,
+  house_key    TEXT    UNIQUE
+);
+CREATE INDEX IF NOT EXISTS auctions_open_idx ON auctions(settled, ends_at);
+CREATE INDEX IF NOT EXISTS auctions_seller_idx ON auctions(seller_id, settled);
+
+-- What happened at the auction while you were away: outbid, won, sold,
+-- unsold. Read once and cleared by loadState.
+CREATE TABLE IF NOT EXISTS auction_notes (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id   INTEGER NOT NULL,
+  kind        TEXT    NOT NULL,
+  auction_id  TEXT    NOT NULL,
+  amount      INTEGER,
+  coin        TEXT,
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS auction_notes_player_idx ON auction_notes(player_id);

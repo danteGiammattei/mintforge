@@ -346,3 +346,20 @@ export const STALL = {
     { type: "frame", id: "hoard",         price: 12000 },
   ],
 };
+
+/* ─── the auction house (server/auction.js) ──────────────────────────
+ * Players list coins for a starting price and a time of their own
+ * choosing; the highest bid when the clock runs out takes the coin. The
+ * house keeps a tenth of every sale. A bid in the last minutes pushes the
+ * end back, so a coin can't be snatched in the final second. The goblin
+ * lists a couple of his own each day. Open from level 5. */
+export const AUCTION = {
+  minLevel: 5,
+  cut: 0.10,
+  minutes: [10, 7 * 24 * 60],            // the shortest and longest a listing may run
+  maxPrice: 10_000_000,
+  raise: 0.05,                            // a new bid beats the last by at least this (and at least 1)
+  snipe: 2 * 60_000,                      // a bid this close to the end moves the end this far out
+  openPerPlayer: 8,
+  house: { perDay: 2, chestTier: 3, startMul: 0.6, hours: 24 },
+};

@@ -22,8 +22,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 022 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql"]);
+test("migrations 009 and 011 to 023 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -801,4 +801,116 @@ test("the cabinet frame worn: a grade's number, or none for the cabinet's own; n
   assert.equal((await loadState(db, pid)).cabFrame, 2);
   await patchCosmetics(db, pid, { state: { cabFrame: null } });
   assert.equal((await loadState(db, pid)).cabFrame, null);
+});
+
+/* ─── the auction house ─────────────────────────────────────────────── */
+import { settleDue } from "../server/auction.js";
+import { AUCTION } from "../shared/tuning.js";
+async function auctionWorld() {
+  const { db, pid: sam } = await world("sam", 1000);
+  const ids = { sam };
+  for (const n of ["bea", "cal"]) ids[n] = (await register(db, { username: n, pin: "4821", ip: "1.1.1." + n.length, now: 1000 })).body.player.id;
+  db.raw.prepare(`UPDATE player_state SET xp = 100000, marks = 5000`).run();
+  db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, nickname) VALUES ('c_sale', ?, 4242, 5, 1, 0, 3, 1, 0, 'OLD BET')`).run(sam);
+  const T0 = Date.parse("2026-12-03T10:00:00Z");
+  const as = (pid, action, body, now = T0) => act(db, pid, { action, ...body }, { now });
+  const marks = pid => db.raw.prepare(`SELECT marks FROM player_state WHERE player_id = ?`).get(pid).marks;
+  return { db, ...ids, T0, as, marks };
+}
+
+test("auction: gated at level 5; sets and locked coins can't be listed", async () => {
+  const { db, sam, as } = await auctionWorld();
+  db.raw.prepare(`UPDATE player_state SET xp = 0 WHERE player_id = ?`).run(sam);
+  await assert.rejects(as(sam, "auctions", {}), /level 5/);
+  db.raw.prepare(`UPDATE player_state SET xp = 100000 WHERE player_id = ?`).run(sam);
+  db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, relic) VALUES ('c_mg', ?, 1, 3, 0, 0, 5, 1, 0, 'magi:0')`).run(sam);
+  db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES ('c_as', ?, 2, 12, 0, 0, 2, 1, 0, 4)`).run(sam);
+  db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES ('c_lk', ?, 3, 2, 0, 1, 1, 1, 0)`).run(sam);
+  for (const coinId of ["c_mg", "c_as"]) await assert.rejects(as(sam, "list", { coinId, price: 10, minutes: 60 }), /set/);
+  await assert.rejects(as(sam, "list", { coinId: "c_lk", price: 10, minutes: 60 }), /Unlock/);
+  await assert.rejects(as(sam, "list", { coinId: "c_sale", price: 0, minutes: 60 }));
+  await assert.rejects(as(sam, "list", { coinId: "c_sale", price: 10, minutes: 5 }));
+  await assert.rejects(as(sam, "list", { coinId: "c_sale", price: 10, minutes: 8 * 1440 }));
+});
+
+test("auction: a listing leaves the vault; bids are held and handed back when beaten; the winner gets the coin, the seller 90%", async () => {
+  const { db, sam, bea, cal, T0, as, marks } = await auctionWorld();
+  const l = (await as(sam, "list", { coinId: "c_sale", price: 1, minutes: 60 })).result;
+  assert.ok(!(await loadState(db, sam, T0)).coins.some(c => c.id === "c_sale"), "out of the vault while it is up");
+  const feed = (await as(bea, "auctions", {})).result.list;
+  const mine = feed.find(a => a.id === l.auctionId);
+  assert.equal(mine.coin.nick, "OLD BET"); assert.equal(mine.seller, "sam"); assert.equal(mine.next, 1);
+  assert.equal(feed.filter(a => a.house).length, AUCTION.house.perDay, "the goblin has his two up");
+
+  await assert.rejects(as(sam, "bid", { auctionId: l.auctionId, amount: 5 }), /own/);
+  await as(bea, "bid", { auctionId: l.auctionId, amount: 100 });
+  assert.equal(marks(bea), 4900);
+  await assert.rejects(as(bea, "bid", { auctionId: l.auctionId, amount: 200 }), /Yours/);
+  await assert.rejects(as(cal, "bid", { auctionId: l.auctionId, amount: 104 }), /At least 105/);
+  await assert.rejects(as(cal, "bid", { auctionId: l.auctionId, amount: 6000 }), /Not enough/);
+  await as(cal, "bid", { auctionId: l.auctionId, amount: 1000 });
+  assert.equal(marks(cal), 4000);
+  assert.equal(marks(bea), 5000, "beaten, and handed back");
+  const bn = (await loadState(db, bea, T0)).auctionNotes;
+  assert.equal(bn[0].kind, "outbid"); assert.equal(bn[0].amount, 1000);
+  assert.ok(!(await loadState(db, bea, T0)).auctionNotes, "told once");
+
+  // a bid in the last minute pushes the end out
+  const late = T0 + 59 * 60_000;
+  const r = (await as(bea, "bid", { auctionId: l.auctionId, amount: 2000 }, late)).result;
+  assert.equal(r.endsAt, late + AUCTION.snipe);
+  assert.equal(marks(cal), 5000);
+
+  // the clock runs out: settled by whoever loads next
+  const after = r.endsAt + 1;
+  const s = await loadState(db, bea, after);
+  const won = s.coins.find(c => c.id === "c_sale");
+  assert.ok(won && won.shiny && won.nick === "OLD BET" && !won.locked, "the coin, as it was, in the winner's vault");
+  assert.equal(s.auctionNotes[0].kind, "won");
+  assert.equal(s.journal.c["5:3"], 1, "counted in the winner's journal");
+  assert.equal(marks(bea), 3000);
+  const ss = await loadState(db, sam, after);
+  assert.equal(ss.marks, 5000 + 1800, "the bid less the house's tenth");
+  assert.equal(ss.auctionNotes[0].kind, "sold"); assert.equal(ss.auctionNotes[0].amount, 1800);
+  assert.equal(await settleDue(db, after + 10), 0, "settled once");
+  assert.equal(marks(sam), 6800);
+});
+
+test("auction: unsold goes home; a listing can be withdrawn only while nobody has bid", async () => {
+  const { db, sam, bea, T0, as } = await auctionWorld();
+  const l = (await as(sam, "list", { coinId: "c_sale", price: 50, minutes: 10 })).result;
+  await settleDue(db, T0 + 11 * 60_000);
+  const s = await loadState(db, sam, T0 + 11 * 60_000);
+  assert.ok(s.coins.some(c => c.id === "c_sale"));
+  assert.equal(s.auctionNotes[0].kind, "unsold");
+  const l2 = (await as(sam, "list", { coinId: "c_sale", price: 50, minutes: 60 }, T0 + 12 * 60_000)).result;
+  await as(sam, "withdraw", { auctionId: l2.auctionId }, T0 + 13 * 60_000);
+  assert.ok((await loadState(db, sam, T0 + 13 * 60_000)).coins.some(c => c.id === "c_sale"));
+  const l3 = (await as(sam, "list", { coinId: "c_sale", price: 50, minutes: 60 }, T0 + 14 * 60_000)).result;
+  await as(bea, "bid", { auctionId: l3.auctionId, amount: 50 }, T0 + 15 * 60_000);
+  await assert.rejects(as(sam, "withdraw", { auctionId: l3.auctionId }, T0 + 16 * 60_000), /bid/);
+  assert.ok(l.auctionId !== l3.auctionId);
+});
+
+test("auction: the goblin's coins: the same two all day, and what they fetch leaves the game", async () => {
+  const { db, bea, cal, T0, as, marks } = await auctionWorld();
+  await as(bea, "auctions", {});
+  await as(cal, "auctions", {}, T0 + 3600e3);
+  const house = db.raw.prepare(`SELECT * FROM auctions WHERE seller_id IS NULL`).all();
+  assert.equal(house.length, AUCTION.house.perDay);
+  const before = db.raw.prepare(`SELECT SUM(marks) AS m FROM player_state`).get().m;
+  await as(bea, "bid", { auctionId: house[0].id, amount: house[0].start_price });
+  await settleDue(db, house[0].ends_at + 1);
+  const s = await loadState(db, bea, house[0].ends_at + 1);
+  assert.ok(s.coins.some(c => c.id === JSON.parse(house[0].coin).id));
+  assert.equal(db.raw.prepare(`SELECT SUM(marks) AS m FROM player_state`).get().m, before - house[0].start_price);
+  assert.equal(marks(cal), 5000);
+});
+
+test("auction: two bids on the same last price: one stands, the other changes nothing", async () => {
+  const { sam, bea, cal, as, marks } = await auctionWorld();
+  const l = (await as(sam, "list", { coinId: "c_sale", price: 10, minutes: 60 })).result;
+  const res = await Promise.allSettled([as(bea, "bid", { auctionId: l.auctionId, amount: 10 }), as(cal, "bid", { auctionId: l.auctionId, amount: 10 })]);
+  assert.equal(res.filter(r => r.status === "fulfilled").length, 1);
+  assert.equal(marks(bea) + marks(cal), 10000 - 10, "only the standing bid is held");
 });
