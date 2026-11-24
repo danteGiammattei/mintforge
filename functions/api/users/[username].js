@@ -64,6 +64,7 @@ export async function onRequestGet({ request, env, params }) {
     xp: player.xp,
     frame: player.frame,
     profileFx: player.profile_fx || null,
+    relics: [...new Set(allCoins.map(c => c.relic).filter(Boolean))],
     cabFrame: (() => { try { const f = JSON.parse(player.stats || "{}").cabFrame; return Number.isInteger(f) ? f : null; } catch { return null; } })(),
     createdAt: player.created_at,
     isSelf: player.id === auth.player.id,

@@ -1,5 +1,6 @@
 import PixelBanner from "./PixelBanner.jsx";
 import ProfileFx from "./ProfileFx.jsx";
+import Hearth from "./Hearth.jsx";
 import CabinetFrame, { gradeInk, XMAS_FRAME } from "./CabinetFrame.jsx";
 import SignBadges from "./SignBadges.jsx";
 import { CoinTile } from "../screens/Vault.jsx";
@@ -15,7 +16,7 @@ import { TomeCover } from "./TomeCover.jsx";
  * so what you see of yourself is what they see. */
 export const KINDS_TOTAL = METALS.length * (MAX_RARITY + 1);
 
-export default function PublicProfile({ festive = false, cabFrame = null, frame, fx = null, username, level, title, bio, coins, kinds, shiny, signs = [], tomes = ["primer"], cabinet, showcase, onCoin, empty, children }) {
+export default function PublicProfile({ festive = false, relics = [], cabFrame = null, frame, fx = null, username, level, title, bio, coins, kinds, shiny, signs = [], tomes = ["primer"], cabinet, showcase, onCoin, empty, children }) {
   return (
     // a profile effect is worn over the banner and behind everything else
     <div style={{ position: "relative" }}>
@@ -44,6 +45,7 @@ export default function PublicProfile({ festive = false, cabFrame = null, frame,
             <span className="t-label">TOMES {TOMES.filter(t => !t.event && tomes.includes(t.id)).length} / {TOMES.filter(t => !t.event).length}</span>
           </div>
         {signs.length > 0 && <SignBadges signs={signs}/>}
+        {festive && <Hearth relics={relics}/>}
         {showcase.length > 0 ? (
           <CabinetFrame rank={cabFrame == null ? cabinet?.rank || 0 : Math.min(cabFrame, cabinet?.rank || 0)} score={cabinet?.score} pad={6} dress={festive ? XMAS_FRAME : null}>
             <div>

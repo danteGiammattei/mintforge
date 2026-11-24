@@ -190,7 +190,7 @@ function You({ g }) {
   return (
     <>
       <section className="panel" style={{ overflow: "hidden" }} aria-label="Your profile, as others see it">
-        <PublicProfile festive={!!g.event} cabFrame={g.cabFrame} frame={g.frame} fx={g.profileFx} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
+        <PublicProfile festive={!!g.event} relics={g.coins.filter(c => c.relic).map(c => c.relic)} cabFrame={g.cabFrame} frame={g.frame} fx={g.profileFx} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
                        coins={g.coins.length} kinds={journalCounts(g.journal).kinds} shiny={g.coins.filter(c => c.shiny).length}
                        signs={[...new Set(g.coins.filter(c => c.sign != null).map(c => c.sign))]}
                        tomes={g.tomes}
