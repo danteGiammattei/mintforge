@@ -122,7 +122,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   };
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
-  if (snow) paintSnow(put, G, seed, frame);
+  if (snow) paintSnow(put, G, seed, frame, face, inside);
   if (rarity <= 0) {
     const f = frame % LOOP;
     if (flames) replay(d, G, `edge:${seed}:${shapeOf(coin)}:${M}:${f}`, p => paintBlazeEdge(p, inner, seed, f));
@@ -465,9 +465,17 @@ function paintMoon(put, G, M, inside, seed, frame) {
 
 /* A frost coin's snow: a few flakes falling past it, each at its own
  * pace and drifting a little side to side, some single pixels, some
- * small crosses, over the coin and the air round it. */
+ * small crosses, over the coin and the air round it. The snow lying on
+ * its upper rim is painted again here, over the aura's ring, so a
+ * coin's glow never melts it. */
 const FLAKE = [244, 249, 255];
-function paintSnow(put, G, seed, frame) {
+function paintSnow(put, G, seed, frame, face, dist) {
+  const out = (x, y) => y < 0 || dist[y * G + x] !== 0;
+  for (const p of face) {
+    if (p.y > G * 0.55) continue;
+    if (out(p.x, p.y - 1) || out(p.x, p.y - 2)) put(p.x, p.y, FLAKE, 1);
+    else if (out(p.x, p.y - 3) && h32(seed + p.x * 31 + p.y) < 0.6) put(p.x, p.y, FLAKE, 0.85);
+  }
   for (let k = 0; k < 9; k++) {
     const hx = h32(seed + k * 17), hs = h32(seed * 3 + k * 29), hp = h32(seed * 5 + k * 41);
     const speed = 0.7 + hs * 0.9, span = G + 6;
