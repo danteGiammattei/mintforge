@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import Sprite from "../ui/Sprite.jsx";
 import { present, loadGifts } from "../lib/presentArt.js";
-import { PROFILE_FX } from "../../shared/events.js";
+import { PROFILE_FX, RELICS, relicOf } from "../../shared/events.js";
 import { useGame } from "../lib/GameContext.js";
 import { feel } from "../lib/feel.js";
 import { FRAMES, PREMIUM_TITLES } from "../lib/data.js";
@@ -171,6 +171,25 @@ function Body({ r }) {
       </>
     );
   }
+  if (r.kind === "relics") {
+    // one gift found, or the last of the three (then the set pays too)
+    const total = r.relics.reduce((a, b) => a + b.marks, 0);
+    const set = r.relics.find(b => b.set), found = r.relics.filter(b => b.relic).map(b => relicOf(b.relic));
+    const show = set ? RELICS[set.set].coins.map((_, i) => `${set.set}:${i}`) : found.map(f => `${f.set}:${f.index}`);
+    return (
+      <>
+        <div className="row" style={{ justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+          {show.map(id => <CoinCanvas key={id} coin={{ seed: 7, metalIdx: 3, rarity: 5, relic: id, shape: "round" }} size={show.length > 1 ? 80 : 128} aura={false}/>)}
+        </div>
+        <p className="t-title" style={{ margin: 0, textAlign: "center" }}>{show.map(id => relicOf(id).name).join(" · ")}</p>
+        <div className="t-big t-gold row" style={{ justifyContent: "center", gap: 10 }}><PixelIcon name="mark" size={22}/>{total.toLocaleString()}</div>
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>
+          {set ? "ALL THREE GIFTS, BROUGHT TOGETHER. THE STAR STOPS OVER YOUR VAULT."
+               : `ONE OF THE THREE GIFTS. ${RELICS[found[0].set].firstBonus.toLocaleString()} FOR EACH, THE FIRST TIME; ${RELICS[found[0].set].setBonus.toLocaleString()} MORE FOR ALL THREE.`}
+        </p>
+      </>
+    );
+  }
   if (r.kind === "tome") {
     const t = TOME_BY_ID[r.id];
     if (!t) return null;
@@ -232,10 +251,11 @@ const HEADS = {
   marks: ["A POUCH OF MARKS", "HE PUSHED IT THROUGH THE GAP"],
   daily: ["TODAY'S GIFT", ""],
   signs: ["A NEW STAR SIGN", "THE SKY PAYS ITS DUES"],
+  relics: ["A GIFT OF THE MAGI", "A KING'S OFFERING"],
   tome:  ["A NEW TOME", "IT WAS IN THE CHEST"],
   event: ["LIMITED TIME EVENT", ""],
 };
-const COLOUR = { event: "#d8584e", fx: "#a8d8ff", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", tome: "#c080ff" };
+const COLOUR = { event: "#d8584e", fx: "#a8d8ff", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", relics: "#ffd98a", tome: "#c080ff" };
 
 function Card({ r, onClose }) {
   const g = useGame();
@@ -249,9 +269,9 @@ function Card({ r, onClose }) {
 
   const [head0, sub0] = HEADS[r.kind];
   const sub = r.kind === "signs" && r.signs.length > 1 ? "THE SKY PAYS WHAT IT OWES" : sub0;
-  const head = r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
+  const head = r.kind === "relics" && r.relics.some(b => b.set) ? "THE MAGI'S GIFTS" : r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
   const subline = r.from === "level" ? "" : r.from === "chest" ? "IT WAS IN THE PRESENT"
-                : r.kind === "daily" && g.event ? `A GIFT FOR ${g.event.name}` : r.kind === "event" ? eventLeft(r.to) : sub;
+                : r.kind === "daily" && g.event ? `A GIFT FOR ${g.event.name}` : r.kind === "event" ? eventLeft(r.to) : r.kind === "relics" && r.relics.some(b => b.set) ? "THE SET IS WHOLE" : sub;
   // something wearable can be put on from here
   const wear = r.kind === "title" ? { on: g.selectedTitle === r.label, go: () => g.setSelectedTitle(r.label) }
              : r.kind === "frame" ? { on: g.frame === r.id, go: () => g.setFrame(r.id) }

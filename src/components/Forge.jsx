@@ -113,7 +113,9 @@ export default function Forge({ coinId, onClose }) {
           </>
         ))}
 
-        {bench === "face" && (coin.metalIdx === ASTRAL.metal ? (
+        {bench === "face" && (coin.relic ? (
+          <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>THIS ONE WAS A GIFT FOR A KING. ITS FACE IS NOT YOURS TO CHANGE.</p>
+        ) : coin.metalIdx === ASTRAL.metal ? (
           <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>AN ASTRAL COIN BEARS ITS SIGN, NOT A FACE. THERE IS NOTHING TO RESTRIKE.</p>
         ) : (
           <>

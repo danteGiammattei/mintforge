@@ -261,7 +261,7 @@ function Challenge() {
   const [who, setWho] = useState(null);
   const [pick, setPick] = useState(null);
   useEffect(() => { g.api.listFriends().then(r => setFriends(r.friends || [])).catch(() => setFriends([])); }, [g.api]);
-  const free = useMemo(() => g.coins.filter(c => !c.locked), [g.coins]);
+  const free = useMemo(() => g.coins.filter(c => !c.locked && !c.relic), [g.coins]);
   const send = async () => {
     const c = g.coins.find(x => x.id === pick); if (!c || !who) return;
     if ((c.shiny || coinRarity(c) >= 3) && !(await ui.confirm({

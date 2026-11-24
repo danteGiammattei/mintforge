@@ -60,6 +60,8 @@ export function useGameState() {
     for (const k of LISTS) if (k in state) held.current[k] = listHash(state[k]);
     if (state.signBonus?.length) { const signs = state.signBonus; setNews(n => ({ signs, n: (n?.n || 0) + 1 })); }
     delete state.signBonus;
+    if (state.relicBonus?.length) { const relics = state.relicBonus; setNews(n => ({ relics, n: (n?.n || 0) + 1 })); }
+    delete state.relicBonus;
   };
   const apply = useCallback(state => {
     remember(state);

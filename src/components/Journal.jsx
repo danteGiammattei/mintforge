@@ -1,5 +1,5 @@
 import { useGame } from "../lib/GameContext.js";
-import { EVENTS, SEASONS } from "../../shared/events.js";
+import { EVENTS, SEASONS, RELICS } from "../../shared/events.js";
 import { METALS, RARITIES } from "../lib/data.js";
 import { ASTRAL } from "../../shared/tuning.js";
 import CoinCanvas from "./CoinCanvas.jsx";
@@ -76,7 +76,7 @@ export default function Journal() {
 
       {/* an event's own page: its season's coins, one per metal, found lit;
           shown while it runs, and for good once one has been found */}
-      {EVENTS.filter(e => e.id === g.event?.id || METALS.some((_, mi) => (j.s || {})[`${e.season}:${mi}`])).map(e => {
+      {EVENTS.filter(e => e.id === g.event?.id || METALS.some((_, mi) => (j.s || {})[`${e.season}:${mi}`]) || (e.relics && Object.keys(j.r || {}).some(k => k.startsWith(e.relics + ":")))).map(e => {
         const n = METALS.filter((_, mi) => (j.s || {})[`${e.season}:${mi}`]).length;
         return (
           <section key={e.id} className="panel" style={{ padding: 8, borderColor: "#6aa8e0" }} aria-label={`${e.name}: ${SEASONS[e.season].label} coins found`}>
@@ -94,6 +94,7 @@ export default function Journal() {
                 );
               })}
             </div>
+            {e.relics && <Relics set={e.relics} found={j.r || {}}/>}
             <p className="t-dim" style={{ margin: "8px 0 0", fontSize: 12 }}>
               {g.event?.id === e.id ? "PRESENTS COME THROUGH THE GAP UNTIL 5 JANUARY. THE BETTER THE SCROLLS, THE BETTER THE PRESENT." : "NO MORE WILL BE MADE."}
             </p>
@@ -173,5 +174,35 @@ export default function Journal() {
         <button className="btn btn-ghost" style={{ alignSelf: "center" }} onClick={g.replayStory}>HOW IT BEGAN</button>
       )}
     </>
+  );
+}
+
+/* A named set inside an event's page: the three gifts, each lit once
+ * found; one not found yet is a dark coin and a question. */
+function Relics({ set, found }) {
+  const s = RELICS[set], n = s.coins.filter((_, i) => found[`${set}:${i}`]).length;
+  return (
+    <div style={{ marginTop: 8, paddingTop: 8, borderTop: "2px solid var(--line)" }} aria-label={`${s.name}: ${n} of ${s.coins.length} found`}>
+      <div className="between" style={{ marginBottom: 6 }}>
+        <span className="t-label" style={{ color: "#ffd98a" }}>{s.name}</span>
+        <span className="t-label">{n} / {s.coins.length}</span>
+      </div>
+      <div style={{ display: "flex", justifyContent: "center", gap: 14 }}>
+        {s.coins.map((c, i) => {
+          const has = !!found[`${set}:${i}`];
+          return (
+            <div key={c.name} style={{ display: "grid", justifyItems: "center", gap: 2 }}>
+              <div style={{ opacity: has ? 1 : 0.3, filter: has ? "none" : "brightness(0)" }}>
+                <CoinCanvas coin={{ seed: 7, metalIdx: s.metal, rarity: 5, relic: `${set}:${i}`, shape: "round" }} size={44} aura={false}/>
+              </div>
+              <span className="t-label" style={{ fontSize: 10 }}>{has ? c.name : "?"}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="t-dim" style={{ margin: "6px 0 0", fontSize: 12, textAlign: "center" }}>
+        ONE PRESENT IN A HUNDRED. {s.firstBonus.toLocaleString()} MARKS FOR EACH, {s.setBonus.toLocaleString()} FOR ALL THREE.
+      </p>
+    </div>
   );
 }

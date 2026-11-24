@@ -31,7 +31,7 @@ export async function onRequestGet({ request, env, params }) {
   if (!player) return bad("Player not found", 404);
 
   const r = await env.DB.prepare(
-    `SELECT id, seed, metal_idx, shiny, rarity, nickname, material, sign, season FROM coins WHERE player_id = ?1 AND dusty = 0`
+    `SELECT id, seed, metal_idx, shiny, rarity, nickname, material, sign, season, relic FROM coins WHERE player_id = ?1 AND dusty = 0`
   ).bind(player.id).all();
   const allCoins = r.results || [];
 
@@ -81,6 +81,7 @@ export async function onRequestGet({ request, env, params }) {
       ...(c.material ? { material: c.material } : {}),
       ...(c.season ? { season: c.season } : {}),
       ...(c.sign != null ? { sign: c.sign } : {}),
+      ...(c.relic ? { relic: c.relic } : {}),
     })),
   });
 }

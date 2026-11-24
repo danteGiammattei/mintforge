@@ -46,9 +46,9 @@ export const RELICS = {
     event: "longnight26", name: "THE MAGI'S GIFTS", chance: 0.01,
     firstBonus: 5000, setBonus: 20000, metal: 3,
     coins: [
-      { name: "GOLD",         emblem: "crown" },
-      { name: "FRANKINCENSE", emblem: "censer" },
-      { name: "MYRRH",        emblem: "jar" },
+      { name: "GOLD",         emblem: "crown",  era: "Carried by the first king, for a king" },
+      { name: "FRANKINCENSE", emblem: "censer", era: "Carried by the second king, for a god" },
+      { name: "MYRRH",        emblem: "jar",    era: "Carried by the third king, for the grave" },
     ],
   },
 };

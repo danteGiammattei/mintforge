@@ -52,7 +52,7 @@ export default function Tavern() {
   const [res, setRes] = useState(null);
   const def = GAMES[game];
 
-  const free = useMemo(() => g.coins.filter(c => !c.locked), [g.coins]);
+  const free = useMemo(() => g.coins.filter(c => !c.locked && !c.relic), [g.coins]);
   const first = free.find(c => c.id === ids[0]);
   // the crucible takes one metal: once the first coin is in, only its kin can follow
   const eligible = game === "crucible" && first ? free.filter(c => c.metalIdx === first.metalIdx) : free;

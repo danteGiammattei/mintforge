@@ -81,7 +81,10 @@ function EventWatch({ event, hold }) {
 /* Star signs found for the first time, and paid for: one card for them all. */
 function SignWatch({ news }) {
   const celebrate = useCelebrate();
-  useEffect(() => { if (news?.signs?.length) celebrate({ kind: "signs", signs: news.signs }); }, [news, celebrate]);
+  useEffect(() => {
+    if (news?.signs?.length) celebrate({ kind: "signs", signs: news.signs });
+    if (news?.relics?.length) celebrate({ kind: "relics", relics: news.relics });
+  }, [news, celebrate]);
   return null;
 }
 
