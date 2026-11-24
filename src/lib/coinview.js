@@ -4,6 +4,7 @@
 import { mkCoin } from "./coin.js";
 import { METALS, MATERIALS } from "./data.js";
 import { ASTRAL } from "../../shared/tuning.js";
+import { SEASONS } from "../../shared/events.js";
 
 export function hydrate(row) {
   const c = mkCoin(row.seed, 1, row.metalIdx);
@@ -12,6 +13,7 @@ export function hydrate(row) {
   if (row.nick) c.nick = row.nick;
   if (row.material && MATERIALS[row.material]) c.material = row.material;
   if (row.sign != null && ASTRAL.signs[row.sign]) c.sign = row.sign;
+  if (row.season && SEASONS[row.season]) c.season = row.season;
   return c;
 }
 

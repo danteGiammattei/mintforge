@@ -194,6 +194,7 @@ canvas { image-rendering: pixelated; }
 
 /* Premium title flairs — gifts from the goblin */
 .title-shimmer { background: linear-gradient(90deg,#d4a017 0%,#fff8a0 50%,#d4a017 100%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: titleShimmer 3s steps(12) infinite; }
+.title-frost   { background: linear-gradient(90deg,#a8d8ff,#ffffff,#a8d8ff,#6aa8e0); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: titleShimmer 5s steps(16) infinite; }
 .title-void    { color: #c890ff; animation: titleVoidPulse 2.4s steps(8) infinite; }
 .title-astral  { background: linear-gradient(90deg,#fff8a0,#ffd060,#a8d8ff,#c890ff,#fff8a0); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: titleShimmer 4s steps(16) infinite, titleAstralGlow 5s steps(10) infinite; }
 

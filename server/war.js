@@ -56,22 +56,23 @@ export function dealRound(deck, hp, gp, war) {
 const pickOk = v => Number.isInteger(v) && v >= 0 && v < WAR.fan;
 
 const coinJson = `json_object('id', id, 'seed', seed, 'metal_idx', metal_idx, 'shiny', shiny,
-  'rarity', COALESCE(rarity, ?R), 'nickname', nickname, 'acquired_at', acquired_at, 'material', material, 'sign', sign)`;
+  'rarity', COALESCE(rarity, ?R), 'nickname', nickname, 'acquired_at', acquired_at, 'material', material, 'sign', sign, 'season', season)`;
 const parse = s => { try { return JSON.parse(s); } catch { return null; } };
 const coinOut = c => c && ({
   id: c.id, seed: c.seed >>> 0, metalIdx: c.metal_idx, shiny: !!c.shiny, locked: false, rarity: c.rarity,
   ...(c.nickname ? { nick: c.nickname } : {}),
   ...(c.material ? { material: c.material } : {}),
   ...(c.sign != null ? { sign: c.sign } : {}),
+  ...(c.season ? { season: c.season } : {}),
 });
 const rarityOf = row => row.rarity ?? deriveRarity(row.seed >>> 0);
 
 /* A coin coming out of escrow into `owner`'s vault. */
 const release = (db, t, side, owner, nonce, now) => db.prepare(
-  `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, nickname, material, sign)
+  `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, nickname, material, sign, season)
    SELECT json_extract(${side}_coin, '$.id'), ?3, json_extract(${side}_coin, '$.seed'), json_extract(${side}_coin, '$.metal_idx'),
           json_extract(${side}_coin, '$.shiny'), 0, json_extract(${side}_coin, '$.rarity'), ?4, 0, json_extract(${side}_coin, '$.nickname'),
-          json_extract(${side}_coin, '$.material'), json_extract(${side}_coin, '$.sign')
+          json_extract(${side}_coin, '$.material'), json_extract(${side}_coin, '$.sign'), json_extract(${side}_coin, '$.season')
      FROM war_tables WHERE id = ?1 AND settle = ?2 AND ${side}_coin IS NOT NULL`
 ).bind(t.id, nonce, owner, now);
 

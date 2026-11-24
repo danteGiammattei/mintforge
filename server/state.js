@@ -26,6 +26,7 @@ export const coinOut = r => ({
   ...(r.nickname ? { nick: r.nickname } : {}),
   ...(r.material ? { material: r.material } : {}),
   ...(r.sign != null ? { sign: r.sign } : {}),
+  ...(r.season ? { season: r.season } : {}),
 });
 
 /* The journal as stored, topped up with what the player holds right now —
@@ -101,14 +102,14 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   const [ps, coins, scrolls, chests] = await Promise.all([
     db.prepare(
       `SELECT players.username, s.xp, s.marks, s.frame, s.bio, s.selected_title, s.pinned_ids,
-              s.owned_frames, s.owned_titles, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
+              s.owned_frames, s.owned_titles, s.owned_fx, s.profile_fx, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
               s.journal, s.well_level, s.tomes
          FROM player_state s JOIN players ON players.id = s.player_id
         WHERE s.player_id = ?1`
     ).bind(pid).first(),
-    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material, sign FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
+    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material, sign, season FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
     db.prepare(`SELECT id, rarity, seed FROM scrolls WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
-    db.prepare(`SELECT id, tier FROM chests WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
+    db.prepare(`SELECT id, tier, season FROM chests WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
   ]);
   if (!ps) throw new Refusal("State missing — your account may need recreating", 500);
   const all = coins.results || [];
@@ -126,10 +127,11 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     pinnedIds: ps.pinned_ids ? JSON.parse(ps.pinned_ids) : null,
     iconCoin: stats.iconCoin || null,
     ownedFrames: parseList(ps.owned_frames), ownedTitles: parseList(ps.owned_titles),
+    ownedFx: parseList(ps.owned_fx), profileFx: ps.profile_fx || null,
     coins: all.filter(r => !r.dusty).map(coinOut),
     dusty: all.filter(r => r.dusty).map(coinOut),
     scrolls: (scrolls.results || []).map(r => ({ id: r.id, rarity: r.rarity, seed: r.seed >>> 0 })),
-    chests: (chests.results || []).map(r => ({ id: r.id, tier: r.tier })),
+    chests: (chests.results || []).map(r => ({ id: r.id, tier: r.tier, ...(r.season ? { season: r.season } : {}) })),
     scrollCap: SCRIBE.scrollCap,
     wellLevel: ps.well_level || 0, inkMax: inkFor(ps.well_level || 0),
     tomes: tomesOf(ps.tomes),
@@ -165,7 +167,7 @@ export function frameAllowed(id, level, ownedFrames) {
 export async function patchCosmetics(db, pid, body) {
   const s = body?.state && typeof body.state === "object" ? body.state : {};
   const ps = await db.prepare(
-    `SELECT xp, owned_frames, owned_titles FROM player_state WHERE player_id = ?1`
+    `SELECT xp, owned_frames, owned_titles, owned_fx FROM player_state WHERE player_id = ?1`
   ).bind(pid).first();
   if (!ps) throw new Refusal("State missing", 500);
   const level = levelOf(ps.xp);
@@ -190,6 +192,14 @@ export async function patchCosmetics(db, pid, body) {
     }
   }
 
+  // the profile effect worn (shared/events.js PROFILE_FX): one owned, or none
+  if ("profileFx" in s) {
+    if (s.profileFx === null) set("profile_fx", null);
+    else if (typeof s.profileFx === "string") {
+      if (!parseList(ps.owned_fx).includes(s.profileFx)) throw new Refusal("That effect is not yours to wear", 403);
+      set("profile_fx", s.profileFx);
+    }
+  }
   // the coin chosen as the app's icon (lib/appIcon.js), or null for none
   if ("iconCoin" in s) {
     if (s.iconCoin === null) sets.push(`stats = json_remove(COALESCE(stats, '{}'), '$.iconCoin')`);

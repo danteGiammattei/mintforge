@@ -13,6 +13,7 @@ import {
   FAVOUR_PER_RARITY, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
   SHINY_CHANCE, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL, ASTRAL, RESTRIKE,
 } from "./tuning.js";
+import { SEASONS } from "./events.js";
 
 export const MAX_METAL = 10;
 export const MAX_RARITY = 5;
@@ -240,10 +241,11 @@ export function nameAllowed(name) {
 
 /* ─── the cabinet's score ─────────────────────────────────────────── */
 
-/* One coin's points; `coin` is { metalIdx, rarity, shiny }. */
+/* One coin's points; `coin` is { metalIdx, rarity, shiny, season }. */
 export function cabinetPoints(coin) {
   const S = CABINET_SCORE, r = Math.max(0, Math.min(MAX_RARITY, coin?.rarity ?? 0));
-  return Math.round(S.rarity[r] * (1 + S.perMetal * (coin?.metalIdx || 0)) * (coin?.shiny ? S.shiny : 1));
+  const season = SEASONS[coin?.season]?.cabinetMul || 1;
+  return Math.round(S.rarity[r] * (1 + S.perMetal * (coin?.metalIdx || 0)) * (coin?.shiny ? S.shiny : 1) * season);
 }
 
 /* The cabinet's score (its first six coins; gaps count nothing), its

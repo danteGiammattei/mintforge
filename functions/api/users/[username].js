@@ -23,7 +23,7 @@ export async function onRequestGet({ request, env, params }) {
             COALESCE(player_state.bio, '') AS bio,
             player_state.selected_title AS title,
             player_state.pinned_ids, player_state.journal,
-            player_state.tomes
+            player_state.tomes, player_state.profile_fx
        FROM players
        LEFT JOIN player_state ON player_state.player_id = players.id
       WHERE players.username = ?1 COLLATE NOCASE`
@@ -31,7 +31,7 @@ export async function onRequestGet({ request, env, params }) {
   if (!player) return bad("Player not found", 404);
 
   const r = await env.DB.prepare(
-    `SELECT id, seed, metal_idx, shiny, rarity, nickname, material, sign FROM coins WHERE player_id = ?1 AND dusty = 0`
+    `SELECT id, seed, metal_idx, shiny, rarity, nickname, material, sign, season FROM coins WHERE player_id = ?1 AND dusty = 0`
   ).bind(player.id).all();
   const allCoins = r.results || [];
 
@@ -63,6 +63,7 @@ export async function onRequestGet({ request, env, params }) {
     bio: player.bio,
     xp: player.xp,
     frame: player.frame,
+    profileFx: player.profile_fx || null,
     createdAt: player.created_at,
     isSelf: player.id === auth.player.id,
     isFriend: !!friendRow,
@@ -72,12 +73,13 @@ export async function onRequestGet({ request, env, params }) {
     tomes: tomesOf(player.tomes),
     // the star signs they hold, one astral coin each
     signs: [...new Set(allCoins.filter(c => c.sign != null).map(c => c.sign))].sort((a, b) => a - b),
-    cabinet: cabinetScore(showcase.map(c => ({ metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity ?? deriveRarity(c.seed >>> 0) }))),
+    cabinet: cabinetScore(showcase.map(c => ({ metalIdx: c.metal_idx, shiny: !!c.shiny, season: c.season, rarity: c.rarity ?? deriveRarity(c.seed >>> 0) }))),
     showcase: showcase.map(c => ({
       id: c.id, seed: c.seed >>> 0, metalIdx: c.metal_idx, shiny: !!c.shiny,
       ...(c.rarity != null ? { rarity: c.rarity } : {}),
       ...(c.nickname ? { nick: c.nickname } : {}),
       ...(c.material ? { material: c.material } : {}),
+      ...(c.season ? { season: c.season } : {}),
       ...(c.sign != null ? { sign: c.sign } : {}),
     })),
   });

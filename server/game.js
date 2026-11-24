@@ -30,6 +30,7 @@ import {
 } from "../shared/economy.js";
 import { heldSigns } from "./signs.js";
 import { pageOf, tomeFromChest, cravedPage } from "../shared/tomes.js";
+import { eventOn, eventChest, eventChestHolds, eventById, SEASONS } from "../shared/events.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
@@ -127,17 +128,18 @@ async function seal(db, pid, body, { now, rand, tz }) {
 
 /* ─── offer ───────────────────────────────────────────────────────── */
 
-async function offerOne(db, pid, scrollId, { now, rand }) {
+async function offerOne(db, pid, scrollId, { now, rand, tz }) {
   const sc = await db.prepare(
     `DELETE FROM scrolls WHERE id = ?1 AND player_id = ?2 RETURNING rarity, hint`
   ).bind(scrollId, pid).first();
   if (!sc) return null;
 
-  let pot, chest;
+  let pot, chest, grade = 0;
   for (let attempt = 0; ; attempt++) {
     const ps = await db.prepare(
       `SELECT favour, chest_tier, chest_cost, pot_best, chests_given FROM player_state WHERE player_id = ?1`
     ).bind(pid).first();
+    grade = Math.max(ps.pot_best || 0, sc.rarity);                  // the best scroll in the pot that pays
     ({ pot, chest } = offerScroll(
       { favour: ps.favour, tier: ps.chest_tier, cost: ps.chest_cost, best: ps.pot_best, chests: ps.chests_given },
       sc.rarity, rand));
@@ -154,9 +156,12 @@ async function offerOne(db, pid, scrollId, { now, rand }) {
     `UPDATE player_state SET xp = xp + ?2, stats = ${bump("offered")} WHERE player_id = ?1`).bind(pid, xp)];
   let given = null;
   if (chest != null) {
-    given = { id: "k_" + randomHex(8), tier: chest };
+    // while an event runs, a share of his chests are the event's
+    const ev = eventOn(localDay(now, tz));
+    given = { id: "k_" + randomHex(8), tier: chest, ...(eventChest(ev, rand) ? { season: ev.season } : {}) };
     stmts.push(
-      db.prepare(`INSERT INTO chests (id, player_id, tier, created_at) VALUES (?1, ?2, ?3, ?4)`).bind(given.id, pid, chest, now),
+      db.prepare(`INSERT INTO chests (id, player_id, tier, created_at, season, grade) VALUES (?1, ?2, ?3, ?4, ?5, ?6)`)
+        .bind(given.id, pid, chest, now, given.season || null, given.season ? grade : 0),
       db.prepare(`UPDATE player_state SET stats = ${bump("chests")} WHERE player_id = ?1`).bind(pid),
     );
   }
@@ -276,14 +281,18 @@ export function journalStmt(db, pid, c) {
   // known names, since they are written into the path
   const mat = MATERIAL.byTier.includes(c.material) ? c.material : null;
   const mk = mat ? `$.m."${mat}"` : null;
-  const value = coinValue(hydrate({ seed: c.seed, metal_idx: c.metalIdx, shiny: c.shiny ? 1 : 0, rarity: c.rarity, material: mat }));
+  // a season too, by metal ($.s."frost26:3"); only known seasons
+  const sk = c.season && SEASONS[c.season] ? `$.s."${c.season}:${c.metalIdx}"` : null;
+  const value = coinValue(hydrate({ seed: c.seed, metal_idx: c.metalIdx, shiny: c.shiny ? 1 : 0, rarity: c.rarity, material: mat, season: c.season }));
   return db.prepare(
     `UPDATE player_state SET journal = json_set(
         json_set(journal,
           '$.c', json(COALESCE(json_extract(journal, '$.c'), '{}')),
-          '$.m', json(COALESCE(json_extract(journal, '$.m'), '{}'))),
+          '$.m', json(COALESCE(json_extract(journal, '$.m'), '{}')),
+          '$.s', json(COALESCE(json_extract(journal, '$.s'), '{}'))),
         '${k}', COALESCE(json_extract(journal, '${k}'), 0) + 1,${mk ? `
-        '${mk}', COALESCE(json_extract(journal, '${mk}'), 0) + 1,` : ""}
+        '${mk}', COALESCE(json_extract(journal, '${mk}'), 0) + 1,` : ""}${sk ? `
+        '${sk}', COALESCE(json_extract(journal, '${sk}'), 0) + 1,` : ""}
         '$.shiny', COALESCE(json_extract(journal, '$.shiny'), 0) + ?2,
         '$.best', MAX(COALESCE(json_extract(journal, '$.best'), 0), ?3))
       WHERE player_id = ?1`
@@ -295,13 +304,19 @@ export function journalStmt(db, pid, c) {
 async function open(db, pid, body, { now, rand }) {
   if (!idOk(body.chestId)) throw new Refusal("Which chest?");
   const [ch, ps] = await Promise.all([
-    db.prepare(`DELETE FROM chests WHERE id = ?1 AND player_id = ?2 RETURNING tier`).bind(body.chestId, pid).first(),
-    db.prepare(`SELECT tomes FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+    db.prepare(`DELETE FROM chests WHERE id = ?1 AND player_id = ?2 RETURNING tier, season, grade`).bind(body.chestId, pid).first(),
+    db.prepare(`SELECT tomes, owned_titles, owned_fx FROM player_state WHERE player_id = ?1`).bind(pid).first(),
   ]);
   if (!ch) throw new Refusal("That chest is gone", 404);
   // now and then a tome, tucked in with the coin
   const tome = tomeFromChest(ch.tier, tomesOf(ps.tomes), CHESTS.tomeChance, rand);
-  const rolled = rollCoin(ch.tier, rand);
+  // an event's chest: its coin is of the season, rolled as from a finer
+  // chest the better the scroll that paid for it, and it may hold the
+  // event's title or its profile effect (shared/events.js)
+  const ev = ch.season && SEASONS[ch.season] ? eventById(SEASONS[ch.season].event) : null;
+  const holds = ev ? eventChestHolds(ev, ch.tier, ch.grade, { titles: parseList(ps.owned_titles), effects: parseList(ps.owned_fx) }, rand) : null;
+  const rolled = rollCoin(holds ? holds.coinTier : ch.tier, rand);
+  if (ev) rolled.season = ch.season;
   const id = "c_" + randomHex(8);
   // an astral coin takes a sign its owner lacks (and if two chests race
   // for the last free one, the index refuses the second: pick again)
@@ -311,31 +326,40 @@ async function open(db, pid, body, { now, rand }) {
     try {
       await db.batch([
         db.prepare(
-          `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material, sign)
-           VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, 1, ?8, ?9)`
-        ).bind(id, pid, c.seed, c.metalIdx, c.shiny ? 1 : 0, c.rarity, now, c.material || null, c.sign ?? null),
+          `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, material, sign, season)
+           VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6, ?7, 1, ?8, ?9, ?10)`
+        ).bind(id, pid, c.seed, c.metalIdx, c.shiny ? 1 : 0, c.rarity, now, c.material || null, c.sign ?? null, c.season || null),
         db.prepare(`UPDATE player_state SET xp = xp + ?2 WHERE player_id = ?1`).bind(pid, XP.open),
         ...(tome ? [db.prepare(
           `UPDATE player_state SET tomes = json_insert(tomes, '$[#]', ?2)
             WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(tomes) WHERE value = ?2)`).bind(pid, tome)] : []),
+        ...(holds?.title ? [db.prepare(
+          `UPDATE player_state SET owned_titles = json_insert(COALESCE(owned_titles, '[]'), '$[#]', ?2)
+            WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(owned_titles, '[]')) WHERE value = ?2)`).bind(pid, holds.title)] : []),
+        ...(holds?.effect ? [db.prepare(
+          `UPDATE player_state SET owned_fx = json_insert(owned_fx, '$[#]', ?2)
+            WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(owned_fx) WHERE value = ?2)`).bind(pid, holds.effect)] : []),
       ]);
       break;
     } catch (e) { if (tries >= 2 || !/UNIQUE/i.test(String(e?.message))) throw e; }
   }
-  return { tier: ch.tier, coin: { id, seed: c.seed, metalIdx: c.metalIdx, shiny: c.shiny, locked: false, rarity: c.rarity }, xp: XP.open, ...(tome ? { tome } : {}) };
+  return { tier: ch.tier, coin: { id, seed: c.seed, metalIdx: c.metalIdx, shiny: c.shiny, locked: false, rarity: c.rarity, ...(c.season ? { season: c.season } : {}) },
+           xp: XP.open, ...(tome ? { tome } : {}),
+           ...(holds?.title ? { title: describeReward({ type: "title", id: holds.title }) } : {}),
+           ...(holds?.effect ? { effect: holds.effect } : {}) };
 }
 
 async function brush(db, pid, body, { now }) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const c = await db.prepare(
     `UPDATE coins SET dusty = 0, acquired_at = ?3 WHERE id = ?1 AND player_id = ?2 AND dusty = 1
-     RETURNING id, seed, metal_idx, shiny, locked, rarity, material, sign`
+     RETURNING id, seed, metal_idx, shiny, locked, rarity, material, sign, season`
   ).bind(body.coinId, pid, now).first();
   if (!c) throw new Refusal("That coin is already clean", 404);
   const xp = xpForBrush({ rarity: c.rarity, metalIdx: c.metal_idx, shiny: !!c.shiny });
   await db.batch([
     db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${bump("brushed")} WHERE player_id = ?1`).bind(pid, xp),
-    journalStmt(db, pid, { seed: c.seed, metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity, material: c.material }),
+    journalStmt(db, pid, { seed: c.seed, metalIdx: c.metal_idx, shiny: !!c.shiny, rarity: c.rarity, material: c.material, season: c.season }),
   ]);
   return { coin: coinOut(c), xp };       // a new star sign's bonus is paid by the state load (server/state.js)
 }
@@ -347,6 +371,7 @@ const hydrate = r => {
   c.shiny = !!r.shiny;
   if (r.rarity != null) c.rarity = r.rarity;
   if (MATERIAL.byTier.includes(r.material) && r.material) c.material = r.material;
+  if (r.season && SEASONS[r.season]) c.season = r.season;
   return c;
 };
 const placeholders = (n, from) => Array.from({ length: n }, (_, i) => `?${i + from}`).join(",");
@@ -357,7 +382,7 @@ async function sell(db, pid, body) {
   // locked coins and dusty ones are simply not matched, so not sold
   const gone = await db.prepare(
     `DELETE FROM coins WHERE player_id = ?1 AND locked = 0 AND dusty = 0 AND id IN (${placeholders(ids.length, 2)})
-     RETURNING id, seed, metal_idx, shiny, rarity, material`
+     RETURNING id, seed, metal_idx, shiny, rarity, material, season`
   ).bind(pid, ...ids).all();
   const rows = gone.results || [];
   if (!rows.length) throw new Refusal("None of those can be sold", 409);
@@ -372,7 +397,7 @@ async function sell(db, pid, body) {
 async function forge(db, pid, body, { rand }) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const c = await db.prepare(
-    `SELECT id, seed, metal_idx, shiny, rarity, material FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
+    `SELECT id, seed, metal_idx, shiny, rarity, material, season FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
   ).bind(body.coinId, pid).first();
   if (!c) throw new Refusal("That coin is gone", 404);
   if (c.shiny) throw new Refusal("It already shines", 409);
@@ -410,7 +435,7 @@ async function forge(db, pid, body, { rand }) {
 async function restrike(db, pid, body, { rand }) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const c = await db.prepare(
-    `SELECT id, seed, metal_idx, shiny, rarity, material FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
+    `SELECT id, seed, metal_idx, shiny, rarity, material, season FROM coins WHERE id = ?1 AND player_id = ?2 AND dusty = 0`
   ).bind(body.coinId, pid).first();
   if (!c) throw new Refusal("That coin is gone", 404);
   if (c.metal_idx === ASTRAL.metal) throw new Refusal("An astral coin bears its sign, not a face", 409);
@@ -484,7 +509,7 @@ async function gamble(db, pid, body, { now, rand }) {
   if (ids.length !== g.coins) throw new Refusal(`Stake ${g.coins} coin${g.coins > 1 ? "s" : ""}`);
 
   const found = await db.prepare(
-    `SELECT id, metal_idx FROM coins WHERE player_id = ?1 AND locked = 0 AND dusty = 0 AND id IN (${placeholders(ids.length, 2)})`
+    `SELECT id, metal_idx, season FROM coins WHERE player_id = ?1 AND locked = 0 AND dusty = 0 AND id IN (${placeholders(ids.length, 2)})`
   ).bind(pid, ...ids).all();
   const staked = ids.map(id => (found.results || []).find(r => r.id === id));
   if (staked.some(r => !r)) throw new Refusal("A staked coin is locked or gone", 409);
@@ -500,9 +525,12 @@ async function gamble(db, pid, body, { now, rand }) {
   if (del.meta.changes !== lost.length) throw new Refusal("A staked coin is locked or gone", 409);
 
   const held = res.make.includes(ASTRAL.metal) ? await heldSigns(db, pid) : new Set();
-  const minted = res.make.map(m => {
+  // a season is the coin's for good: what a staked coin becomes keeps it
+  const seasons = staked.map(r => r.season).filter(Boolean);
+  const minted = res.make.map((m, i) => {
     const seed = u32(rand);
     const c = placeAstral({ id: "c_" + randomHex(8), seed, metalIdx: m, shiny: false, locked: false, rarity: deriveRarity(seed) }, held, rand);
+    if (seasons[i]) c.season = seasons[i];
     if (c.sign != null) held.add(c.sign);
     return c;
   });
@@ -510,8 +538,8 @@ async function gamble(db, pid, body, { now, rand }) {
   await db.batch([
     ...minted.map(c => journalStmt(db, pid, c)),
     ...minted.map(c => db.prepare(
-      `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign)
-       VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, ?6, 0, ?7)`).bind(c.id, pid, c.seed, c.metalIdx, c.rarity, now, c.sign ?? null)),
+      `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign, season)
+       VALUES (?1, ?2, ?3, ?4, 0, 0, ?5, ?6, 0, ?7, ?8)`).bind(c.id, pid, c.seed, c.metalIdx, c.rarity, now, c.sign ?? null, c.season || null)),
     db.prepare(`UPDATE player_state SET xp = xp + ?2, stats = ${bump("gambles")} WHERE player_id = ?1`).bind(pid, xp),
   ]);
   return {

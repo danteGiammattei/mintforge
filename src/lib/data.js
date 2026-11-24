@@ -175,6 +175,8 @@ export const PREMIUM_TITLES = [
   { id:"night_buyer",    label:"Night Buyer",             minLvl:1, effect:"void" },
   { id:"ill_gotten",     label:"Of Ill-Gotten Wares",     minLvl:1, effect:"void" },
   { id:"stall_favourite",label:"The Stallholder's Favourite", minLvl:1, effect:"astral" },
+  // events (shared/events.js): only ever from the event's chests
+  { id:"long_night",     label:"Of the Long Night",       minLvl:1, effect:"frost" },
 ];
 export const PREMIUM_TITLE_BY_ID  = Object.fromEntries(PREMIUM_TITLES.map(t => [t.id, t]));
 export const PREMIUM_TITLE_LABELS = new Set(PREMIUM_TITLES.map(t => t.label));

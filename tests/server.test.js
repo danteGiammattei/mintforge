@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { EVENTS, SEASONS, eventOn } from "../shared/events.js";
 import assert from "node:assert/strict";
 import { makeDb, seeded, scripted } from "./d1.js";
 import { world, driver, circle, line, scribble } from "./helpers.js";
@@ -21,8 +22,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 018 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql"]);
+test("migrations 009 and 011 to 021 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -257,8 +258,9 @@ test("every gift names something that exists", async () => {
   assert.equal(got.length, GIFTS.length);
   const s = await loadState(db, pid);
   assert.equal(s.ownedFrames.length, 4);
-  // every title but the ones only the stall sells
-  assert.equal(s.ownedTitles.length, PREMIUM_TITLES.length - STALL.oddities.filter(o => o.type === "title").length);
+  // every title but the ones only the stall sells or an event's chest holds
+  const eventTitles = EVENTS.map(e => e.title.id);
+  assert.equal(s.ownedTitles.length, PREMIUM_TITLES.length - STALL.oddities.filter(o => o.type === "title").length - eventTitles.length);
 });
 
 /* ─── chest → coin → vault → marks ────────────────────────────────── */
@@ -688,4 +690,66 @@ test("war: nobody can win a star sign they already hold", async () => {
   await assert.rejects(warMove(db, a, { op: "invite", friend: "astronomer", coinId: "c_cancer" }, { now: 1e9 + 1 }), /already holds Cancer/);
   const { result: { tableId } } = await warMove(db, a, { op: "invite", friend: "astronomer", coinId: "c_leo" }, { now: 1e9 + 1 });
   await assert.rejects(warMove(db, b, { op: "join", tableId, coinId: "c_cancer2" }, { now: 1e9 + 2, rand: seeded(1) }), /already hold Cancer/);
+});
+
+/* ─── the Long Night ──────────────────────────────────────────────── */
+
+test("events: the Long Night runs Dec 1 to Jan 5 on the player's own calendar", () => {
+  const day = iso => Math.floor(Date.parse(iso + "T00:00:00Z") / 86400e3);
+  assert.equal(eventOn(day("2026-11-30")), null);
+  assert.equal(eventOn(day("2026-12-01"))?.id, "longnight26");
+  assert.equal(eventOn(day("2027-01-05"))?.id, "longnight26");
+  assert.equal(eventOn(day("2027-01-06")), null);
+});
+
+test("during the Long Night some of his chests are frost: a frost coin, worth half again, and it keeps its frost", async () => {
+  const { db, pid } = await world();
+  const at = Date.parse("2026-12-10T10:00:00Z");
+  const go = driver(db, pid, seeded(5), at);
+  // a pot that pays at once, with a legendary scroll in it
+  let frost = null;
+  for (let i = 0; i < 40 && !frost; i++) {
+    db.raw.prepare(`UPDATE player_state SET favour = 1000, chest_cost = 10, chest_tier = 0, pot_best = 4 WHERE player_id = ?`).run(pid);
+    db.raw.prepare(`INSERT INTO scrolls (id, player_id, rarity, seed, created_at) VALUES (?, ?, 4, 1, ?)`).run("s_" + i, pid, at);
+    const r = await go("offer", { scrollId: "s_" + i });
+    frost = r.result.chest?.season ? r.result.chest : null;
+  }
+  assert.ok(frost, "a frost chest came through");
+  assert.equal(frost.season, "frost26");
+  assert.equal(db.raw.prepare(`SELECT grade FROM chests WHERE id = ?`).get(frost.id).grade, 4);
+  const o = await go("open", { chestId: frost.id });
+  assert.equal(o.result.coin.season, "frost26");
+  const b = await go("brush", { coinId: o.result.coin.id });
+  const coin = b.state.coins.find(c => c.id === o.result.coin.id);
+  assert.equal(coin.season, "frost26");
+  assert.equal(JSON.parse(db.raw.prepare(`SELECT journal FROM player_state WHERE player_id = ?`).get(pid).journal).s[`frost26:${coin.metalIdx}`], 1);
+  // sold, it fetches half again what the same coin without frost would
+  const { hydrate } = await import("../src/lib/coinview.js");
+  const { coinValue } = await import("../src/lib/coin.js");
+  const plain = coinValue(hydrate({ ...coin, season: null })), frosted = coinValue(hydrate(coin));
+  assert.ok(Math.abs(frosted - plain * SEASONS.frost26.valueMul) <= 1, `${frosted} vs ${plain}`);
+  const s = await go("sell", { coinIds: [coin.id] });
+  assert.equal(s.result.marks, frosted);
+});
+
+test("out of season, no frost chest ever comes", async () => {
+  const { db, pid } = await world();
+  const go = driver(db, pid, seeded(6), Date.parse("2026-11-20T10:00:00Z"));
+  for (let i = 0; i < 30; i++) {
+    db.raw.prepare(`UPDATE player_state SET favour = 1000, chest_cost = 10, chest_tier = 0 WHERE player_id = ?`).run(pid);
+    db.raw.prepare(`INSERT INTO scrolls (id, player_id, rarity, seed, created_at) VALUES (?, ?, 2, 1, ?)`).run("s_" + i, pid, 0);
+    const r = await go("offer", { scrollId: "s_" + i });
+    assert.ok(!r.result.chest?.season);
+  }
+});
+
+test("a profile effect can be worn only once owned", async () => {
+  const { db, pid } = await world();
+  const { patchCosmetics } = await import("../server/state.js");
+  await assert.rejects(patchCosmetics(db, pid, { state: { profileFx: "frostfall" } }));
+  db.raw.prepare(`UPDATE player_state SET owned_fx = '["frostfall"]' WHERE player_id = ?`).run(pid);
+  await patchCosmetics(db, pid, { state: { profileFx: "frostfall" } });
+  assert.equal((await loadState(db, pid)).profileFx, "frostfall");
+  await patchCosmetics(db, pid, { state: { profileFx: null } });
+  assert.equal((await loadState(db, pid)).profileFx, null);
 });

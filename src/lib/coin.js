@@ -19,6 +19,7 @@ import {
   RARITIES,   TITLES, TITLE_LEVELS,
 } from "./data.js";
 import { METAL_BASE_VALUE, SHINY_VALUE_MUL, CONDITION_STEP, XP, MATERIAL, ASTRAL } from "../../shared/tuning.js";
+import { SEASONS } from "../../shared/events.js";
 
 /* ─── RUNE TRANSLATOR ─────────────────────────────────────────────────── */
 const RL = { A:"ᚨ",B:"ᛒ",C:"ᚲ",D:"ᛞ",E:"ᛖ",F:"ᚠ",G:"ᚷ",H:"ᚺ",I:"ᛁ",J:"ᛃ",K:"ᚲ",L:"ᛚ",M:"ᛗ",N:"ᚾ",O:"ᛟ",P:"ᛈ",R:"ᚱ",S:"ᛊ",T:"ᛏ",U:"ᚢ",V:"ᚡ",W:"ᚹ",X:"ᛪ",Y:"ᚤ",Z:"ᛉ" };
@@ -660,7 +661,8 @@ export function coinValue(c) {
   const shinyMul = c.shiny ? SHINY_VALUE_MUL : 1;
   const rarMul   = RARITIES[coinRarity(c)]?.valueMul || 1;
   const matMul   = c.material ? MATERIAL.valueMul : 1;
-  return Math.max(1, Math.round(base * condMul * shinyMul * rarMul * matMul));
+  const seasonMul = SEASONS[c.season]?.valueMul || 1;          // a coin of an event (shared/events.js)
+  return Math.max(1, Math.round(base * condMul * shinyMul * rarMul * matMul * seasonMul));
 }
 
 export function vaultMarks(coins) {

@@ -32,8 +32,8 @@ export async function world(name = "tester", now = Date.now()) {
 }
 
 /* Run an action with a fixed clock that moves forward on its own. */
-export function driver(db, pid, rand) {
-  let now = 10_000_000;
+export function driver(db, pid, rand, start = 10_000_000) {
+  let now = start;
   const go = (action, body = {}) => { now += 60_000; return act(db, pid, { action, ...body }, { now, rand }); };
   go.now = () => now;
   return go;

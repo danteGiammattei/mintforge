@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS player_state (
   journal         TEXT    NOT NULL DEFAULT '{}',
   well_level      INTEGER NOT NULL DEFAULT 0,
   tomes           TEXT    NOT NULL DEFAULT '["primer"]',   -- shared/tomes.js ids (migration 020)
+  owned_fx        TEXT    NOT NULL DEFAULT '[]',           -- profile effects owned (migration 021)
+  profile_fx      TEXT,                                    -- the one worn, or none
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 
@@ -57,6 +59,7 @@ CREATE TABLE IF NOT EXISTS coins (
   nickname        TEXT,                               -- engraved at the forge
   material        TEXT,                               -- a twin in another material (migration 015)
   sign            INTEGER,                            -- an astral coin's star sign, 0-11 (migration 016)
+  season          TEXT,                               -- an event's mark, e.g. 'frost26' (migration 021)
   PRIMARY KEY (player_id, id),
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
@@ -101,6 +104,8 @@ CREATE TABLE IF NOT EXISTS chests (
   player_id   INTEGER NOT NULL,
   tier        INTEGER NOT NULL,
   created_at  INTEGER NOT NULL,
+  season      TEXT,                                   -- an event's chest (migration 021)
+  grade       INTEGER NOT NULL DEFAULT 0,             -- best scroll in the pot that paid for it
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS chests_player_time_idx ON chests(player_id, created_at);

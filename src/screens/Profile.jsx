@@ -133,7 +133,7 @@ function You({ g }) {
   const [open, setOpen] = useState(null);         // a cabinet coin, looked at
   if (editing) return <EditProfile g={g} onDone={() => setEditing(false)}/>;
   const shown = g.showcase.filter(Boolean);
-  const cab = cabinetScore(g.showcase.map(c => c && { metalIdx: c.metalIdx, rarity: coinRarity(c), shiny: c.shiny }));
+  const cab = cabinetScore(g.showcase.map(c => c && { metalIdx: c.metalIdx, rarity: coinRarity(c), shiny: c.shiny, season: c.season }));
   return (
     <>
       <section className="panel" style={{ overflow: "hidden" }} aria-label="Your profile, as others see it">
