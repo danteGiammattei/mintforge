@@ -62,6 +62,8 @@ export function useGameState() {
     delete state.signBonus;
     if (state.relicBonus?.length) { const relics = state.relicBonus; setNews(n => ({ relics, n: (n?.n || 0) + 1 })); }
     delete state.relicBonus;
+    if (state.setBonus?.length) { const sets = state.setBonus; setNews(n => ({ sets, n: (n?.n || 0) + 1 })); }
+    delete state.setBonus;
     if (state.auctionNotes?.length) { const auction = state.auctionNotes; setNews(n => ({ auction, n: (n?.n || 0) + 1 })); }
     delete state.auctionNotes;
   };

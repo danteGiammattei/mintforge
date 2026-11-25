@@ -4,7 +4,7 @@ import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel, isMuted, setMuted } from "../lib/feel.js";
 import { unlockedTitles, coinRarity } from "../lib/coin.js";
-import { journalCounts, cabinetScore } from "../../shared/economy.js";
+import { journalCounts, cabinetScore, setsDone } from "../../shared/economy.js";
 import { FRAMES, PREMIUM_TITLE_BY_ID, TITLES, TITLE_LEVELS } from "../lib/data.js";
 import CoinModal from "../components/CoinModal.jsx";
 import CabinetFrame, { gradeInk } from "../components/CabinetFrame.jsx";
@@ -190,7 +190,7 @@ function You({ g }) {
   return (
     <>
       <section className="panel" style={{ overflow: "hidden" }} aria-label="Your profile, as others see it">
-        <PublicProfile festive={!!g.event} relics={g.coins.filter(c => c.relic).map(c => c.relic)} cabFrame={g.cabFrame} frame={g.frame} fx={g.profileFx} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
+        <PublicProfile sets={setsDone(g.journal)} festive={!!g.event} relics={g.coins.filter(c => c.relic).map(c => c.relic)} cabFrame={g.cabFrame} frame={g.frame} fx={g.profileFx} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
                        coins={g.coins.length} kinds={journalCounts(g.journal).kinds} shiny={g.coins.filter(c => c.shiny).length}
                        signs={[...new Set(g.coins.filter(c => c.sign != null).map(c => c.sign))]}
                        tomes={g.tomes}

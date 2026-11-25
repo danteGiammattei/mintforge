@@ -321,6 +321,22 @@ export const MATERIAL = {
  * takes a sign they lack, and once they hold all twelve, no more astral
  * coins come (that roll is eldritch instead). Selling or losing one frees
  * its sign. Enforced by a unique index (migration 016). */
+/* A metal's set: one coin of every rarity of it, common to mythic, ever
+ * found (the journal's count, so selling one later never undoes it). The
+ * first ten metals have sets (Astral keeps its twelve signs instead);
+ * each pays its bonus once, finer metals more. About 60,000 for all ten. */
+export const METAL_SETS = {
+  metals: 10,
+  bonus: [1000, 1500, 2000, 3000, 4000, 5500, 7000, 9000, 12000, 15000],
+};
+
+/* Fusing, at the forge: three coins of one metal and one rarity become a
+ * single coin of that metal one rarity finer. A way to climb, not to
+ * profit: the fee is a share of what the three would sell for. Not for
+ * locked coins, the collectable sets (astral, the Magi's gifts) or a
+ * mythic, which has nowhere higher to go. */
+export const FUSE = { take: 3, feeShare: 0.1, minFee: 20 };
+
 /* Secret titles (src/lib/data.js, secret: true): listed nowhere until
  * earned. The first star asks for an astral coin among a player's first
  * ten coins ever; coins are counted by the journal, which began on

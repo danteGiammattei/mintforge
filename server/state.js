@@ -10,9 +10,9 @@
  *  and title to wear, the bio, the cabinet, which coins are locked.
  * ══════════════════════════════════════════════════════════════════════ */
 
-import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay } from "../shared/economy.js";
+import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay, setsDone } from "../shared/economy.js";
 import { settleDue, takeNotes } from "./auction.js";
-import { SCRIBE, ASTRAL, CABINET_SCORE } from "../shared/tuning.js";
+import { SCRIBE, ASTRAL, CABINET_SCORE, METAL_SETS } from "../shared/tuning.js";
 import { heldSigns } from "./signs.js";
 import { STARTER, cravedPage } from "../shared/tomes.js";
 import { eventOn, RELICS, relicOf } from "../shared/events.js";
@@ -107,6 +107,25 @@ async function paySigns(db, pid, ps, rows) {
  * the journal's $.r with what is held; paid is $.relicsPaid, a bitmask per
  * set, the set's own bonus the bit past its coins. Each payment is its own
  * guarded statement, so two loads at once pay it once. */
+/* A metal's set, completed: its bonus, once (journal.setsPaid, a bit per
+ * metal), guarded so two loads can't both pay it. */
+async function paySets(db, pid, ps) {
+  const j = parseObj(ps.journal), had = j.setsPaid | 0;
+  const due = setsDone(j).filter(m => !(had & (1 << m)));
+  if (!due.length) return [];
+  let res;
+  try {
+    res = await db.batch(due.map(m => db.prepare(
+      `UPDATE player_state SET marks = marks + ?3,
+         journal = json_set(journal, '$.setsPaid', COALESCE(json_extract(journal, '$.setsPaid'), 0) | ?2)
+       WHERE player_id = ?1 AND (COALESCE(json_extract(journal, '$.setsPaid'), 0) & ?2) = 0`
+    ).bind(pid, 1 << m, METAL_SETS.bonus[m])));
+  } catch { return []; }
+  const got = due.filter((_, k) => res[k]?.meta?.changes).map(m => ({ metal: m, marks: METAL_SETS.bonus[m] }));
+  ps.marks = (ps.marks || 0) + got.reduce((n, g) => n + g.marks, 0);
+  return got;
+}
+
 async function payRelics(db, pid, ps, rows) {
   const j = parseObj(ps.journal), paid = parseObj(j.relicsPaid), out = [], stmts = [];
   for (const [set, def] of Object.entries(RELICS)) {
@@ -158,6 +177,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   await signOldAstrals(db, pid, all);
   const signBonus = await paySigns(db, pid, ps, all);
   const relicBonus = await payRelics(db, pid, ps, all);
+  const setBonus = await paySets(db, pid, ps);
   const auctionNotes = await takeNotes(db, pid);
   const stats = parseObj(ps.stats);
   delete stats.lastVisitAt;
@@ -195,6 +215,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     // star signs paid for just now, for the popup
     ...(signBonus.length ? { signBonus } : {}),
     ...(relicBonus.length ? { relicBonus } : {}),
+    ...(setBonus.length ? { setBonus } : {}),
     ...(auctionNotes.length ? { auctionNotes } : {}),
   };
 }

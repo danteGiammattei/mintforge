@@ -1,7 +1,7 @@
 import { json, bad, getAuth } from "../_utils.js";
 import { currentTitle } from "../../../src/lib/data.js";
 import { journalOut, tomesOf } from "../../../server/state.js";
-import { journalCounts, cabinetScore } from "../../../shared/economy.js";
+import { journalCounts, cabinetScore, setsDone } from "../../../shared/economy.js";
 import { deriveRarity } from "../../../src/lib/coin.js";
 
 /* GET /api/users/:username
@@ -65,6 +65,7 @@ export async function onRequestGet({ request, env, params }) {
     frame: player.frame,
     profileFx: player.profile_fx || null,
     relics: [...new Set(allCoins.map(c => c.relic).filter(Boolean))],
+    sets: (() => { try { return setsDone(JSON.parse(player.journal || "{}")); } catch { return []; } })(),
     cabFrame: (() => { try { const f = JSON.parse(player.stats || "{}").cabFrame; return Number.isInteger(f) ? f : null; } catch { return null; } })(),
     createdAt: player.created_at,
     isSelf: player.id === auth.player.id,

@@ -84,6 +84,7 @@ function SignWatch({ news }) {
   useEffect(() => {
     if (news?.signs?.length) celebrate({ kind: "signs", signs: news.signs });
     if (news?.relics?.length) celebrate({ kind: "relics", relics: news.relics });
+    if (news?.sets?.length) celebrate({ kind: "sets", sets: news.sets });
     if (news?.auction?.length) celebrate({ kind: "auction", notes: news.auction });
   }, [news, celebrate]);
   return null;

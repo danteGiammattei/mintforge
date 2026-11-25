@@ -1026,3 +1026,19 @@ test("migration 024: the secret titles for what was done before they existed", a
   assert.deepEqual(titles(ids.gil), []);
   assert.deepEqual(titles(ids.bob), []);
 });
+
+test("metal sets: every rarity of a metal ever found pays its bonus once", async () => {
+  const { db, pid } = await world();
+  const { METAL_SETS } = await import("../shared/tuning.js");
+  const j = c => db.raw.prepare(`UPDATE player_state SET journal = json_set(journal, '$.c', json(?)) WHERE player_id = ?`).run(JSON.stringify(c), pid);
+  const m0 = (await loadState(db, pid)).marks;
+  j({ "3:0": 1, "3:1": 2, "3:2": 1, "3:3": 1, "3:4": 1 });                     // gold, all but mythic
+  assert.ok(!(await loadState(db, pid)).setBonus);
+  j({ "3:0": 1, "3:1": 2, "3:2": 1, "3:3": 1, "3:4": 1, "3:5": 1, "0:0": 4 });
+  const s = await loadState(db, pid);
+  assert.deepEqual(s.setBonus, [{ metal: 3, marks: METAL_SETS.bonus[3] }]);
+  assert.equal(s.marks, m0 + METAL_SETS.bonus[3]);
+  const again = await loadState(db, pid);
+  assert.ok(!again.setBonus, "once");
+  assert.equal(again.marks, m0 + METAL_SETS.bonus[3]);
+});

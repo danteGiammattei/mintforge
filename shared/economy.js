@@ -10,7 +10,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import {
-  FAVOUR_PER_RARITY, STREAK, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
+  FAVOUR_PER_RARITY, STREAK, METAL_SETS, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
   SHINY_CHANCE, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL, ASTRAL, RESTRIKE,
 } from "./tuning.js";
 import { SEASONS } from "./events.js";
@@ -57,6 +57,13 @@ export function offerScroll(pot0, rarity, rand, mul = 1) {
   if (pot.best >= CHESTS.impressFrom && rand() < CHESTS.impressChance[pot.best]) tier = Math.min(MAX_CHEST, tier + 1);
   pot = primePot({ favour: pot.favour - pot.cost, tier: 0, cost: 0, best: 0, chests: pot.chests + 1 }, rand);
   return { pot, chest: tier };
+}
+
+/* Which metals' sets are complete in a journal ({ c: { "metal:rarity": n } }). */
+export function setsDone(journal) {
+  const c = (journal && journal.c) || {}, out = [];
+  for (let m = 0; m < METAL_SETS.metals; m++) if ([0, 1, 2, 3, 4, 5].every(r => (c[`${m}:${r}`] | 0) > 0)) out.push(m);
+  return out;
 }
 
 /* The streak after a scroll of `rarity`, and what it multiplies by. */

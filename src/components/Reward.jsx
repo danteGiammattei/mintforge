@@ -4,12 +4,13 @@ import { present, loadGifts } from "../lib/presentArt.js";
 import { PROFILE_FX, RELICS, relicOf } from "../../shared/events.js";
 import { useGame } from "../lib/GameContext.js";
 import { feel } from "../lib/feel.js";
-import { FRAMES, PREMIUM_TITLES } from "../lib/data.js";
+import { FRAMES, PREMIUM_TITLES, METALS } from "../lib/data.js";
 import { SCRIBE, DAILY, CHESTS, ASTRAL } from "../../shared/tuning.js";
 import { TOME_BY_ID } from "../../shared/tomes.js";
 import { RARITY } from "../../shared/sigil.js";
 import CoinCanvas from "./CoinCanvas.jsx";
 import { hydrate } from "../lib/coinview.js";
+import { Gem } from "./SetGems.jsx";
 import { TomeCover } from "./TomeCover.jsx";
 import PixelBanner from "./PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
@@ -174,6 +175,17 @@ function Body({ r }) {
       </>
     );
   }
+  if (r.kind === "sets") {
+    // a metal's set whole: its gem lights, and he pays for it
+    return (
+      <>
+        <div className="row" style={{ justifyContent: "center", gap: 10 }}>{r.sets.map(s => <Gem key={s.metal} metal={s.metal} lit size={54}/>)}</div>
+        <p className="t-title" style={{ margin: 0, textAlign: "center" }}>{r.sets.map(s => METALS[s.metal].name.toUpperCase()).join(" · ")}</p>
+        <div className="t-big t-gold row" style={{ justifyContent: "center", gap: 10 }}><PixelIcon name="mark" size={22}/>{r.sets.reduce((n, s) => n + s.marks, 0).toLocaleString()}</div>
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>EVERY RARITY OF IT, COMMON TO MYTHIC. ITS GEM IS LIT ON YOUR PROFILE.</p>
+      </>
+    );
+  }
   if (r.kind === "auction") {
     // the back room's news, every line since you last looked
     const SAY = { won: "YOU WON IT", sold: "SOLD", unsold: "NO BIDS. IT CAME HOME", outbid: "OUTBID" };
@@ -281,10 +293,11 @@ const HEADS = {
   signs: ["A NEW STAR SIGN", "THE SKY PAYS ITS DUES"],
   relics: ["A GIFT OF THE MAGI", "A KING'S OFFERING"],
   auction: ["FROM THE BACK ROOM", "THE HAMMER FELL"],
+  sets: ["A SET COMPLETE", "EVERY RARITY OF IT"],
   tome:  ["A NEW TOME", "IT WAS IN THE CHEST"],
   event: ["LIMITED TIME EVENT", ""],
 };
-const COLOUR = { event: "#d8584e", fx: "#a8d8ff", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", relics: "#ffd98a", auction: "#e0b860", tome: "#c080ff" };
+const COLOUR = { event: "#d8584e", fx: "#a8d8ff", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", relics: "#ffd98a", auction: "#e0b860", sets: "#9fe0d0", tome: "#c080ff" };
 
 function Card({ r, onClose }) {
   const g = useGame();
