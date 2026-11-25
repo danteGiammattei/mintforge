@@ -9,6 +9,7 @@ import { SCRIBE, DAILY, CHESTS, ASTRAL } from "../../shared/tuning.js";
 import { TOME_BY_ID } from "../../shared/tomes.js";
 import { RARITY } from "../../shared/sigil.js";
 import CoinCanvas from "./CoinCanvas.jsx";
+import { hydrate } from "../lib/coinview.js";
 import { TomeCover } from "./TomeCover.jsx";
 import PixelBanner from "./PixelBanner.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
@@ -171,6 +172,31 @@ function Body({ r }) {
       </>
     );
   }
+  if (r.kind === "auction") {
+    // the back room's news, every line since you last looked
+    const SAY = { won: "YOU WON IT", sold: "SOLD", unsold: "NO BIDS. IT CAME HOME", outbid: "OUTBID" };
+    return (
+      <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
+        {r.notes.slice(0, 6).map((nt, i) => (
+          <li key={i} className="row" style={{ gap: 10 }}>
+            {nt.coin && <CoinCanvas coin={hydrate(nt.coin)} size={48} aura={false}/>}
+            <div style={{ display: "grid", gap: 2, textAlign: "left" }}>
+              <span className={nt.kind === "won" || nt.kind === "sold" ? "t-gold" : "t-dim"}>{SAY[nt.kind] || nt.kind.toUpperCase()}</span>
+              {nt.amount != null && (
+                <span className="t-label row" style={{ gap: 4 }}>
+                  <PixelIcon name="mark" size={10}/>
+                  {nt.kind === "sold" ? `${nt.amount.toLocaleString()} TO YOU, AFTER THE HOUSE'S TENTH`
+                    : nt.kind === "outbid" ? `SOMEONE BID ${nt.amount.toLocaleString()}. YOUR MARKS ARE BACK`
+                    : `${nt.amount.toLocaleString()} PAID. IT IS IN YOUR VAULT`}
+                </span>
+              )}
+            </div>
+          </li>
+        ))}
+        {r.notes.length > 6 && <li className="t-label">AND {r.notes.length - 6} MORE</li>}
+      </ul>
+    );
+  }
   if (r.kind === "relics") {
     // one gift found, or the last of the three (then the set pays too)
     const total = r.relics.reduce((a, b) => a + b.marks, 0);
@@ -252,10 +278,11 @@ const HEADS = {
   daily: ["TODAY'S GIFT", ""],
   signs: ["A NEW STAR SIGN", "THE SKY PAYS ITS DUES"],
   relics: ["A GIFT OF THE MAGI", "A KING'S OFFERING"],
+  auction: ["FROM THE BACK ROOM", "THE HAMMER FELL"],
   tome:  ["A NEW TOME", "IT WAS IN THE CHEST"],
   event: ["LIMITED TIME EVENT", ""],
 };
-const COLOUR = { event: "#d8584e", fx: "#a8d8ff", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", relics: "#ffd98a", tome: "#c080ff" };
+const COLOUR = { event: "#d8584e", fx: "#a8d8ff", well: "#80c0ff", title: "#c080ff", frame: "#e0b860", level: "#8fd4b4", marks: "#e0b860", daily: "#8fd4b4", signs: "#8fd4e0", relics: "#ffd98a", auction: "#e0b860", tome: "#c080ff" };
 
 function Card({ r, onClose }) {
   const g = useGame();
