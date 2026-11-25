@@ -21,7 +21,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { analyse, rollScroll, measure, TRAITS, LIFTS, likeness } from "../shared/sigil.js";
-import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL, SECRET } from "../shared/tuning.js";
+import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL, SECRET, FUSE } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, streakAfter, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
@@ -387,6 +387,51 @@ async function open(db, pid, body, { now, rand }) {
            ...(holds?.effect ? { effect: holds.effect } : {}) };
 }
 
+/* ─── fuse: three coins of one metal and rarity → one, a rarity finer ─ */
+
+export function fuseFee(rows) {
+  const worth = rows.reduce((n, r) => n + coinValue(hydrate({ seed: r.seed, metal_idx: r.metal_idx, shiny: r.shiny, rarity: r.rarity, material: r.material, season: r.season })), 0);
+  return Math.max(FUSE.minFee, Math.round(worth * FUSE.feeShare));
+}
+
+async function fuse(db, pid, body, { now, rand }) {
+  const ids = Array.isArray(body.coinIds) ? [...new Set(body.coinIds.filter(idOk))] : [];
+  if (ids.length !== FUSE.take) throw new Refusal(`Three coins go in`);
+  const rows = (await db.prepare(
+    `SELECT * FROM coins WHERE player_id = ?1 AND id IN (?2, ?3, ?4)`).bind(pid, ...ids).all()).results || [];
+  if (rows.length !== FUSE.take) throw new Refusal("One of those is gone", 404);
+  if (rows.some(r => r.dusty)) throw new Refusal("Brush them first", 409);
+  if (rows.some(r => r.locked)) throw new Refusal("Unlock them first", 409);
+  if (rows.some(r => r.relic || r.sign != null || r.metal_idx === ASTRAL.metal)) throw new Refusal("The collectable sets don't go in the fire", 409);
+  const { metal_idx: metal, rarity } = rows[0];
+  if (rows.some(r => r.metal_idx !== metal || (r.rarity ?? 0) !== (rarity ?? 0))) throw new Refusal("All three of one metal and one rarity", 409);
+  if ((rarity ?? 0) >= MAX_RARITY) throw new Refusal("A mythic has nowhere higher to go", 409);
+  const fee = fuseFee(rows), tok = randomHex(8), id = "c_" + randomHex(8);
+  const made = { id, seed: u32(rand), metalIdx: metal, rarity: (rarity ?? 0) + 1, shiny: false };
+  const guard = `EXISTS (SELECT 1 FROM player_state WHERE player_id = ${pid | 0} AND json_extract(stats, '$.fuse') = '${tok}')`;
+  await db.batch([
+    // the fee, and the claim: only if all three are still there as they were
+    db.prepare(
+      `UPDATE player_state SET marks = marks - ?2, stats = json_set(COALESCE(stats, '{}'), '$.fuse', ?3)
+        WHERE player_id = ?1 AND marks >= ?2
+          AND (SELECT COUNT(*) FROM coins WHERE player_id = ?1 AND id IN (?4, ?5, ?6) AND dusty = 0 AND locked = 0
+                 AND relic IS NULL AND sign IS NULL AND metal_idx = ?7 AND COALESCE(rarity, 0) = ?8) = 3`
+    ).bind(pid, fee, tok, ...ids, metal, rarity ?? 0),
+    db.prepare(`DELETE FROM coins WHERE player_id = ?1 AND id IN (?2, ?3, ?4) AND ${guard}`).bind(pid, ...ids),
+    db.prepare(
+      `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty)
+       SELECT ?1, ?2, ?3, ?4, 0, 0, ?5, ?6, 0 WHERE ${guard}`).bind(id, pid, made.seed, metal, made.rarity, now),
+    journalStmt(db, pid, made, guard),
+    db.prepare(`UPDATE player_state SET stats = json_remove(${bump("fused")}, '$.fuse') WHERE player_id = ?1 AND ${guard}`).bind(pid),
+  ]);
+  const ok = await db.prepare(`SELECT 1 FROM coins WHERE id = ?1 AND player_id = ?2`).bind(id, pid).first();
+  if (!ok) {
+    const ps = await db.prepare(`SELECT marks FROM player_state WHERE player_id = ?1`).bind(pid).first();
+    throw new Refusal((ps?.marks || 0) < fee ? "Not enough marks" : "Those coins changed. Have another look", 409);
+  }
+  return { coin: { id, seed: made.seed, metalIdx: metal, shiny: false, locked: false, rarity: made.rarity }, fee, gone: ids };
+}
+
 async function brush(db, pid, body, { now }) {
   if (!idOk(body.coinId)) throw new Refusal("Which coin?");
   const c = await db.prepare(
@@ -590,7 +635,7 @@ async function gamble(db, pid, body, { now, rand }) {
 
 /* ─── dispatch ────────────────────────────────────────────────────── */
 
-const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, well, stall, buy, auctions, list, bid, withdraw };
+const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, fuse, well, stall, buy, auctions, list, bid, withdraw };
 
 export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, tz = 0 } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;

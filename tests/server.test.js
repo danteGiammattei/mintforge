@@ -1042,3 +1042,47 @@ test("metal sets: every rarity of a metal ever found pays its bonus once", async
   assert.ok(!again.setBonus, "once");
   assert.equal(again.marks, m0 + METAL_SETS.bonus[3]);
 });
+
+test("fuse: three of one metal and rarity become one a rarity finer, for a tenth of their worth", async () => {
+  const { db, pid } = await world();
+  const { fuseFee } = await import("../server/game.js");
+  const go = driver(db, pid, seeded(5), Date.parse("2026-11-20T10:00:00Z"));
+  db.raw.prepare(`UPDATE player_state SET marks = 100000 WHERE player_id = ?`).run(pid);
+  const coin = (id, metal, rarity, extra = {}) => db.raw.prepare(
+    `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign, relic) VALUES (?, ?, ?, ?, 0, ?, ?, 1, ?, ?, ?)`
+  ).run(id, pid, 100 + id.length, metal, extra.locked ? 1 : 0, rarity, extra.dusty ? 1 : 0, extra.sign ?? null, extra.relic ?? null);
+  ["a", "b", "c"].forEach(x => coin("c_g" + x, 3, 2));
+  const rows = db.raw.prepare(`SELECT * FROM coins WHERE id LIKE 'c_g%'`).all();
+  const fee = fuseFee(rows);
+  const r = (await go("fuse", { coinIds: ["c_ga", "c_gb", "c_gc"] })).result;
+  assert.equal(r.coin.metalIdx, 3); assert.equal(r.coin.rarity, 3); assert.equal(r.fee, fee);
+  const s = await loadState(db, pid);
+  assert.ok(!s.coins.some(c => c.id.startsWith("c_g")), "the three are gone");
+  assert.ok(s.coins.some(c => c.id === r.coin.id && c.rarity === 3));
+  assert.equal(s.marks, 100000 - fee);
+  assert.equal(s.journal.c["3:3"], 1, "counted, so it helps a set");
+
+  // what won't go in
+  coin("c_m1", 3, 2); coin("c_m2", 3, 2); coin("c_x", 4, 2); coin("c_y", 3, 1);
+  await assert.rejects(go("fuse", { coinIds: ["c_m1", "c_m2"] }), /Three/);
+  await assert.rejects(go("fuse", { coinIds: ["c_m1", "c_m2", "c_x"] }), /one metal/);
+  await assert.rejects(go("fuse", { coinIds: ["c_m1", "c_m2", "c_y"] }), /one metal/);
+  coin("c_l", 3, 2, { locked: true }); await assert.rejects(go("fuse", { coinIds: ["c_m1", "c_m2", "c_l"] }), /Unlock/);
+  coin("c_d", 3, 2, { dusty: true }); await assert.rejects(go("fuse", { coinIds: ["c_m1", "c_m2", "c_d"] }), /Brush/);
+  ["1", "2", "3"].forEach(x => coin("c_a" + x, 10, 2, { sign: +x })); await assert.rejects(go("fuse", { coinIds: ["c_a1", "c_a2", "c_a3"] }), /collectable/);
+  ["1", "2", "3"].forEach(x => coin("c_t" + x, 9, 5)); await assert.rejects(go("fuse", { coinIds: ["c_t1", "c_t2", "c_t3"] }), /mythic/);
+  db.raw.prepare(`UPDATE player_state SET marks = 1 WHERE player_id = ?`).run(pid);
+  coin("c_m3", 3, 2); await assert.rejects(go("fuse", { coinIds: ["c_m1", "c_m2", "c_m3"] }), /marks/);
+  assert.equal(db.raw.prepare(`SELECT COUNT(*) AS n FROM coins WHERE id IN ('c_m1','c_m2','c_m3')`).get().n, 3, "a refusal takes nothing");
+});
+
+test("fuse: two at once on the same coins: one stands, the other takes nothing", async () => {
+  const { db, pid } = await world();
+  db.raw.prepare(`UPDATE player_state SET marks = 100000 WHERE player_id = ?`).run(pid);
+  for (const x of ["a", "b", "c"]) db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?, ?, 9, 2, 0, 0, 1, 1, 0)`).run("c_r" + x, pid);
+  const ctx = n => ({ now: Date.parse("2026-11-20T10:00:00Z") + n, rand: seeded(n) });
+  const res = await Promise.allSettled([1, 2].map(n => act(db, pid, { action: "fuse", coinIds: ["c_ra", "c_rb", "c_rc"] }, ctx(n))));
+  assert.equal(res.filter(r => r.status === "fulfilled").length, 1);
+  const s = await loadState(db, pid);
+  assert.equal(s.coins.filter(c => c.rarity === 2 && c.metalIdx === 2).length, 1);
+});
