@@ -1,7 +1,7 @@
 # Chest art
 
 `public/sprites/chests/chest-<tier>.png` — one sheet per tier (0 wooden,
-1 iron, 2 gilded, 3 obsidian, 4 void), six frames side by side, each 40 px
+1 iron, 2 gilded, 3 frost, 4 obsidian, 5 molten, 6 void), six frames side by side, each 40 px
 wide and the sheet's height tall, the chest standing on the bottom edge:
 
 1. closed  2. lid lifted a pixel  3. a crack  4. half open  5. nearly open  6. open
@@ -19,7 +19,11 @@ python3 tools/chest/snap.py gemini-output.png public/sprites/chests/chest-2.png
 each frame, measures the base (which does not move), rebuilds the chest on
 a 36-cell grid from it, and gives all six frames one shared palette.
 
-All five are Gemini's. Iron came back as a 4 × 2 grid of eight frames, so
+All seven are Gemini's. Frost and Molten (November 2026) were snapped with
+`accents` as a fourth argument (`snap.py in.png out.png 36 accents`): it
+keeps small bright colours, the ice crystal and the magma in the cracks,
+that the default palette averages away, and clears the magenta fringe that
+comes with them. The first five were made without it. Iron came back as a 4 × 2 grid of eight frames, so
 six were picked out and laid in a row before snapping; iron and void also
 came with black outlines, which were stripped (any dark pixel on the
 silhouette's edge) to match the others.
@@ -45,7 +49,9 @@ no perspective, no three-quarter angle, no isometric view. When the lid
 opens it swings up and back, so you see its edge rise above the chest. The
 inside of the chest is plain dark shadow.
 
-Chest design: <one of the lines below>
+Chest design: <one line per chest, e.g.>
+  Frost: Pale frosted blue-grey wood glazed with a thin layer of ice, polished silver bands and corner brackets, a ridge of packed snow along the top edge of the lid with a few short icicles hanging from its front lip, silver lock plate set with a small pale cyan ice crystal, slightly tarnished.
+  Molten: Blackened, cracked volcanic stone plates bound with charred iron, thin seams of dull orange magma painted into the cracks between the plates, dark bronze bands and corner brackets, bronze lock plate set with a small ember-orange gem, slightly tarnished.
 
 Lighting: one warm candle light from the lower left, in front of the chest.
 The rest falls into deep shadow. Low-key and gloomy, muted colours, mostly

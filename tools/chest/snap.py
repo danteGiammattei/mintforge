@@ -8,6 +8,9 @@ from PIL import Image
 
 src, dst = sys.argv[1], sys.argv[2]
 N = int(sys.argv[3]) if len(sys.argv) > 3 else 36
+# "accents": keep small bright details (a gem, magma in the cracks) that
+# median-cut averages away; the first five sheets were made without it
+ACCENTS = len(sys.argv) > 4 and sys.argv[4] == "accents"
 a = np.asarray(Image.open(src).convert("RGB")).astype(float)
 r, g, b = a[..., 0], a[..., 1], a[..., 2]
 magenta = (r > 150) & (g < 110) & (b > 150) & (r - g > 90) & (b - g > 90)
@@ -55,7 +58,14 @@ for k, f in enumerate(frames):
 img = Image.fromarray(sheet, "RGBA")
 # one shared palette across the six frames, so a colour stays a colour as the lid moves
 rgb = img.convert("RGB"); alpha = img.getchannel("A")
-q = rgb.quantize(colors=48, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert("RGB")
+q = rgb.quantize(colors=48, method=Image.Quantize.FASTOCTREE if ACCENTS else Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert("RGB")
 q.putalpha(alpha)
+if ACCENTS:
+    # octree keeps small colours, the magenta fringe among them: clear any
+    # purple-leaning pixel (no chest so far is purple-lit through the snap)
+    a = np.array(q).astype(int)
+    fringe = (a[..., 3] > 0) & (a[..., 0] > a[..., 1] + 15) & (a[..., 2] > a[..., 1] + 15)
+    a[fringe] = 0
+    q = Image.fromarray(a.astype(np.uint8), "RGBA")
 q.save(dst)
 print(f"{dst}: {FW}x{H} per frame")
