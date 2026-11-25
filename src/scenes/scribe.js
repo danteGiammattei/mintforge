@@ -644,16 +644,19 @@ const teardown = () => {
 teardown.undo = undo; teardown.clear = clear;
 /* A copy made without a pointer: the open page, by a shaky hand, as
  * much of it as the ink allows. It is judged like any other, so nobody
- * is shut out of the loop for being unable to drag. */
+ * is shut out of the loop for being unable to drag; and the hand is
+ * shaky enough (each line a little out of place, each point a little off)
+ * that it makes a fair or close copy, now and then a true one, and never
+ * one he can't fault: careful drawing has to stay the better way. */
 teardown.scrawl = () => {
   if (S.phase !== "draw") return;
   const { page } = bus.page(), k = 120, ox = SHEET.x + (SHEET.w - k) / 2, oy = SHEET.y + (SHEET.h - k) / 2;
   let t = performance.now(), ink = 0;
   S.strokes = [];
   for (const st of page.strokes) {
-    const out = [];
+    const out = [], dx = (Math.random() - 0.5) * 14, dy = (Math.random() - 0.5) * 14;
     for (let i = 0; i < st.length; i++) {
-      const x = ox + st[i][0] * k + (Math.random() - 0.5) * 4, y = oy + st[i][1] * k + (Math.random() - 0.5) * 4;
+      const x = ox + st[i][0] * k + dx + (Math.random() - 0.5) * 12, y = oy + st[i][1] * k + dy + (Math.random() - 0.5) * 12;
       if (out.length) { const l = out[out.length - 1]; ink += Math.hypot(x - l.x, y - l.y); if (ink > inkMax() - 2) break; }
       out.push({ x, y, t: (t += 60) });
     }
