@@ -914,3 +914,18 @@ test("auction: two bids on the same last price: one stands, the other changes no
   assert.equal(res.filter(r => r.status === "fulfilled").length, 1);
   assert.equal(marks(bea) + marks(cal), 10000 - 10, "only the standing bid is held");
 });
+
+test("the first book: by the 8th chest a player with only the primer finds THE HEDGE BOOK, once", async () => {
+  const { db, pid } = await world();
+  const go = driver(db, pid, () => 0.999, Date.parse("2026-11-20T10:00:00Z"));   // no luck at all
+  const chest = n => db.raw.prepare(`INSERT INTO chests (id, player_id, tier, created_at) VALUES (?, ?, 0, ?)`).run("k_f" + n, pid, n);
+  db.raw.prepare(`UPDATE player_state SET chests_given = 7 WHERE player_id = ?`).run(pid);
+  chest(1);
+  assert.ok(!(await go("open", { chestId: "k_f1" })).result.tome, "not before the 8th");
+  db.raw.prepare(`UPDATE player_state SET chests_given = 8 WHERE player_id = ?`).run(pid);
+  chest(2);
+  assert.equal((await go("open", { chestId: "k_f2" })).result.tome, "hedge");
+  assert.ok((await loadState(db, pid)).tomes.includes("hedge"));
+  chest(3);
+  assert.ok(!(await go("open", { chestId: "k_f3" })).result.tome, "and only the once");
+});

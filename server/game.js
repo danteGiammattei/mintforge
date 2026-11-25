@@ -29,7 +29,7 @@ import {
   inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz, placeAstral, MAX_RARITY,
 } from "../shared/economy.js";
 import { heldSigns } from "./signs.js";
-import { pageOf, tomeFromChest, cravedPage } from "../shared/tomes.js";
+import { TOMES, pageOf, tomeFromChest, cravedPage } from "../shared/tomes.js";
 import { eventOn, eventChest, eventChestHolds, eventById, SEASONS, RELICS, relicOf } from "../shared/events.js";
 import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES } from "../src/lib/data.js";
@@ -310,7 +310,7 @@ async function open(db, pid, body, { now, rand }) {
   if (!idOk(body.chestId)) throw new Refusal("Which chest?");
   const [ch, ps] = await Promise.all([
     db.prepare(`DELETE FROM chests WHERE id = ?1 AND player_id = ?2 RETURNING tier, season, grade`).bind(body.chestId, pid).first(),
-    db.prepare(`SELECT tomes, owned_titles, owned_fx FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+    db.prepare(`SELECT tomes, owned_titles, owned_fx, chests_given FROM player_state WHERE player_id = ?1`).bind(pid).first(),
   ]);
   if (!ch) throw new Refusal("That chest is gone", 404);
   // now and then a tome, tucked in with the coin
@@ -325,6 +325,8 @@ async function open(db, pid, body, { now, rand }) {
   // or, rarely, one of the event's named coins: always mythic, no frost
   if (holds?.relic) rolled = { ...rolled, metalIdx: RELICS[relicOf(holds.relic).set].metal, rarity: MAX_RARITY, material: null, season: null, relic: holds.relic };
   if (!tome && holds?.tome) tome = holds.tome;          // the event's own tome, from its present
+  // nobody waits forever for their first book (an event's tome isn't one)
+  if (!tome && (ps.chests_given || 0) >= CHESTS.firstTomeBy && !tomesOf(ps.tomes).some(t => TOMES.some(x => x.id === t && x.tier > 0 && !x.event))) tome = CHESTS.firstTome;
   const id = "c_" + randomHex(8);
   // an astral coin takes a sign its owner lacks (and if two chests race
   // for the last free one, the index refuses the second: pick again)

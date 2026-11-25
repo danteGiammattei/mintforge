@@ -100,6 +100,10 @@ export const CHESTS = {
   // the chance a chest also holds a tome the player lacks, no rarer than
   // the chest (shared/tomes.js tomeFromChest). A wooden one never does.
   tomeChance: [0, 0.06, 0.1, 0.16, 0.25],
+  // and a player still holding only the primer by this many chests finds
+  // the first tome (THE HEDGE BOOK) in the next one opened, whatever the
+  // odds said: left to chance, a quarter of new players waited 400+ scrolls
+  firstTomeBy: 8, firstTome: "hedge",
   cost:  [10, 26, 60, 120, 240],
   early: [70, 22, 6, 1.7, 0.3],
   late:  [42, 31, 16, 8, 3],
