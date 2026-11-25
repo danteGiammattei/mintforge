@@ -22,8 +22,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 026 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql", "migrations/025_seven_chests.sql", "migrations/026_star_touched_fifty.sql"]);
+test("migrations 009 and 011 to 027 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql", "migrations/025_seven_chests.sql", "migrations/026_star_touched_fifty.sql", "migrations/027_notice_board.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -1151,4 +1151,55 @@ test("metal sets: coins held count too (the journal began late and was never bac
   db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES ('c_d5', ?, 1, 2, 0, 0, 5, 1, 1)`).run(pid);
   [0, 1, 2, 3, 4].forEach(r => db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?, ?, 1, 2, 0, 0, ?, 1, 0)`).run("c_sv" + r, pid, r));
   assert.ok(!(await loadState(db, pid)).setBonus);
+});
+
+/* ─── the notice board ─────────────────────────────────────────────── */
+async function boardWorld() {
+  const { db, pid: amy } = await world("amy", 1000);
+  const ids = { amy };
+  for (const n of ["ben", "cat", "dan"]) ids[n] = (await register(db, { username: n, pin: "4821", ip: "3.3.3." + n.length, now: 1000 })).body.player.id;
+  db.raw.prepare(`UPDATE player_state SET xp = 100000`).run();
+  const T = Date.parse("2026-12-03T10:00:00Z");
+  const as = (pid, action, body = {}, now = T) => act(db, pid, { action, ...body }, { now });
+  return { db, ...ids, T, as };
+}
+
+test("board: post, see, replace, take down; gated, worded, no links", async () => {
+  const { db, amy, ben, T, as } = await boardWorld();
+  db.raw.prepare(`UPDATE player_state SET xp = 0 WHERE player_id = ?`).run(ben);
+  await assert.rejects(as(ben, "post", { kind: "notice", text: "hi" }), /level 5/);
+  db.raw.prepare(`UPDATE player_state SET xp = 100000 WHERE player_id = ?`).run(ben);
+  await assert.rejects(as(amy, "post", { kind: "shout", text: "hi" }), /Wanted/);
+  await assert.rejects(as(amy, "post", { kind: "wanted", metal: 3, text: "gold" }), /metal and a rarity/);
+  await assert.rejects(as(amy, "post", { kind: "wanted", metal: 99, rarity: 1, text: "x" }), /Which coin/);
+  await assert.rejects(as(amy, "post", { kind: "notice", text: "   " }), /Say something/);
+  await assert.rejects(as(amy, "post", { kind: "notice", text: "x".repeat(121) }), /120/);
+  await assert.rejects(as(amy, "post", { kind: "notice", text: "trade me at discord.gg/abc" }), /links/);
+  await as(amy, "post", { kind: "wanted", metal: 3, rarity: 4, text: "<b>legendary gold</b>, paying well" });
+  const seen = (await as(ben, "board")).result.list;
+  assert.equal(seen.length, 1);
+  assert.deepEqual([seen[0].by, seen[0].kind, seen[0].metal, seen[0].rarity, seen[0].mine], ["amy", "wanted", 3, 4, false]);
+  assert.equal(seen[0].text, "<b>legendary gold</b>, paying well", "kept as plain text");
+  await assert.rejects(as(amy, "post", { kind: "notice", text: "again" }, T + 60_000), /ten minutes/);
+  await as(amy, "post", { kind: "offering", text: "spare ice coins" }, T + 11 * 60_000);
+  const after = (await as(amy, "board", {}, T + 11 * 60_000)).result.list;
+  assert.equal(after.length, 1, "one each: the new one replaced the old");
+  assert.equal(after[0].kind, "offering"); assert.equal(after[0].mine, true);
+  await as(amy, "unpost", {}, T + 12 * 60_000);
+  assert.equal((await as(ben, "board", {}, T + 12 * 60_000)).result.list.length, 0);
+  // three days, then gone
+  await as(ben, "post", { kind: "notice", text: "hello all" }, T);
+  assert.equal((await as(amy, "board", {}, T + 3 * 86400e3 + 1)).result.list.length, 0);
+});
+
+test("board: three reports from different players take a notice down (but its author still sees it)", async () => {
+  const { amy, ben, cat, dan, as } = await boardWorld();
+  const { id } = (await as(amy, "post", { kind: "notice", text: "rude words" })).result;
+  await assert.rejects(as(amy, "report", { noticeId: id }), /yours/);
+  await as(ben, "report", { noticeId: id }); await as(ben, "report", { noticeId: id });   // twice counts once
+  await as(cat, "report", { noticeId: id });
+  assert.equal((await as(dan, "board")).result.list.length, 1, "two reports: still up");
+  await as(dan, "report", { noticeId: id });
+  assert.equal((await as(ben, "board")).result.list.length, 0, "three: down");
+  assert.equal((await as(amy, "board")).result.list.length, 1, "its author still sees it");
 });

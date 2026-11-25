@@ -215,3 +215,24 @@ CREATE TABLE IF NOT EXISTS auction_notes (
   created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS auction_notes_player_idx ON auction_notes(player_id);
+
+-- The tavern's notice board (migration 027; server/board.js)
+CREATE TABLE IF NOT EXISTS notices (
+  id          TEXT    PRIMARY KEY,
+  player_id   INTEGER NOT NULL UNIQUE,
+  kind        TEXT    NOT NULL,            -- wanted | offering | notice
+  metal       INTEGER,                     -- the coin it is about, if any
+  rarity      INTEGER,
+  text        TEXT    NOT NULL,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER NOT NULL,
+  reports     INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS notices_live_idx ON notices(expires_at);
+
+CREATE TABLE IF NOT EXISTS notice_reports (
+  notice_id   TEXT    NOT NULL,
+  player_id   INTEGER NOT NULL,
+  PRIMARY KEY (notice_id, player_id)
+);

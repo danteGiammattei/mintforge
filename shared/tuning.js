@@ -408,3 +408,9 @@ export const AUCTION = {
   openPerPlayer: 8,
   house: { perDay: 2, chestTier: 4, startMul: 0.6, hours: 24 },      // an obsidian chest's band
 };
+
+/* ─── the notice board (server/board.js) ─────────────────────────────
+ * A board in the tavern: WANTED, OFFERING or a plain NOTICE, about a coin
+ * (metal and rarity) or not, in a few words. One per player at a time,
+ * up three days; three reports take one down. Links are refused. */
+export const BOARD = { minLevel: 5, maxChars: 120, days: 3, every: 10 * 60_000, hideAt: 3, kinds: ["wanted", "offering", "notice"], show: 60 };

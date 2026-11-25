@@ -37,6 +37,7 @@ import { Refusal, randomHex, cryptoRand } from "./http.js";
 import { loadState, parseList, parseObj, coinOut, tomesOf } from "./state.js";
 import { stall, buy } from "./stall.js";
 import { auctions, list, bid, withdraw } from "./auction.js";
+import { board, post, unpost, report } from "./board.js";
 import { LISTS, listHash } from "../shared/listhash.js";
 
 const SECRET_TITLES = { faultless: "faultless" };
@@ -633,7 +634,7 @@ async function gamble(db, pid, body, { now, rand }) {
 
 /* ─── dispatch ────────────────────────────────────────────────────── */
 
-const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, fuse, well, stall, buy, auctions, list, bid, withdraw };
+const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, fuse, well, stall, buy, auctions, list, bid, withdraw, board, post, unpost, report };
 
 export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, tz = 0 } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;
