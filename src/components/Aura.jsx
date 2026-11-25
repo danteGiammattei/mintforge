@@ -10,7 +10,7 @@ import { coinRarity } from "../lib/coin.js";
 export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rare = true, layer = "front" }) {
   const ref = useRef();
   // a Magi's globe wears no ring of fire: the snow inside it is its show
-  const rarity = rare && !coin.relic ? coinRarity(coin) : 0, k = size >= 64 ? Math.round(size / 64) : size / 64;   // a small coin, a small glow
+  const rarity = rare && !coin.relic ? coinRarity(coin) : 0, k = size / 64;   // the glow scales with the coin exactly, at any size (a 72px coin wore a 64px ring, pinned top-left)
   const tendrils = rare && coin.metalIdx === METAL.eldritch;
   const moon = rare && coin.metalIdx === METAL.astral && layer === "front";
   // the great flame round a fire coin is retired (Nov 2026): its fire
