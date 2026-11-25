@@ -260,7 +260,7 @@ test("every gift names something that exists", async () => {
   assert.equal(s.ownedFrames.length, 4);
   // every title but the ones only the stall sells or an event's chest holds
   const eventTitles = EVENTS.map(e => e.title.id);
-  assert.equal(s.ownedTitles.length, PREMIUM_TITLES.length - STALL.oddities.filter(o => o.type === "title").length - eventTitles.length);
+  assert.equal(s.ownedTitles.length, PREMIUM_TITLES.length - STALL.oddities.filter(o => o.type === "title").length - eventTitles.length - PREMIUM_TITLES.filter(t => t.secret).length);
 });
 
 /* ─── chest → coin → vault → marks ────────────────────────────────── */
@@ -806,6 +806,7 @@ test("the cabinet frame worn: a grade's number, or none for the cabinet's own; n
 /* ─── the auction house ─────────────────────────────────────────────── */
 import { settleDue } from "../server/auction.js";
 import { AUCTION } from "../shared/tuning.js";
+import { pageOf } from "../shared/tomes.js";
 async function auctionWorld() {
   const { db, pid: sam } = await world("sam", 1000);
   const ids = { sam };
@@ -946,4 +947,26 @@ test("a streak: from the third rare-or-better scroll in a row, favour x1.5; anyt
   r = await give(4); assert.equal(r.favour, 49, "20 x1.5");
   assert.equal((await loadState(db, pid)).offerStreak, 4);
   r = await give(1); assert.equal(r.streak, 0); assert.equal(r.streakMul, 1); assert.equal(r.favour, 51, "broken: plain 2");
+});
+
+test("a secret title for a perfect copy: 100% likeness earns The Faultless Hand, once", async () => {
+  const { db, pid } = await world();
+  const go = driver(db, pid, seeded(3), Date.parse("2026-11-20T10:00:00Z"));
+  const page = pageOf("primer", "salt", ["primer"]);
+  // the page itself, traced exactly, on the sheet
+  let t = 0;
+  const trace = page.strokes.map(st => st.flatMap((p, i) => {
+    const prev = st[Math.max(0, i - 1)], n = i ? Math.max(1, Math.ceil(Math.hypot(p[0] - prev[0], p[1] - prev[1]) * 30)) : 1;
+    return Array.from({ length: n }, (_, k) => { t += 30; const f = (k + 1) / n; return { x: 20 + (prev[0] + (p[0] - prev[0]) * f) * 115, y: 30 + (prev[1] + (p[1] - prev[1]) * f) * 115, t }; });
+  }));
+  const shaky = trace.map(st => st.map(q => ({ x: q.x, y: 30 + (q.y - 30) * 0.8, t: q.t })));   // squashed a little
+  const a = await go("seal", { tome: "primer", page: "salt", strokes: shaky });
+  assert.ok(a.result.likeness < 1 && !a.result.title, "a near miss earns nothing");
+  const b = await go("seal", { tome: "primer", page: "salt", strokes: trace });
+  assert.equal(b.result.likeness, 1);
+  assert.equal(b.result.title, "faultless");
+  assert.ok((await loadState(db, pid)).ownedTitles.includes("faultless"));
+  const c = await go("seal", { tome: "primer", page: "salt", strokes: trace });
+  assert.ok(!c.result.title, "only the once");
+  assert.equal((await loadState(db, pid)).ownedTitles.filter(x => x === "faultless").length, 1);
 });

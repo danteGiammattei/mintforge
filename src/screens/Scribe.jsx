@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { PREMIUM_TITLE_BY_ID } from "../lib/data.js";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
@@ -65,6 +66,8 @@ function Lectern({ owned, wanted, chosen, choose, onBack, event = null }) {
 }
 export default function Scribe() {
   const g = useGame(), ui = useUi(), celebrate = useCelebrate();
+  const cel = useRef(celebrate);
+  cel.current = celebrate;
   const ref = useRef(null), scene = useRef(null), live = useRef(g);
   live.current = g;
   const [lectern, setLectern] = useState(false);
@@ -110,7 +113,11 @@ export default function Scribe() {
       },
       deeper: () => live.current.wellLevel < SCRIBE.wells.length - 1,
       well: () => buyRef.current(),
-      seal: strokes => live.current.act("seal", { strokes, tome: book.current.tome.id, page: book.current.page.id }),
+      seal: strokes => live.current.act("seal", { strokes, tome: book.current.tome.id, page: book.current.page.id }).then(r => {
+        // a perfect copy: the secret title, once the scroll has been seen
+        if (r?.title) setTimeout(() => cel.current({ kind: "title", label: PREMIUM_TITLE_BY_ID[r.title]?.label || r.title, from: "faultless" }), 2600);
+        return r;
+      }),
       page: () => book.current,
       lectern: () => { keepSeen(live.current.tomes.length); setLectern(true); },
       newTome: () => live.current.tomes.length > readSeen(),

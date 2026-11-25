@@ -39,6 +39,7 @@ import { stall, buy } from "./stall.js";
 import { auctions, list, bid, withdraw } from "./auction.js";
 import { LISTS, listHash } from "../shared/listhash.js";
 
+const SECRET_TITLES = { faultless: "faultless" };
 const u32 = rand => Math.floor(rand() * 4294967296) >>> 0;
 const bump = key => `json_set(stats, '$.${key}', COALESCE(json_extract(stats, '$.${key}'), 0) + 1)`;
 const idOk = v => typeof v === "string" && v.length > 0 && v.length <= 80;
@@ -78,7 +79,7 @@ async function seal(db, pid, body, { now, rand, tz }) {
   if (!a) throw new Refusal("Nothing to seal");
 
   const [ps, held] = await Promise.all([
-    db.prepare(`SELECT last_seal_at, seal_nonce, seal_count, recent_sigs, well_level, tomes FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+    db.prepare(`SELECT last_seal_at, seal_nonce, seal_count, recent_sigs, well_level, tomes, owned_titles FROM player_state WHERE player_id = ?1`).bind(pid).first(),
     db.prepare(`SELECT COUNT(*) AS n FROM scrolls WHERE player_id = ?1`).bind(pid).first(),
   ]);
   if (a.ink > inkFor(ps.well_level) * SCRIBE.inkSlack) throw new Refusal("More ink than your well holds");
@@ -109,6 +110,9 @@ async function seal(db, pid, body, { now, rand, tz }) {
   const id = "s_" + randomHex(8);
   const xp = xpForSeal(r.rarity);
   const sigs = [r.signature, ...recent].slice(0, SCRIBE.recentSigs);
+  // a secret title for a copy he can't fault: 100% likeness, as the
+  // player is shown it (rounded), once
+  const faultless = !r.poor && Math.round(like * 100) >= 100 && !parseList(ps.owned_titles).includes(SECRET_TITLES.faultless);
 
   await db.batch([
     db.prepare(`INSERT INTO scrolls (id, player_id, rarity, seed, hint, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)`)
@@ -122,9 +126,12 @@ async function seal(db, pid, body, { now, rand, tz }) {
       `UPDATE player_state SET xp = xp + ?2, seal_nonce = ?3, seal_count = seal_count + 1, recent_sigs = ?4,
               stats = ${bump("sealed")} WHERE player_id = ?1`
     ).bind(pid, xp, nonce, JSON.stringify(sigs)),
+    ...(faultless ? [db.prepare(
+      `UPDATE player_state SET owned_titles = json_insert(COALESCE(owned_titles, '[]'), '$[#]', ?2)
+        WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(owned_titles, '[]')) WHERE value = ?2)`).bind(pid, SECRET_TITLES.faultless)] : []),
   ]);
   return { scroll: { id, rarity: r.rarity, seed: r.seed }, familiar: r.familiar, xp, base: r.base, steps: r.steps,
-           likeness: Math.round(like * 100) / 100, poor: r.poor };
+           likeness: Math.round(like * 100) / 100, poor: r.poor, ...(faultless ? { title: SECRET_TITLES.faultless } : {}) };
 }
 
 /* ─── offer ───────────────────────────────────────────────────────── */

@@ -175,6 +175,8 @@ export const PREMIUM_TITLES = [
   { id:"night_buyer",    label:"Night Buyer",             minLvl:1, effect:"void" },
   { id:"ill_gotten",     label:"Of Ill-Gotten Wares",     minLvl:1, effect:"void" },
   { id:"stall_favourite",label:"The Stallholder's Favourite", minLvl:1, effect:"astral" },
+  // secret: never listed until earned
+  { id:"faultless",      label:"The Faultless Hand",      minLvl:1, effect:"astral", secret: true },   // a copy at 100% likeness (server/game.js seal)
   // events (shared/events.js): only ever from the event's chests
   { id:"long_night",     label:"Santa's Little Helper",   minLvl:1, effect:"frost" },
 ];

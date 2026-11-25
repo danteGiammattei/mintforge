@@ -98,7 +98,8 @@ function Body({ r }) {
     return (
       <>
         <div className="t-big" style={{ textAlign: "center", lineHeight: 1.3 }}><TitleText label={r.label}/></div>
-        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>{r.from === "gift" ? "HE DOES NOT GIVE THIS TO JUST ANYONE." : "IT IS YOURS TO WEAR."}</p>
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>{r.from === "gift" ? "HE DOES NOT GIVE THIS TO JUST ANYONE."
+          : r.from === "faultless" ? "A COPY HE CANNOT FAULT. FEW HANDS EVER MAKE ONE." : "IT IS YOURS TO WEAR."}</p>
       </>
     );
   }
