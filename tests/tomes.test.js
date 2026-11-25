@@ -131,3 +131,17 @@ test("an event's tome is never in an ordinary chest", () => {
     assert.ok(!event.includes(got), got);
   }
 });
+
+test("the roll: likeness is a sure floor (fair uncommon, close rare, true epic), held to the page's tier", () => {
+  const deep = TOMES.flatMap(t => t.pages).find(p => p.id === "deep");       // tier 5
+  const salt0 = TOMES.flatMap(t => t.pages).find(p => p.id === "mercury");   // tier 2
+  const a = analyse(copy(deep, 0.02), SCRIBE.sheet);
+  for (let salt = 0; salt < 300; salt++) {
+    for (const [like, floor] of [[SIGIL.copy.fair, 1], [SIGIL.copy.close, 2], [SIGIL.copy.true, 3]]) {
+      const r = rollScroll(a, [], salt, { page: deep, likeness: like, maxMs: Infinity });
+      if (!r.faint) assert.ok(r.rarity >= floor, `${like} gave ${r.rarity}`);
+    }
+    const capped = rollScroll(a, [], salt, { page: salt0, likeness: 1, maxMs: Infinity });
+    assert.ok(capped.rarity <= 2, "never past the page");
+  }
+});

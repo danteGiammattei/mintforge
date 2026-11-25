@@ -218,10 +218,14 @@ export function rollScroll(a, recent = [], salt = 0, opts = {}) {
   const lift = why => { if (rarity >= cap) return false; rarity++; steps.push({ why, to: rarity }); return true; };
 
   if (!faint) {
-    // the copy itself: the closer, the higher, before anything else
-    // (each grade reached is a chance of a lift, not a certainty: the
-    // seal still has to feel like a roll)
-    if (page) for (const [k, at] of [["fair", SIGIL.copy.fair], ["close", SIGIL.copy.close], ["true", SIGIL.copy.true]]) if (like >= at && rng() < SIGIL.copy.bump) lift(k);
+    // the copy itself, before anything else: the closer, the higher the
+    // floor under the roll (fair uncommon, close rare, true epic), sure
+    if (page) {
+      const grades = [["fair", SIGIL.copy.fair], ["close", SIGIL.copy.close], ["true", SIGIL.copy.true]];
+      let g = -1; grades.forEach(([, at], i) => { if (like >= at) g = i; });
+      const floor = g < 0 ? 0 : Math.min(cap, SIGIL.copy.floors[g]);
+      if (rarity < floor) { rarity = floor; steps.push({ why: grades[g][0], to: rarity }); }
+    }
     // what he wants today always lifts, and sometimes lifts again: for a
     // copy, his page (opts.craved), copied at least fairly; drawn
     // freehand, his trait (opts.craving)

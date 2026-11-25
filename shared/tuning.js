@@ -70,10 +70,11 @@ export const SIGIL = {
   effortInk: 150,        // ink at which a drawing counts as a real attempt
   faintChance: 0.85,     // with no ink or time at all, how often the roll comes to nothing
   // copying a tome page (shared/tomes.js): likeness 1 at `perfect`
-  // distance or closer, 0 at `none`. A copy at `fair` or better lifts one
-  // tier, at `close` two, at `true` three; below `poor` it is nothing,
-  // like a hurried scrap. The page's tier caps it all.
-  copy: { perfect: 0.02, none: 0.09, poor: 0.3, fair: 0.55, close: 0.72, true: 0.86, bump: 0.4 },
+  // distance or closer, 0 at `none`. A copy is a floor under the roll: at
+  // `fair` or better it is at least uncommon, at `close` at least rare, at
+  // `true` at least epic; below `poor` it is nothing, like a hurried scrap.
+  // The page's tier caps it all. A sure thing, so drawing well always pays.
+  copy: { perfect: 0.02, none: 0.09, poor: 0.3, fair: 0.55, close: 0.72, true: 0.86, floors: [1, 2, 3] },
   familiar: 0.86,        // signature similarity that counts as a repeat
   familiarPenalty: 2,    // tiers lost for a repeat
 };
@@ -81,6 +82,10 @@ export const SIGIL = {
 /* ─── the door ────────────────────────────────────────────────────────
  * Favour is what a scroll is worth to him. It is never shown. */
 export const FAVOUR_PER_RARITY = [1, 2, 4, 9, 20, 50];
+/* A streak: scrolls of at least `from` (rare) handed over one after
+ * another. From the `at`th in a row each pays `mul` times its favour;
+ * anything less breaks it. Shown to the player, unlike the favour. */
+export const STREAK = { from: 2, at: 3, mul: 1.5 };
 
 /* The chest rule
  * ──────────────
