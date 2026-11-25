@@ -1,14 +1,14 @@
 import PixelIcon from "../ui/PixelIcon.jsx";
 
-/* Seven tabs, in the order the loop runs: draw, pay, open, keep, work —
- * then the two places that are not part of it. Friends live under
+/* Seven tabs, the door in the middle (November 2026): draw, open, keep
+ * on its left; work, play, you on its right. Friends live under
  * Profile. Icons only (seven names don't fit a phone); each keeps its
  * name for screen readers and as a tooltip. */
 export const TABS = [
   ["scribe",  "quill",   "SCRIBE"],
-  ["door",    "door",    "DOOR"],
   ["satchel", "satchel", "SATCHEL"],
   ["vault",   "vault",   "VAULT"],
+  ["door",    "door",    "DOOR"],
   ["forge",   "anvil",   "FORGE"],
   ["tavern",  "die",     "TAVERN"],
   ["profile", "face",    "PROFILE"],
