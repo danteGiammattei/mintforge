@@ -351,9 +351,11 @@ export const FUSE = { take: 3, feeShare: 0.1, minFee: 20 };
 
 /* Secret titles (src/lib/data.js, secret: true): listed nowhere until
  * earned. The first star asks for an astral coin among a player's first
- * ten coins ever; coins are counted by the journal, which began on
+ * fifty coins ever (ten, until the seven-chest ladder put stars in the
+ * Void chest alone, which opens at 45 chests: modelled, about 1 player
+ * in 250 manages fifty); coins are counted by the journal, which began on
  * `journalSince`, so only accounts made since then can be judged. */
-export const SECRET = { firstStarWithin: 10, journalSince: Date.parse("2026-11-12T00:00:00Z") };
+export const SECRET = { firstStarWithin: 50, journalSince: Date.parse("2026-11-12T00:00:00Z") };
 
 export const ASTRAL = {
   metal: 10,

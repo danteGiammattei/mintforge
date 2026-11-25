@@ -101,7 +101,7 @@ function Body({ r }) {
         <div className="t-big" style={{ textAlign: "center", lineHeight: 1.3 }}><TitleText label={r.label}/></div>
         <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>{r.from === "gift" ? "HE DOES NOT GIVE THIS TO JUST ANYONE."
           : r.from === "faultless" ? "A COPY HE CANNOT FAULT. FEW HANDS EVER MAKE ONE."
-          : r.from === "first_star" ? "A STAR IN YOUR FIRST HANDFUL OF COINS. THE SKY NOTICED YOU EARLY." : "IT IS YOURS TO WEAR."}</p>
+          : r.from === "first_star" ? "A STAR AMONG YOUR FIRST FIFTY COINS. THE SKY NOTICED YOU EARLY." : "IT IS YOURS TO WEAR."}</p>
       </>
     );
   }

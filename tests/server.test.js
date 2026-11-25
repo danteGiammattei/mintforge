@@ -22,8 +22,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 025 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql", "migrations/025_seven_chests.sql"]);
+test("migrations 009 and 011 to 026 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql", "migrations/025_seven_chests.sql", "migrations/026_star_touched_fifty.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -965,7 +965,7 @@ test("a secret title for a perfect copy: 100% likeness earns The Faultless Hand,
   assert.equal((await loadState(db, pid)).ownedTitles.filter(x => x === "faultless").length, 1);
 });
 
-test("Star-Touched: an astral coin among your first ten coins ever; not for accounts older than the journal", async () => {
+test("Star-Touched: an astral coin among your first fifty coins ever; not for accounts older than the journal", async () => {
   const { SECRET } = await import("../shared/tuning.js");
   const astralChest = async (db, pid, n) => {
     db.raw.prepare(`INSERT INTO chests (id, player_id, tier, created_at) VALUES (?, ?, 6, ?)`).run("k_st" + n, pid, n);   // void: the only chest with stars
@@ -980,10 +980,14 @@ test("Star-Touched: an astral coin among your first ten coins ever; not for acco
   assert.equal(r.secretTitle?.id, "first_star");
   assert.ok((await loadState(fresh.db, fresh.pid)).ownedTitles.includes("first_star"));
   assert.ok(!(await astralChest(fresh.db, fresh.pid, 2)).secretTitle, "once");
-  // eleven coins already seen: too late
+  // fifty-one coins already seen: too late (forty-nine: still in time)
   const late = await world("late");
   late.db.raw.prepare(`UPDATE players SET created_at = ? WHERE id = ?`).run(SECRET.journalSince + 1, late.pid);
-  late.db.raw.prepare(`UPDATE player_state SET journal = '{"c":{"2:1":11}}' WHERE player_id = ?`).run(late.pid);
+  late.db.raw.prepare(`UPDATE player_state SET journal = '{"c":{"2:1":51}}' WHERE player_id = ?`).run(late.pid);
+  const ontime = await world("ontime");
+  ontime.db.raw.prepare(`UPDATE players SET created_at = ? WHERE id = ?`).run(SECRET.journalSince + 1, ontime.pid);
+  ontime.db.raw.prepare(`UPDATE player_state SET journal = '{"c":{"2:1":49}}' WHERE player_id = ?`).run(ontime.pid);
+  assert.equal((await astralChest(ontime.db, ontime.pid, 1)).secretTitle?.id, "first_star");
   assert.ok(!(await astralChest(late.db, late.pid, 1)).secretTitle);
   // an account from before the journal can't be judged
   const old = await world("elder", 1000);
@@ -1120,4 +1124,16 @@ test("migration 025: chests and decided pots move to the chest they were", async
   assert.deepEqual(tiers, [0, 1, 2, 4, 6], "obsidian to 4, void to 6");
   const ps = db.raw.prepare(`SELECT chest_tier, chest_cost FROM player_state WHERE player_id = ?`).get(pid);
   assert.deepEqual([ps.chest_tier, ps.chest_cost], [4, 110]);
+});
+
+test("migration 026: Star-Touched for a star among the first fifty, where certain", async () => {
+  const { db, pid } = await world("fifty");
+  const { readFileSync } = await import("node:fs");
+  db.raw.prepare(`UPDATE players SET created_at = ? WHERE id = ?`).run(1794441600000 + 5, pid);
+  for (let i = 0; i < 30; i++) db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?, ?, 1, 2, 0, 0, 1, ?, 0)`).run("c_f" + i, pid, 10 + i);
+  db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES ('c_fs', ?, 1, 10, 0, 0, 1, 99, 0, 3)`).run(pid);
+  db.raw.prepare(`UPDATE player_state SET journal = '{"c":{"2:1":40,"10:1":1}}' WHERE player_id = ?`).run(pid);   // 10 gone: 31 + 10 = 41
+  const run = () => db.raw.exec(readFileSync("migrations/026_star_touched_fifty.sql", "utf8"));
+  run(); run();
+  assert.deepEqual(JSON.parse(db.raw.prepare(`SELECT owned_titles FROM player_state WHERE player_id = ?`).get(pid).owned_titles), ["first_star"]);
 });

@@ -1,5 +1,8 @@
 -- 025 · seven chest tiers (shared/tuning.js CHESTS)
 --
+-- ALREADY RUN ON PRODUCTION (26 November 2026). DO NOT RUN IT AGAIN:
+-- a second run would turn every Obsidian chest into a Void chest.
+--
 --   node tools/migrate.mjs migrations/025_seven_chests.sql --remote
 --
 -- Frost came in at 3 and Molten at 5, so Obsidian moved 3 → 4 and Void

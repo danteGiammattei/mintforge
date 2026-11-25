@@ -363,7 +363,7 @@ async function open(db, pid, body, { now, rand }) {
       break;
     } catch (e) { if (tries >= 2 || !/UNIQUE/i.test(String(e?.message))) throw e; }
   }
-  // a secret title: an astral coin among your first ten coins ever (the
+  // a secret title: an astral coin among your first fifty coins ever (the
   // journal's count of every coin you've cleaned, won or bought, and those
   // still to be brushed; this one is among them now)
   let firstStar = false;
