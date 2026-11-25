@@ -321,6 +321,12 @@ export const MATERIAL = {
  * takes a sign they lack, and once they hold all twelve, no more astral
  * coins come (that roll is eldritch instead). Selling or losing one frees
  * its sign. Enforced by a unique index (migration 016). */
+/* Secret titles (src/lib/data.js, secret: true): listed nowhere until
+ * earned. The first star asks for an astral coin among a player's first
+ * ten coins ever; coins are counted by the journal, which began on
+ * `journalSince`, so only accounts made since then can be judged. */
+export const SECRET = { firstStarWithin: 10, journalSince: Date.parse("2026-11-12T00:00:00Z") };
+
 export const ASTRAL = {
   metal: 10,
   instead: 9,

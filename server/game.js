@@ -21,7 +21,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { analyse, rollScroll, measure, TRAITS, LIFTS, likeness } from "../shared/sigil.js";
-import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL } from "../shared/tuning.js";
+import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL, SECRET } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, streakAfter, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
@@ -363,9 +363,27 @@ async function open(db, pid, body, { now, rand }) {
       break;
     } catch (e) { if (tries >= 2 || !/UNIQUE/i.test(String(e?.message))) throw e; }
   }
+  // a secret title: an astral coin among your first ten coins ever (the
+  // journal's count of every coin you've cleaned, won or bought, and those
+  // still to be brushed; this one is among them now)
+  let firstStar = false;
+  if (c.metalIdx === ASTRAL.metal && c.sign != null) {
+    const seen = await db.prepare(
+      `SELECT p.created_at AS born, ps.owned_titles AS titles,
+              COALESCE((SELECT SUM(value) FROM json_each(ps.journal, '$.c')), 0) + COALESCE((SELECT SUM(value) FROM json_each(ps.journal, '$.r')), 0)
+              + (SELECT COUNT(*) FROM coins WHERE player_id = ?1 AND dusty = 1) AS n
+         FROM player_state ps JOIN players p ON p.id = ps.player_id WHERE ps.player_id = ?1`).bind(pid).first();
+    if (seen && seen.born >= SECRET.journalSince && seen.n <= SECRET.firstStarWithin && !parseList(seen.titles).includes("first_star")) {
+      await db.prepare(
+        `UPDATE player_state SET owned_titles = json_insert(COALESCE(owned_titles, '[]'), '$[#]', 'first_star')
+          WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(owned_titles, '[]')) WHERE value = 'first_star')`).bind(pid).run();
+      firstStar = true;
+    }
+  }
   return { tier: ch.tier, coin: { id, seed: c.seed, metalIdx: c.metalIdx, shiny: c.shiny, locked: false, rarity: c.rarity, ...(c.season ? { season: c.season } : {}), ...(c.relic ? { relic: c.relic } : {}) },
            xp: XP.open, ...(tome ? { tome } : {}),
            ...(holds?.title ? { title: describeReward({ type: "title", id: holds.title }) } : {}),
+           ...(firstStar ? { secretTitle: describeReward({ type: "title", id: "first_star" }) } : {}),
            ...(holds?.effect ? { effect: holds.effect } : {}) };
 }
 

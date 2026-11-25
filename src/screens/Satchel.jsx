@@ -33,6 +33,7 @@ function Ceremony({ chest, onDone, onClose }) {
       const r = found.current || {};
       if (r.tome) celebrate({ kind: "tome", id: r.tome });
       if (r.title) celebrate({ kind: "title", label: PREMIUM_TITLES.find(t => t.id === r.title.id)?.label || r.title.name, from: "chest" });
+      if (r.secretTitle) celebrate({ kind: "title", label: PREMIUM_TITLES.find(t => t.id === r.secretTitle.id)?.label || r.secretTitle.name, from: "first_star" });
       if (r.effect) celebrate({ kind: "fx", id: r.effect });
     }, say: ui.say, feel,
   }, { tier: chest.tier, season: chest.season || null, look: chest.id }), [chest.id]);   // eslint-disable-line react-hooks/exhaustive-deps

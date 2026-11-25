@@ -22,8 +22,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 023 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql"]);
+test("migrations 009 and 011 to 024 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -969,4 +969,60 @@ test("a secret title for a perfect copy: 100% likeness earns The Faultless Hand,
   const c = await go("seal", { tome: "primer", page: "salt", strokes: trace });
   assert.ok(!c.result.title, "only the once");
   assert.equal((await loadState(db, pid)).ownedTitles.filter(x => x === "faultless").length, 1);
+});
+
+test("Star-Touched: an astral coin among your first ten coins ever; not for accounts older than the journal", async () => {
+  const { SECRET } = await import("../shared/tuning.js");
+  const astralChest = async (db, pid, n) => {
+    db.raw.prepare(`INSERT INTO chests (id, player_id, tier, created_at) VALUES (?, ?, 4, ?)`).run("k_st" + n, pid, n);
+    const go = driver(db, pid, () => 0.99999, Date.parse("2026-11-20T10:00:00Z"));
+    return (await go("open", { chestId: "k_st" + n })).result;
+  };
+  // a new account: its first coin a star
+  const fresh = await world("nova");
+  fresh.db.raw.prepare(`UPDATE players SET created_at = ? WHERE id = ?`).run(SECRET.journalSince + 1, fresh.pid);
+  const r = await astralChest(fresh.db, fresh.pid, 1);
+  assert.equal(r.coin.metalIdx, 10, "the roll gave a star");
+  assert.equal(r.secretTitle?.id, "first_star");
+  assert.ok((await loadState(fresh.db, fresh.pid)).ownedTitles.includes("first_star"));
+  assert.ok(!(await astralChest(fresh.db, fresh.pid, 2)).secretTitle, "once");
+  // eleven coins already seen: too late
+  const late = await world("late");
+  late.db.raw.prepare(`UPDATE players SET created_at = ? WHERE id = ?`).run(SECRET.journalSince + 1, late.pid);
+  late.db.raw.prepare(`UPDATE player_state SET journal = '{"c":{"2:1":11}}' WHERE player_id = ?`).run(late.pid);
+  assert.ok(!(await astralChest(late.db, late.pid, 1)).secretTitle);
+  // an account from before the journal can't be judged
+  const old = await world("elder", 1000);
+  assert.ok(!(await astralChest(old.db, old.pid, 1)).secretTitle);
+});
+
+test("migration 024: the secret titles for what was done before they existed", async () => {
+  const { db, pid } = await world("ret");
+  const { readFileSync } = await import("node:fs");
+  const ids = { ret: pid };
+  for (const n of ["sol", "gil", "bob"]) ids[n] = (await register(db, { username: n, pin: "4821", ip: "2.2.2." + n.length, now: 1000 })).body.player.id;
+  const born = 1794441600000 + 5;
+  db.raw.prepare(`UPDATE players SET created_at = ?`).run(born);
+  db.raw.prepare(`UPDATE players SET created_at = 1000 WHERE id = ?`).run(ids.bob);      // before the journal
+  const coin = (p, id, metal, sign, at) => db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, sign) VALUES (?, ?, 1, ?, 0, 0, 1, ?, 0, ?)`).run(id, p, metal, at, sign);
+  // ret: a perfect copy on record, and a star as its 3rd coin, nothing sold
+  db.raw.prepare(`INSERT INTO seal_log (player_id, created_at, rarity, traits, bumped, familiar, well_level, m) VALUES (?, 1, 2, '', '', 0, 0, '{"like":1}')`).run(ids.ret);
+  db.raw.prepare(`INSERT INTO seal_log (player_id, created_at, rarity, traits, bumped, familiar, well_level, m) VALUES (?, 1, 2, '', '', 0, 0, '{"like":0.99}')`).run(ids.sol);
+  ["a", "b"].forEach((x, i) => coin(ids.ret, "c_r" + x, 2, null, 10 + i)); coin(ids.ret, "c_rs", 10, 4, 20);
+  db.raw.prepare(`UPDATE player_state SET journal = '{"c":{"2:1":2,"10:1":1}}' WHERE player_id = ?`).run(ids.ret);
+  // sol: a star 3rd among what it holds, but it has sold 9 coins: can't be sure, so no
+  ["a", "b"].forEach((x, i) => coin(ids.sol, "c_s" + x, 2, null, 10 + i)); coin(ids.sol, "c_ss", 10, 4, 20);
+  db.raw.prepare(`UPDATE player_state SET journal = '{"c":{"2:1":11,"10:1":1}}' WHERE player_id = ?`).run(ids.sol);
+  // gil: a star as its 12th coin
+  for (let i = 0; i < 11; i++) coin(ids.gil, "c_g" + i, 2, null, 10 + i); coin(ids.gil, "c_gs", 10, 4, 99);
+  db.raw.prepare(`UPDATE player_state SET journal = '{"c":{"2:1":11,"10:1":1}}' WHERE player_id = ?`).run(ids.gil);
+  // bob: a star first, but the account is older than the journal
+  coin(ids.bob, "c_bs", 10, 4, 5);
+  const run = () => db.raw.exec(readFileSync("migrations/024_secret_titles.sql", "utf8"));
+  run(); run();                                                         // twice: nobody gets one twice
+  const titles = p => JSON.parse(db.raw.prepare(`SELECT owned_titles FROM player_state WHERE player_id = ?`).get(p).owned_titles || "[]");
+  assert.deepEqual(titles(ids.ret).sort(), ["faultless", "first_star"]);
+  assert.deepEqual(titles(ids.sol), []);
+  assert.deepEqual(titles(ids.gil), []);
+  assert.deepEqual(titles(ids.bob), []);
 });

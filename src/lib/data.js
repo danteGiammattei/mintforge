@@ -177,6 +177,7 @@ export const PREMIUM_TITLES = [
   { id:"stall_favourite",label:"The Stallholder's Favourite", minLvl:1, effect:"astral" },
   // secret: never listed until earned
   { id:"faultless",      label:"The Faultless Hand",      minLvl:1, effect:"astral", secret: true },   // a copy at 100% likeness (server/game.js seal)
+  { id:"first_star",     label:"Star-Touched",            minLvl:1, effect:"astral", secret: true },   // an astral coin among your first ten (server/game.js open)
   // events (shared/events.js): only ever from the event's chests
   { id:"long_night",     label:"Santa's Little Helper",   minLvl:1, effect:"frost" },
 ];
