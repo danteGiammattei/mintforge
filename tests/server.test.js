@@ -315,16 +315,10 @@ test("coin toss: a win mints the next metal, a loss takes the coin", async () =>
   assert.equal(loss.state.stats.gambles, 2);
 });
 
-test("crucible wants three of one metal; losing keeps exactly one", async () => {
+test("the crucible has left the tavern (fusing lives at the forge now)", async () => {
   const { db, pid } = await world();
-  coin(db, pid, "a", 1); coin(db, pid, "b", 1); coin(db, pid, "c", 1); coin(db, pid, "d", 4);
-  const go = driver(db, pid, scripted(0.9, 0.5));
-  await refuses(go("gamble", { game: "crucible", coinIds: ["a", "b", "d"] }), 400);
-  await refuses(go("gamble", { game: "crucible", coinIds: ["a", "b"] }), 400);
-  const r = await driver(db, pid, scripted(0.9, 0.5))("gamble", { game: "crucible", coinIds: ["a", "b", "c"] });
-  assert.equal(r.result.won, false);
-  assert.deepEqual(r.result.kept, ["b"]);
-  assert.deepEqual(r.state.coins.map(c => c.id).sort(), ["b", "d"]);
+  coin(db, pid, "a", 1); coin(db, pid, "b", 1); coin(db, pid, "c", 1);
+  await refuses(driver(db, pid, seeded(1))("gamble", { game: "crucible", coinIds: ["a", "b", "c"] }), 400);
 });
 
 test("roulette: locked coins cannot be staked, the top metal does not overflow", async () => {

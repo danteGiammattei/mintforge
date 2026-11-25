@@ -25,7 +25,7 @@ import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL, SECRET, FUSE } fr
 import {
   levelOf, offerScroll, streakAfter, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
-  resolveToss, resolveCrucible, resolveRoulette, resolvePlinko, forgeCost, restrikeCost,
+  resolveToss, resolveRoulette, resolvePlinko, forgeCost, restrikeCost,
   inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz, placeAstral, MAX_RARITY,
 } from "../shared/economy.js";
 import { heldSigns } from "./signs.js";
@@ -582,7 +582,6 @@ async function well(db, pid) {
 
 const GAMES = {
   toss:     { coins: 1, resolve: resolveToss,     winXp: XP.gambleWin,   lossXp: XP.gambleLoss },
-  crucible: { coins: 3, resolve: resolveCrucible, winXp: XP.gambleWin,   lossXp: XP.gambleLoss, sameMetal: true },
   roulette: { coins: 1, resolve: resolveRoulette, winXp: XP.rouletteWin, lossXp: XP.rouletteLoss },
   plinko:   { coins: 1, resolve: resolvePlinko,   winXp: XP.rouletteWin, lossXp: XP.rouletteLoss },
 };
@@ -599,7 +598,6 @@ async function gamble(db, pid, body, { now, rand }) {
   const staked = ids.map(id => (found.results || []).find(r => r.id === id));
   if (staked.some(r => !r)) throw new Refusal("A staked coin is locked or gone", 409);
   const metal = staked[0].metal_idx;
-  if (g.sameMetal && staked.some(r => r.metal_idx !== metal)) throw new Refusal("All three must be the same metal");
 
   const res = g.resolve(metal, rand);
   const lost = res.lose.map(i => ids[i]);

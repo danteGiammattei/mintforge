@@ -119,15 +119,6 @@ export function resolveToss(metal, rand) {
   return { won, lose: [0], make: won ? [Math.min(MAX_METAL, metal + 1)] : [], outcome: won ? "up1" : "lose" };
 }
 
-export function resolveCrucible(metal, rand) {
-  if (rand() < GAMBLE.crucible.win) {
-    const up = Math.min(MAX_METAL, metal + 1);
-    return { won: true, lose: [0, 1, 2], make: [up, up, up], outcome: "up1" };
-  }
-  const kept = Math.min(2, Math.floor(rand() * 3));
-  return { won: false, lose: [0, 1, 2].filter(i => i !== kept), make: [], outcome: "lose", kept };
-}
-
 const makeFor = (outcome, metal) => ({
   lose:    [],
   same:    [metal],

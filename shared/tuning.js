@@ -186,7 +186,6 @@ export const ENGRAVE = { cost: 250, maxLength: 14 };
 /* ─── the tavern ──────────────────────────────────────────────────── */
 export const GAMBLE = {
   toss:     { coins: 1, win: 0.5 },                 // tier up, or lost
-  crucible: { coins: 3, win: 0.38 },                // three of one metal: all tier up, or keep one
   roulette: [
     { outcome: "lose",    label: "LOSE",    weight: 40 },
     { outcome: "same",    label: "SAME",    weight: 14 },

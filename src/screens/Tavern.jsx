@@ -4,7 +4,7 @@ import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
 import { coinRarity } from "../lib/coin.js";
 import { hydrate, matterOf } from "../lib/coinview.js";
-import { METALS, RARITIES, MAX_TIER } from "../lib/data.js";
+import { RARITIES, MAX_TIER } from "../lib/data.js";
 import { GAMBLE } from "../../shared/tuning.js";
 import CoinCanvas from "../components/CoinCanvas.jsx";
 import RouletteWheel, { SECTOR_COLOURS } from "../components/RouletteWheel.jsx";
@@ -17,7 +17,6 @@ import Auction from "../components/Auction.jsx";
 /* ─── TAVERN ──────────────────────────────────────────────────────────────
  * Three wagers, all staked in coins, all resolved by the server:
  *   TOSS      one coin. It rises a metal, or it is gone.
- *   CRUCIBLE  three of one metal. All rise, or you keep one.
  *   ROULETTE  one coin on a six-sector wheel.
  *   PLINKO    one coin down eight rows of pegs into one of nine slots.
  *   WAR       a friend's coin against yours, high card (components/War.jsx).
@@ -26,7 +25,6 @@ import Auction from "../components/Auction.jsx";
 const pct = p => Math.round(p * 100) + "%";
 const GAMES = {
   toss:     { label: "TOSS",     need: 1, rule: `1 COIN · ${pct(GAMBLE.toss.win)} IT RISES A METAL · OTHERWISE IT IS LOST` },
-  crucible: { label: "CRUCIBLE", need: 3, rule: `3 COINS OF ONE METAL · ${pct(GAMBLE.crucible.win)} ALL THREE RISE · OTHERWISE YOU KEEP ONE` },
   roulette: { label: "ROULETTE", need: 1, rule: "1 COIN ON THE WHEEL" },
   plinko:   { label: "PLINKO",   need: 1, rule: "1 COIN DOWN THE PEGS." },
   war:      { label: "WAR",      need: 0, rule: "" },
@@ -57,8 +55,7 @@ export default function Tavern() {
 
   const free = useMemo(() => g.coins.filter(c => !c.locked && !c.relic), [g.coins]);
   const first = free.find(c => c.id === ids[0]);
-  // the crucible takes one metal: once the first coin is in, only its kin can follow
-  const eligible = game === "crucible" && first ? free.filter(c => c.metalIdx === first.metalIdx) : free;
+  const eligible = free;
   const ready = ids.length === def.need;
 
   const reset = () => { setIds([]); setPhase("pick"); setRes(null); setStake([]); };
@@ -185,7 +182,6 @@ export default function Tavern() {
               <>
                 <div className="between">
                   <span className="t-label">STAKE {ids.length} / {def.need}</span>
-                  {game === "crucible" && first && <span style={{ color: METALS[first.metalIdx].hl }}>{METALS[first.metalIdx].name} ONLY</span>}
                   {first && first.metalIdx >= MAX_TIER && game !== "roulette" && <span className="t-blood">ALREADY THE HIGHEST METAL</span>}
                 </div>
                 <div className="grid-coins coin-scroll" style={{ maxHeight: 300, padding: 2 }}>
@@ -194,7 +190,7 @@ export default function Tavern() {
                   ))}
                 </div>
                 <button className="btn btn-danger btn-block" disabled={!ready} onClick={play}>
-                  {ready ? ({ roulette: "SPIN", plinko: "DROP IT", toss: "TOSS IT", crucible: "POUR THEM IN" })[game] : `PICK ${def.need - ids.length} MORE`}
+                  {ready ? ({ roulette: "SPIN", plinko: "DROP IT", toss: "TOSS IT" })[game] : `PICK ${def.need - ids.length} MORE`}
                 </button>
               </>
             )
