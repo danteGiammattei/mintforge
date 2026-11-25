@@ -33,7 +33,7 @@ function PlayerRow({ p, onOpen, right }) {
   );
 }
 
-function ProfileCard({ soc }) {
+export function ProfileCard({ soc }) {
   const ev = useGame().event;
   const v = soc.viewing, d = v.data;
   const [coin, setCoin] = useState(null);
