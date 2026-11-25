@@ -109,9 +109,10 @@ async function paySigns(db, pid, ps, rows) {
  * guarded statement, so two loads at once pay it once. */
 /* A metal's set, completed: its bonus, once (journal.setsPaid, a bit per
  * metal), guarded so two loads can't both pay it. */
-async function paySets(db, pid, ps) {
+async function paySets(db, pid, ps, rows) {
   const j = parseObj(ps.journal), had = j.setsPaid | 0;
-  const due = setsDone(j).filter(m => !(had & (1 << m)));
+  const held = rows.filter(r => !r.dusty && !r.relic).map(r => `${r.metal_idx}:${r.rarity ?? 0}`);
+  const due = setsDone(j, held).filter(m => !(had & (1 << m)));
   if (!due.length) return [];
   let res;
   try {
@@ -177,7 +178,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   await signOldAstrals(db, pid, all);
   const signBonus = await paySigns(db, pid, ps, all);
   const relicBonus = await payRelics(db, pid, ps, all);
-  const setBonus = await paySets(db, pid, ps);
+  const setBonus = await paySets(db, pid, ps, all);
   const auctionNotes = await takeNotes(db, pid);
   const stats = parseObj(ps.stats);
   delete stats.lastVisitAt;

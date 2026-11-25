@@ -63,10 +63,13 @@ export function offerScroll(pot0, rarity, rand, mul = 1) {
   return { pot, chest: tier };
 }
 
-/* Which metals' sets are complete in a journal ({ c: { "metal:rarity": n } }). */
-export function setsDone(journal) {
-  const c = (journal && journal.c) || {}, out = [];
-  for (let m = 0; m < METAL_SETS.metals; m++) if ([0, 1, 2, 3, 4, 5].every(r => (c[`${m}:${r}`] | 0) > 0)) out.push(m);
+/* Which metals' sets are complete: by the journal ({ c: { "metal:rarity":
+ * n } }), and by the coins held now, as "metal:rarity" strings. The
+ * journal only began on 12 November 2026 and was never backfilled, so a
+ * coin found before then counts by being held. */
+export function setsDone(journal, held = []) {
+  const c = (journal && journal.c) || {}, have = new Set(held), out = [];
+  for (let m = 0; m < METAL_SETS.metals; m++) if ([0, 1, 2, 3, 4, 5].every(r => (c[`${m}:${r}`] | 0) > 0 || have.has(`${m}:${r}`))) out.push(m);
   return out;
 }
 

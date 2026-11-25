@@ -65,7 +65,7 @@ export async function onRequestGet({ request, env, params }) {
     frame: player.frame,
     profileFx: player.profile_fx || null,
     relics: [...new Set(allCoins.map(c => c.relic).filter(Boolean))],
-    sets: (() => { try { return setsDone(JSON.parse(player.journal || "{}")); } catch { return []; } })(),
+    sets: (() => { try { return setsDone(JSON.parse(player.journal || "{}"), allCoins.filter(c => !c.dusty && !c.relic).map(c => `${c.metal_idx}:${c.rarity ?? 0}`)); } catch { return []; } })(),
     cabFrame: (() => { try { const f = JSON.parse(player.stats || "{}").cabFrame; return Number.isInteger(f) ? f : null; } catch { return null; } })(),
     createdAt: player.created_at,
     isSelf: player.id === auth.player.id,

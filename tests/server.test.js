@@ -1137,3 +1137,18 @@ test("migration 026: Star-Touched for a star among the first fifty, where certai
   run(); run();
   assert.deepEqual(JSON.parse(db.raw.prepare(`SELECT owned_titles FROM player_state WHERE player_id = ?`).get(pid).owned_titles), ["first_star"]);
 });
+
+test("metal sets: coins held count too (the journal began late and was never backfilled)", async () => {
+  const { db, pid } = await world();
+  const { METAL_SETS } = await import("../shared/tuning.js");
+  db.raw.prepare(`UPDATE player_state SET journal = json_set(journal, '$.c', json('{"4:0":1,"4:1":1}')) WHERE player_id = ?`).run(pid);
+  [2, 3, 4, 5].forEach(r => db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?, ?, 1, 4, 0, 0, ?, 1, 0)`).run("c_ice" + r, pid, r));
+  const m0 = db.raw.prepare(`SELECT marks FROM player_state WHERE player_id = ?`).get(pid).marks;
+  const s = await loadState(db, pid);
+  assert.deepEqual(s.setBonus, [{ metal: 4, marks: METAL_SETS.bonus[4] }]);
+  assert.equal(s.marks, m0 + METAL_SETS.bonus[4]);
+  // a dusty coin is not yet found
+  db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES ('c_d5', ?, 1, 2, 0, 0, 5, 1, 1)`).run(pid);
+  [0, 1, 2, 3, 4].forEach(r => db.raw.prepare(`INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?, ?, 1, 2, 0, 0, ?, 1, 0)`).run("c_sv" + r, pid, r));
+  assert.ok(!(await loadState(db, pid)).setBonus);
+});
