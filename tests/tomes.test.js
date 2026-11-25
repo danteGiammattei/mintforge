@@ -145,3 +145,14 @@ test("the roll: likeness is a sure floor (fair uncommon, close rare, true epic),
     assert.ok(capped.rarity <= 2, "never past the page");
   }
 });
+
+test("the roll: a quick, spare copy that matches its page is never a hurried scrap", () => {
+  const page = TOMES.flatMap(t => t.pages).find(p => p.id === "trident") || TOMES[1].pages[0];
+  const a = { ...analyse(copy(page, 0.02), SCRIBE.sheet), ink: 40, time: 800 };          // little ink, little time
+  for (let salt = 0; salt < 200; salt++) {
+    const good = rollScroll(a, [], salt, { page, likeness: 0.89, maxMs: Infinity });
+    assert.ok(!good.faint && good.rarity >= 3, `salt ${salt}: ${good.rarity}`);        // a true copy: epic floor, always
+  }
+  const scraps = Array.from({ length: 200 }, (_, salt) => rollScroll(a, [], salt, { page, likeness: 0.4, maxMs: Infinity }).faint).filter(Boolean).length;
+  assert.ok(scraps > 100, "a rough, hurried copy still mostly comes to nothing");
+});

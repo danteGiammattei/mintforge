@@ -453,6 +453,7 @@ function drawSeal() {
     ctx.fillText(RARITY[tier].n, W / 2, y0 + 13);
     ctx.fillStyle = INK.warm;
     if (r.familiar) ctx.fillText("HE HAS SEEN THIS ONE BEFORE", W / 2, y0 + 27);
+    else if (r.faint && !r.poor) ctx.fillText("HURRIED. HE BARELY LOOKED AT IT", W / 2, y0 + 27);
     else if (!r.steps.length) ctx.fillText("SEALED INTO YOUR SATCHEL", W / 2, y0 + 27);
     // each lift, as it lands
     for (let i = 0; i < n; i++) {

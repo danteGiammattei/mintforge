@@ -131,7 +131,7 @@ async function seal(db, pid, body, { now, rand, tz }) {
         WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(owned_titles, '[]')) WHERE value = ?2)`).bind(pid, SECRET_TITLES.faultless)] : []),
   ]);
   return { scroll: { id, rarity: r.rarity, seed: r.seed }, familiar: r.familiar, xp, base: r.base, steps: r.steps,
-           likeness: Math.round(like * 100) / 100, poor: r.poor, ...(faultless ? { title: SECRET_TITLES.faultless } : {}) };
+           likeness: Math.round(like * 100) / 100, poor: r.poor, faint: r.faint, ...(faultless ? { title: SECRET_TITLES.faultless } : {}) };
 }
 
 /* ─── offer ───────────────────────────────────────────────────────── */

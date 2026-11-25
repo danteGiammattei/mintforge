@@ -202,11 +202,14 @@ export function rollScroll(a, recent = [], salt = 0, opts = {}) {
   for (let i = 0; i < RARITY.length; i++) { roll -= RARITY[i].w; if (roll <= 0) { rarity = i; break; } }
 
   // a hurried scrap should not pay like a sigil: too little ink, or too
-  // little time, and the roll usually comes to nothing
+  // little time, and the roll usually comes to nothing. But a copy that
+  // matches its page (fair or better) is no scrap, however quick or
+  // spare: a simple page takes little ink, and a sure hand is quick
   const effort = Math.min(1, a.ink / SIGIL.effortInk, time / SIGIL.hurriedMs);
   const page = opts.page || null, like = page ? Math.max(0, Math.min(1, opts.likeness ?? 0)) : null;
   const poor = page ? like < SIGIL.copy.poor : false;           // nothing like the page
-  const faint = rng() < (1 - effort) * SIGIL.faintChance || poor;
+  const sure = page && like >= SIGIL.copy.fair;
+  const faint = (rng() < (1 - effort) * SIGIL.faintChance && !sure) || poor;
   if (faint) rarity = 0;
 
   // how high this drawing may climb: by its page's tier, or (drawn
