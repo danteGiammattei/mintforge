@@ -22,8 +22,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 024 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql"]);
+test("migrations 009 and 011 to 025 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql", "migrations/025_seven_chests.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -968,7 +968,7 @@ test("a secret title for a perfect copy: 100% likeness earns The Faultless Hand,
 test("Star-Touched: an astral coin among your first ten coins ever; not for accounts older than the journal", async () => {
   const { SECRET } = await import("../shared/tuning.js");
   const astralChest = async (db, pid, n) => {
-    db.raw.prepare(`INSERT INTO chests (id, player_id, tier, created_at) VALUES (?, ?, 4, ?)`).run("k_st" + n, pid, n);
+    db.raw.prepare(`INSERT INTO chests (id, player_id, tier, created_at) VALUES (?, ?, 6, ?)`).run("k_st" + n, pid, n);   // void: the only chest with stars
     const go = driver(db, pid, () => 0.99999, Date.parse("2026-11-20T10:00:00Z"));
     return (await go("open", { chestId: "k_st" + n })).result;
   };
@@ -1079,4 +1079,45 @@ test("fuse: two at once on the same coins: one stands, the other takes nothing",
   assert.equal(res.filter(r => r.status === "fulfilled").length, 1);
   const s = await loadState(db, pid);
   assert.equal(s.coins.filter(c => c.rarity === 2 && c.metalIdx === 2).length, 1);
+});
+
+test("seven chests: each holds only its own band of metals", async () => {
+  const { rollCoin } = await import("../shared/economy.js");
+  const { COIN_METAL_BY_CHEST } = await import("../shared/tuning.js");
+  const r = seeded(42);
+  COIN_METAL_BY_CHEST.forEach((band, tier) => {
+    const allowed = new Set(band.map((w, m) => (w > 0 ? m : -1)).filter(m => m >= 0));
+    for (let i = 0; i < 400; i++) assert.ok(allowed.has(rollCoin(tier, r).metalIdx), `tier ${tier}`);
+  });
+  assert.deepEqual([...new Set(Array.from({ length: 400 }, () => rollCoin(0, r).metalIdx))].sort(), [0, 1], "wooden: copper and bronze, nothing else");
+});
+
+test("seven chests: a tier can't come before its gate, by the odds or by trading up", async () => {
+  const { chestTierWeights, topChestFor, offerScroll } = await import("../shared/economy.js");
+  const { CHESTS } = await import("../shared/tuning.js");
+  for (let n = 0; n < 60; n++) {
+    const w = chestTierWeights(n), top = topChestFor(n);
+    w.forEach((x, t) => { if (t > top) assert.equal(x, 0, `tier ${t} at ${n} chests`); });
+    assert.equal(CHESTS.opensAt[top] <= n, true);
+  }
+  assert.equal(topChestFor(0), 0); assert.equal(topChestFor(12), 3); assert.equal(topChestFor(45), 6);
+  // a mythic scroll trades up, but never past the gate: 6 chests in, gilded at most
+  const r = seeded(9);
+  for (let i = 0; i < 300; i++) {
+    const { chest } = offerScroll({ favour: 0, tier: 2, cost: 1, best: 0, chests: 6 }, 5, r);
+    assert.ok(chest !== null && chest <= 2, `got ${chest}`);
+  }
+});
+
+test("migration 025: chests and decided pots move to the chest they were", async () => {
+  const { db, pid } = await world();
+  const { readFileSync } = await import("node:fs");
+  db.raw.exec(`DELETE FROM chests`);
+  [0, 1, 2, 3, 4].forEach(t => db.raw.prepare(`INSERT INTO chests (id, player_id, tier, created_at) VALUES (?, ?, ?, 1)`).run("k_m" + t, pid, t));
+  db.raw.prepare(`UPDATE player_state SET chest_tier = 3, chest_cost = 120 WHERE player_id = ?`).run(pid);
+  db.raw.exec(readFileSync("migrations/025_seven_chests.sql", "utf8"));
+  const tiers = db.raw.prepare(`SELECT id, tier FROM chests ORDER BY id`).all().map(r => r.tier);
+  assert.deepEqual(tiers, [0, 1, 2, 4, 6], "obsidian to 4, void to 6");
+  const ps = db.raw.prepare(`SELECT chest_tier, chest_cost FROM player_state WHERE player_id = ?`).get(pid);
+  assert.deepEqual([ps.chest_tier, ps.chest_cost], [4, 110]);
 });

@@ -310,7 +310,9 @@ const CHEST_TIERS = [
   { body: "wood",      strap: "iron"      },   // wooden
   { body: "wood",      strap: "stone"     },   // iron
   { body: "wood",      strap: "gold"      },   // gilded
+  { body: "stone",     strap: "parchmentLit" },// frost
   { body: "obsidian",  strap: "gold"      },   // obsidian
+  { body: "obsidian",  strap: "iron"      },   // molten
   { body: "voidstone", strap: "parchmentLit" },// void
 ];
 const toneIndex = (ramp) => {

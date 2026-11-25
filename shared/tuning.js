@@ -99,19 +99,28 @@ export const STREAK = { from: 2, at: 3, mul: 1.5 };
  * better ones; nobody is told either.
  *
  * `trust` slides the tier odds from `early` to `late` as he hands a
- * player more chests. It is the long game. */
+ * player more chests. It is the long game. And `opensAt` gates the
+ * ladder outright: a tier can't come (not by the odds, not by trading up)
+ * until he has handed the player that many chests, so nobody new opens a
+ * Void chest by accident.
+ *
+ * Seven tiers since November 2026: Frost (between Gilded and Obsidian)
+ * and Molten (between Obsidian and Void) came in, each chest holding its
+ * own narrow band of metals (COIN_METAL_BY_CHEST). migrations/025
+ * renumbered the chests already made. */
 export const CHESTS = {
-  names: ["WOODEN", "IRON", "GILDED", "OBSIDIAN", "VOID"],
+  names: ["WOODEN", "IRON", "GILDED", "FROST", "OBSIDIAN", "MOLTEN", "VOID"],
   // the chance a chest also holds a tome the player lacks, no rarer than
   // the chest (shared/tomes.js tomeFromChest). A wooden one never does.
-  tomeChance: [0, 0.06, 0.1, 0.16, 0.25],
+  tomeChance: [0, 0.06, 0.1, 0.13, 0.16, 0.2, 0.25],
   // and a player still holding only the primer by this many chests finds
   // the first tome (THE HEDGE BOOK) in the next one opened, whatever the
   // odds said: left to chance, a quarter of new players waited 400+ scrolls
   firstTomeBy: 8, firstTome: "hedge",
-  cost:  [10, 26, 60, 120, 240],
-  early: [70, 22, 6, 1.7, 0.3],
-  late:  [42, 31, 16, 8, 3],
+  cost:    [10, 22, 40, 70, 110, 170, 260],
+  early:   [64, 24, 8, 2.6, 1, 0.3, 0.1],
+  late:    [30, 25, 18, 12, 8, 5, 2],
+  opensAt: [0, 3, 6, 12, 20, 32, 45],    // chests received before each tier can come at all
   trustChests: 60,                    // chests received at which `late` applies in full
   alwaysWooden: 3,                    // a new player's first few are quick, whatever the odds say
   impressFrom: 3,                     // best-in-pot rarity that can trade a chest up
@@ -122,18 +131,22 @@ export const CHESTS = {
 
 /* ─── what a chest holds ──────────────────────────────────────────── */
 export const COIN_METAL_BY_CHEST = [
-  // Lava and Fire came in between Obsidian and Void (November 2026),
-  // their share taken from those two, so the tiers above come as before.
+  // Each chest its own narrow band (November 2026, seven tiers): a chest
+  // tells you what's in it, and a wooden one never hands over magma.
   //  Cu   Br   Ag   Au   Ice  Ob   Lava Fire Vo   El   As
-  [  50,  30,  14,   5,   1,   0,   0,   0,   0,   0,   0   ],   // wooden
-  [  22,  30,  26,  14,   6, 1.2, 0.4, 0.2, 0.2,   0,   0   ],   // iron
-  [   6,  14,  26,  28,  16,   5,   2, 1.2, 1.3, 0.4, 0.1  ],   // gilded
-  [   0,   4,  12,  24,  28,  14,   7,   4,   4, 2.5, 0.5  ],   // obsidian
-  [   0,   0,   3,  10,  22,  20,  12,  10,  12,   8,   3   ],   // void
+  [  70,  30,   0,   0,   0,   0,   0,   0,   0,   0,   0   ],   // wooden
+  [   0,  55,  45,   0,   0,   0,   0,   0,   0,   0,   0   ],   // iron
+  [   0,   0,  40,  60,   0,   0,   0,   0,   0,   0,   0   ],   // gilded
+  [   0,   0,   0,  30,  70,   0,   0,   0,   0,   0,   0   ],   // frost
+  [   0,   0,   0,   0,  20,  80,   0,   0,   0,   0,   0   ],   // obsidian
+  [   0,   0,   0,   0,   0,   0,  55,  45,   0,   0,   0   ],   // molten
+  [   0,   0,   0,   0,   0,   0,   0,   0,  65,  30,   5   ],   // void
 ];
 /* Coin rarity starts from the standard weights and each chest tier leans
  * them toward the top: weight × (1 + tier × lean) ^ rarity. */
-export const COIN_RARITY = { base: [55, 28, 11, 4.5, 1.3, 0.2], leanPerTier: 0.35 };
+// (0.35 a tier across five; spread across seven so the Void chest, the
+// top, leans exactly as it did)
+export const COIN_RARITY = { base: [55, 28, 11, 4.5, 1.3, 0.2], leanPerTier: 0.35 * 4 / 6 };
 /* Shiny is decided when the chest opens, a rare thing at the same odds
  * for everyone: the sure way to a shiny coin is the forge (FORGE). */
 export const SHINY_CHANCE = 0.005;
@@ -220,13 +233,13 @@ export const GIFTS = [
   { id: "firstEpic",    when: { found: 3 },                 reward: { type: "marks", n: 150 } },
   { id: "ledger18",     when: { kinds: 22 },                reward: { type: "chest", tier: 2 } },
   { id: "ledger28",     when: { kinds: 28 },                reward: { type: "marks", n: 1500 } },
-  { id: "firstLegend",  when: { found: 4 },                 reward: { type: "chest", tier: 3 } },
+  { id: "firstLegend",  when: { found: 4 },                 reward: { type: "chest", tier: 4 } },
   { id: "cataloguer",   when: { kinds: 33 },                reward: { type: "title", id: "cataloguer" } },
-  { id: "ledger39",     when: { kinds: 39 },                reward: { type: "chest", tier: 3 } },
+  { id: "ledger39",     when: { kinds: 39 },                reward: { type: "chest", tier: 4 } },
   { id: "firstMythic",  when: { found: 5 },                 reward: { type: "title", id: "mythbound" } },
-  { id: "ledger40",     when: { kinds: 44 },                reward: { type: "chest", tier: 4 } },
+  { id: "ledger40",     when: { kinds: 44 },                reward: { type: "chest", tier: 6 } },
   { id: "ledger50",     when: { kinds: 50 },                reward: { type: "marks", n: 6000 } },
-  { id: "ledger55",     when: { kinds: 55 },                reward: { type: "chest", tier: 4 } },
+  { id: "ledger55",     when: { kinds: 55 },                reward: { type: "chest", tier: 6 } },
   { id: "ledger60",     when: { kinds: 60 },                reward: { type: "marks", n: 12000 } },
   { id: "keeper",       when: { kinds: 66 },                reward: { type: "title", id: "keeper" } },
   { id: "pouch1",       when: { offered: 10 },              reward: { type: "marks", n: 40 } },
@@ -355,11 +368,11 @@ export const ASTRAL = {
  * — a chest about twice what its coins fetch, a coin coinMul × its sale
  * price — so buying to sell is never a way to print marks. */
 export const STALL = {
-  chestPrice: [25, 100, 450, 1500, 4500],
-  chestTier:  [45, 30, 15, 8, 2],        // slot 1's chest
+  chestPrice: [25, 100, 450, 800, 1500, 2600, 4500],
+  chestTier:  [44, 28, 14, 6, 5, 2, 1],  // slot 1's chest
   coinMul: 2.5,
   missingChance: 0.7,                     // a coin slot picks a kind missing from your journal
-  featured: { coin: 40, chest: 35, oddity: 25, discount: 0.88, chestTier: [0, 0, 0, 70, 30], rarity: [0, 0, 0, 75, 25, 0] },
+  featured: { coin: 40, chest: 35, oddity: 25, discount: 0.88, chestTier: [0, 0, 0, 25, 40, 25, 10], rarity: [0, 0, 0, 75, 25, 0] },
   // never a mythic: those are only ever found
   oddities: [                             // shop-only cosmetics: titles in src/lib/data.js PREMIUM_TITLES
     { type: "title", id: "goblin_friend",  price: 1500 },
@@ -391,5 +404,5 @@ export const AUCTION = {
   raise: 0.05,                            // a new bid beats the last by at least this (and at least 1)
   snipe: 2 * 60_000,                      // a bid this close to the end moves the end this far out
   openPerPlayer: 8,
-  house: { perDay: 2, chestTier: 3, startMul: 0.6, hours: 24 },
+  house: { perDay: 2, chestTier: 4, startMul: 0.6, hours: 24 },      // an obsidian chest's band
 };

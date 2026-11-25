@@ -72,7 +72,7 @@ export const TOMES = [
     ],
   },
   {
-    id: "ember", name: "THE EMBER CODEX", tier: 3,
+    id: "ember", name: "THE EMBER CODEX", tier: 4,
     look: { leather: "#5a1a14", trim: "#e0703a", emblem: "flame" },
     pages: [
       { id: "kindling", name: "KINDLING",     tier: 4, strokes: [ring(0.5, 0.5, 0.46), poly(0.5, 0.56, 0.4, 3), poly(0.5, 0.62, 0.14, 3, 1, DOWN)] },
@@ -82,7 +82,7 @@ export const TOMES = [
     ],
   },
   {
-    id: "grimoire", name: "THE ELDER GRIMOIRE", tier: 4,
+    id: "grimoire", name: "THE ELDER GRIMOIRE", tier: 6,
     look: { leather: "#1a1424", trim: "#7ad888", emblem: "maw" },
     pages: [
       { id: "elder",   name: "THE ELDER SIGN", tier: 4, strokes: [poly(0.5, 0.52, 0.46, 5, 2), line([0.5, 0.8], [0.5, 0.36]), line([0.5, 0.52], [0.36, 0.36]), line([0.5, 0.52], [0.64, 0.36]), line([0.5, 0.36], [0.44, 0.24]), line([0.5, 0.36], [0.56, 0.24])] },

@@ -31,10 +31,14 @@ export function weighted(weights, roll) {
 
 /* ─── the door ────────────────────────────────────────────────────── */
 
+/* The highest tier he will hand this player yet (CHESTS.opensAt). */
+export const topChestFor = chestsGiven => CHESTS.opensAt.reduce((top, at, t) => (chestsGiven >= at ? t : top), 0);
+
 export function chestTierWeights(chestsGiven) {
-  if (chestsGiven < CHESTS.alwaysWooden) return [1, 0, 0, 0, 0];
-  const k = Math.min(1, Math.max(0, chestsGiven / CHESTS.trustChests));
-  return CHESTS.early.map((w, i) => w + (CHESTS.late[i] - w) * k);
+  if (chestsGiven < CHESTS.alwaysWooden) return CHESTS.cost.map((_, i) => (i ? 0 : 1));
+  const k = Math.min(1, Math.max(0, chestsGiven / CHESTS.trustChests)), top = topChestFor(chestsGiven);
+  // the odds slide with trust; a tier not yet open has none at all
+  return CHESTS.early.map((w, i) => (i > top ? 0 : w + (CHESTS.late[i] - w) * k));
 }
 
 /* A pot is { favour, tier, cost, best, chests }. cost === 0 means he has
@@ -54,7 +58,7 @@ export function offerScroll(pot0, rarity, rand, mul = 1) {
   if (pot.favour < pot.cost) return { pot, chest: null };
 
   let tier = pot.tier;
-  if (pot.best >= CHESTS.impressFrom && rand() < CHESTS.impressChance[pot.best]) tier = Math.min(MAX_CHEST, tier + 1);
+  if (pot.best >= CHESTS.impressFrom && rand() < CHESTS.impressChance[pot.best]) tier = Math.min(topChestFor(pot.chests), tier + 1);   // never past what he would hand them yet
   pot = primePot({ favour: pot.favour - pot.cost, tier: 0, cost: 0, best: 0, chests: pot.chests + 1 }, rand);
   return { pot, chest: tier };
 }

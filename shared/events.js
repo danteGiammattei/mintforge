@@ -17,6 +17,8 @@
  *  server, the client and tools/maxout.mjs alike.
  * ══════════════════════════════════════════════════════════════════════ */
 
+import { CHESTS } from "./tuning.js";
+
 export const EVENTS = [
   {
     id: "longnight26",
@@ -86,7 +88,7 @@ export const eventChest = (ev, rand) => !!ev && rand() < ev.chestShare;
  * own chest tier, lifted by grade, is `coinTier`. */
 export function eventChestHolds(ev, tier, grade, owned, rand) {
   const g = Math.max(0, Math.min(5, grade | 0));
-  const out = { coinTier: Math.min(4, tier + (ev.coinLift[g] || 0)), tome: null, title: null, effect: null, relic: null };
+  const out = { coinTier: Math.min(CHESTS.cost.length - 1, tier + (ev.coinLift[g] || 0)), tome: null, title: null, effect: null, relic: null };
   // now and then, in place of the frost coin, one of the event's named coins
   const set = ev.relics && RELICS[ev.relics];
   if (set && rand() < set.chance) out.relic = `${ev.relics}:${Math.floor(rand() * set.coins.length)}`;

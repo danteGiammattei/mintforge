@@ -16,6 +16,8 @@
  *  in forms.js. Call loadChestArt() before the first chest is drawn.
  * ══════════════════════════════════════════════════════════════════════ */
 
+import { CHESTS } from "../../shared/tuning.js";
+
 export const CHEST_W = 40;
 export const FRAMES = 6;
 export const OPEN_FRAMES = FRAMES;
@@ -35,7 +37,7 @@ function load(src) {
 }
 
 export function loadChestArt() {
-  pending ||= Promise.all([0, 1, 2, 3, 4].map(t => load(`/sprites/chests/chest-${t}.png`)))
+  pending ||= Promise.all(CHESTS.names.map((_, t) => load(`/sprites/chests/chest-${t}.png`)))
     .then(imgs => { imgs.forEach((im, t) => { sheets[t] = im; }); return imgs.every(Boolean); });
   return pending;
 }
