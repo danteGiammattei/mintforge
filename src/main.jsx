@@ -13,6 +13,16 @@ document.addEventListener("contextmenu", e => {
   if (!e.target.closest?.("input, textarea, [contenteditable='true']")) e.preventDefault();
 });
 
+// iOS scrolls the whole page up to make room for the keyboard and does
+// not always put it back, which leaves the app shifted and the nav over
+// the content. Nothing here scrolls the page itself (the screens scroll
+// inside), so whenever the keyboard goes or the visible area changes,
+// put the page back at the top.
+const settle = () => { if (window.scrollY || document.documentElement.scrollTop) window.scrollTo(0, 0); };
+document.addEventListener("focusout", () => setTimeout(settle, 50));
+window.visualViewport?.addEventListener("resize", () => setTimeout(settle, 50));
+window.addEventListener("orientationchange", () => setTimeout(settle, 300));
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <MintForge />

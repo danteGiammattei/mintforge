@@ -181,7 +181,7 @@ export default function Vault() {
       </div>
 
       {selecting && (
-        <div className="panel panel-hi" style={{ position: "fixed", left: 8, right: 8, bottom: "calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 12px)", zIndex: 80, padding: 8, display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="panel panel-hi" style={{ position: "fixed", left: 8, right: 8, bottom: "calc(var(--nav-h) + var(--guide-h, 0px) + env(safe-area-inset-bottom, 0px) + 12px)", zIndex: 80, padding: 8, display: "flex", alignItems: "center", gap: 8 }}>
           <div style={{ flex: 1, paddingLeft: 4 }}>
             <div>{pickedCoins.length} PICKED</div>
             <div className="t-gold row" style={{ gap: 6 }}><PixelIcon name="mark" size={11}/>{pickedTotal.toLocaleString()}</div>

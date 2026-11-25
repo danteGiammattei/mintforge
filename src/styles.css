@@ -209,7 +209,13 @@ canvas { image-rendering: pixelated; }
 }
 
 /* ── layout ──────────────────────────────────────────────────────────── */
-.app    { height: 100%; display: flex; flex-direction: column; background: var(--void); }
+/* The app is pinned to the screen and sized to what can be seen. A plain
+ * 100% height on iOS is the wrong size in both places it runs: in Safari
+ * it counts the space behind the toolbar, so the nav sits under it; in
+ * the home-screen app some versions leave it short of the bottom edge.
+ * The dynamic viewport height is the visible area in both. */
+.app    { position: fixed; top: 0; left: 0; right: 0; height: 100%; display: flex; flex-direction: column; background: var(--void); }
+@supports (height: 100dvh) { .app { height: 100dvh; } }
 /* A scene takes what room is left and its canvas never asks for more:
  * the canvas is laid over the box, not in it, so Safari cannot let its
  * natural height push the buttons below off the screen. lib/kit fit()
