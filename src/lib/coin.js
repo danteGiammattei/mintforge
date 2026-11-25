@@ -175,7 +175,7 @@ export const newSeed = () => (Date.now() ^ (Math.random() * 0xffffffff | 0)) >>>
  *
  * opts.turn  how wide the coin shows as it spins (64 = face on, ~4 = edge)
  * opts.back  draw the reverse: a plain field and the mint's mark
- * opts.phase where a moving texture (void) is in its loop, 0 … SPACE_LOOP-1 */
+ * opts.phase where a moving texture is in its loop: void and fire 0 … SPACE_LOOP-1, lava 0 … LAVA_LOOP-1 */
 const SZ = 64;
 const CELLS = [4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4, 3, 4];
 const CELL_AT = (() => { const at = new Int8Array(SZ).fill(-1); let p = (SZ - 46) / 2; CELLS.forEach((w, i) => { for (let k = 0; k < w; k++) at[p + k] = i; p += w; }); return at; })();
@@ -291,12 +291,14 @@ const GRAIN = {
   },
   // lava: Dante's Gemini lava tile, 32 × 32 (LAVA_TILE below), each coin
   // cut from it at its own offset. Rock 0–3 is the ramp, cracks 4–7 the
-  // glows; `phase` runs a slow wave of heat along the cracks, a step
-  // brighter where it passes and a step dimmer in its trough
+  // glows. `phase` (0 … LAVA_LOOP-1) is the river: the whole tile slides
+  // down a pixel a step and comes round without a seam, and a slow wave of
+  // heat runs along the cracks with it, a step brighter where it passes
+  // and a step dimmer in its trough
   lava: (s, phase = 0) => {
-    const ox = s % 32, oy = (s * 7) % 32, turn = (phase / SPACE_LOOP) * Math.PI * 2;
+    const ox = s % 32, oy = (s * 7) % 32, turn = (phase / LAVA_LOOP) * Math.PI * 2;
     return (x, y) => {
-      const k = LAVA_TILE[(y + oy) & 31].charCodeAt((x + ox) & 31) - 48;
+      const k = LAVA_TILE[(y + oy - phase + 64) & 31].charCodeAt((x + ox) & 31) - 48;
       if (k < 4) return k + 1;
       let t = 14 - k;                                             // 4 red … 7 yellow → glows 10 … 7
       const w = Math.sin((x + y) * 0.32 - turn) + 0.5 * Math.sin((x - y) * 0.21 + s + turn);
@@ -540,6 +542,7 @@ function paintRelic(coin, back) {
 
 const painted = new Map();
 export const SPACE_LOOP = 16;                 // frames in the void's loop
+export const LAVA_LOOP = 32;                  // steps in the lava's: once down its tile
 // paint a coin into the cache ahead of time (lib/preload.js), so the
 // first time it is drawn costs nothing
 export const warmCoin = coin => { try { paintCoin(coin); } catch { /* drawn later instead */ } };
@@ -551,7 +554,7 @@ function paintCoin(coin, back = false, phase = 0) {
   const out = relic ? paintRelic(coin, back) : coin.metalIdx === METAL.astral && coin.sign != null ? paintAstral(coin, back) : paintFresh(coin, back, phase);
   if (coin.shiny && (relic || (coin.metalIdx === METAL.astral && coin.sign != null))) shine(out.getContext("2d"), coin);
   if (coin.season) frost(out.getContext("2d"), coin);
-  if (painted.size > 900) painted.delete(painted.keys().next().value);
+  if (painted.size > 1600) painted.delete(painted.keys().next().value);
   painted.set(key, out);
   return out;
 }

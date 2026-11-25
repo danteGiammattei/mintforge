@@ -1,5 +1,5 @@
 import { useRef, useEffect } from "react";
-import { drawCoin, SPACE_LOOP } from "../lib/coin.js";
+import { drawCoin, SPACE_LOOP, LAVA_LOOP } from "../lib/coin.js";
 import Aura from "./Aura.jsx";
 import { METAL } from "../lib/data.js";
 import { onAuraFrame, auraStill } from "../lib/aura.js";
@@ -21,7 +21,10 @@ export default function CoinCanvas({ coin, size, hideShine = false, aura = true,
     // without painting every coin in it at once
     const moves = drifts && !auraStill();
     let off = null, drawn = false;
-    const tick = f => drawCoin(cv, c, size, { phase: f % SPACE_LOOP });
+    // the lava flows a pixel every other frame (slow, like a river of it);
+    // void and fire turn on their own shorter loop
+    const tick = c.metalIdx === METAL.lava ? f => drawCoin(cv, c, size, { phase: Math.floor(f / 2) % LAVA_LOOP })
+      : f => drawCoin(cv, c, size, { phase: f % SPACE_LOOP });
     const io = new IntersectionObserver(([e]) => {
       if (e.isIntersecting && !drawn) { drawCoin(cv, c, size); drawn = true; if (!moves) io.disconnect(); }
       if (!moves) return;
