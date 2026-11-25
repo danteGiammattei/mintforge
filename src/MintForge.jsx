@@ -18,6 +18,7 @@ import Scribe from "./screens/Scribe.jsx";
 import Door from "./screens/Door.jsx";
 import Satchel from "./screens/Satchel.jsx";
 import Vault from "./screens/Vault.jsx";
+import ForgeRoom from "./screens/ForgeRoom.jsx";
 // the tavern (its games and war) loads when first visited, and warm in
 // idle time after launch, so the app opens on less
 const loadTavern = () => import("./screens/Tavern.jsx");
@@ -27,7 +28,7 @@ import Profile from "./screens/Profile.jsx";
 /* ══════════════════════════════════════════════════════════════════════
  *  MintForge — the shell
  *  ────────────────────────────────────────────────────────────────────
- *  Sign-in, the frame around the six screens, and nothing else. State
+ *  Sign-in, the frame around the seven screens, and nothing else. State
  *  lives in state/useGameState.js; each screen is its own file.
  *
  *  The two canvas scenes (Scribe, Door) take the whole space above the
@@ -35,7 +36,7 @@ import Profile from "./screens/Profile.jsx";
  *  the door.
  * ══════════════════════════════════════════════════════════════════════ */
 
-const SCREENS = { scribe: Scribe, door: Door, satchel: Satchel, vault: Vault, tavern: Tavern, profile: Profile };
+const SCREENS = { scribe: Scribe, door: Door, satchel: Satchel, vault: Vault, forge: ForgeRoom, tavern: Tavern, profile: Profile };
 const BARE = new Set(["scribe", "door"]);
 const TAB_KEY = "mintforge:tab";
 

@@ -8,7 +8,7 @@ import CoinCanvas from "../components/CoinCanvas.jsx";
 import Journal from "../components/Journal.jsx";
 import { coinName, matterOf } from "../lib/coinview.js";
 import CoinModal from "../components/CoinModal.jsx";
-import Forge from "../components/Forge.jsx";
+import { sendToForge } from "./ForgeRoom.jsx";
 import { FORGE } from "../../shared/tuning.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
 
@@ -52,7 +52,6 @@ export default function Vault() {
   const [picked, setPicked] = useState(() => new Set());
   const [openId, setOpenId] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [forging, setForging] = useState(null);
   // another screen can send the player straight to the journal
   const [view, setView] = useState(() => { try { const v = sessionStorage.getItem("mf.vaultView"); sessionStorage.removeItem("mf.vaultView"); return v === "journal" ? "journal" : "coins"; } catch { return "coins"; } });
   // a coin as the app's icon (lib/appIcon.js); tapped again, the old icon back
@@ -193,10 +192,9 @@ export default function Vault() {
       {open && (
         <CoinModal coin={open} busy={busy} onClose={() => setOpenId(null)} onToggleLock={g.toggleLock} onSell={c => sell([c])}
                    pinned={pinnedSet.has(open.id)} onTogglePin={id => { g.togglePin(id); feel("tap"); }}
-                   onForge={c => { setOpenId(null); setForging(c.id); }}
+                   onForge={c => { setOpenId(null); sendToForge(c.id); g.setTab("forge"); }}
                    isIcon={g.iconCoin === open.id} onIcon={pickIcon}/>
       )}
-      {forging && <Forge coinId={forging} onClose={() => setForging(null)}/>}
     </div>
   );
 }
