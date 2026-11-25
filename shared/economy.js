@@ -10,7 +10,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import {
-  FAVOUR_PER_RARITY, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
+  FAVOUR_PER_RARITY, STREAK, CHESTS, COIN_METAL_BY_CHEST, COIN_RARITY,
   SHINY_CHANCE, XP, GAMBLE, GIFTS, FORGE, SCRIBE, DAILY, ENGRAVE, CABINET_SCORE, MATERIAL, ASTRAL, RESTRIKE,
 } from "./tuning.js";
 import { SEASONS } from "./events.js";
@@ -48,15 +48,21 @@ export function primePot(pot, rand) {
 /* One scroll goes in. Returns the new pot and the tier of the chest he
  * hands over, or null. At most one chest per offering: a rich scroll's
  * overpayment stays in the pot and shortens the next wait instead. */
-export function offerScroll(pot0, rarity, rand) {
+export function offerScroll(pot0, rarity, rand, mul = 1) {
   let pot = primePot(pot0, rand);
-  pot = { ...pot, favour: pot.favour + FAVOUR_PER_RARITY[rarity], best: Math.max(pot.best, rarity) };
+  pot = { ...pot, favour: pot.favour + Math.round(FAVOUR_PER_RARITY[rarity] * mul), best: Math.max(pot.best, rarity) };
   if (pot.favour < pot.cost) return { pot, chest: null };
 
   let tier = pot.tier;
   if (pot.best >= CHESTS.impressFrom && rand() < CHESTS.impressChance[pot.best]) tier = Math.min(MAX_CHEST, tier + 1);
   pot = primePot({ favour: pot.favour - pot.cost, tier: 0, cost: 0, best: 0, chests: pot.chests + 1 }, rand);
   return { pot, chest: tier };
+}
+
+/* The streak after a scroll of `rarity`, and what it multiplies by. */
+export function streakAfter(streak, rarity) {
+  const n = rarity >= STREAK.from ? (streak || 0) + 1 : 0;
+  return { streak: n, mul: n >= STREAK.at ? STREAK.mul : 1 };
 }
 
 /* His posture, 0..leanSteps. Deliberately coarse: the client is told this

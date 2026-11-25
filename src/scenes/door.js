@@ -44,6 +44,7 @@ import {
 import { auraFrame, LOOP as AURA_LOOP, PAD as AURA_PAD, TOP as AURA_TOP } from "../lib/spriteAura.js";
 import { playerHandArt, loadPlayerHand, HAND_ART } from "../lib/playerHandArt.js";
 import { RARITY } from "../../shared/sigil.js";
+import { STREAK } from "../../shared/tuning.js";
 import { stage, pointer, W, H, FONT, INK, lerp, ease, wrap, grainLayer, feather } from "./kit.js";
 
 /* the colour the scene dissolves into at its edges; Door.jsx paints the page with it */
@@ -525,6 +526,9 @@ function stepGive() {
         // his praise first, then what he makes of it: how near the next
         // chest is, in words, by the same measure as his posture
         S.say = [...(S.res.hints || [])];
+        // a run of fine scrolls: he says so, and pays the more for it
+        if (S.res.boosted) S.say.unshift(`${S.res.streak} FINE ONES IN A ROW. HE PAYS HALF AGAIN FOR THAT.`);
+        else if (S.res.streak === STREAK.at - 1) S.say.push("TWO FINE ONES. ONE MORE AND HE PAYS HALF AGAIN.");
         if (!(S.res.chests || []).length) S.say.push(LEAN_LINES[Math.min(LEAN_LINES.length - 1, S.res.lean | 0)]);
         if (S.say.length) speak(S.say.shift());
       }

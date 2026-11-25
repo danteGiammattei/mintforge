@@ -23,7 +23,7 @@
 import { analyse, rollScroll, measure, TRAITS, LIFTS, likeness } from "../shared/sigil.js";
 import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL } from "../shared/tuning.js";
 import {
-  levelOf, offerScroll, leanOf, rollCoin, nextGift,
+  levelOf, offerScroll, streakAfter, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
   resolveToss, resolveCrucible, resolveRoulette, resolvePlinko, forgeCost, restrikeCost,
   inkFor, wellOf, dailyGift, cleanName, nameAllowed, localDay, clampTz, placeAstral, MAX_RARITY,
@@ -135,19 +135,21 @@ async function offerOne(db, pid, scrollId, { now, rand, tz }) {
   ).bind(scrollId, pid).first();
   if (!sc) return null;
 
-  let pot, chest, grade = 0;
+  let pot, chest, grade = 0, run;
   for (let attempt = 0; ; attempt++) {
     const ps = await db.prepare(
-      `SELECT favour, chest_tier, chest_cost, pot_best, chests_given FROM player_state WHERE player_id = ?1`
+      `SELECT favour, chest_tier, chest_cost, pot_best, chests_given, json_extract(stats, '$.offerStreak') AS streak FROM player_state WHERE player_id = ?1`
     ).bind(pid).first();
     grade = Math.max(ps.pot_best || 0, sc.rarity);                  // the best scroll in the pot that pays
+    run = streakAfter(ps.streak || 0, sc.rarity);                   // fine scrolls one after another pay more
     ({ pot, chest } = offerScroll(
       { favour: ps.favour, tier: ps.chest_tier, cost: ps.chest_cost, best: ps.pot_best, chests: ps.chests_given },
-      sc.rarity, rand));
+      sc.rarity, rand, run.mul));
     const w = await db.prepare(
-      `UPDATE player_state SET favour = ?2, chest_tier = ?3, chest_cost = ?4, pot_best = ?5, chests_given = ?6
+      `UPDATE player_state SET favour = ?2, chest_tier = ?3, chest_cost = ?4, pot_best = ?5, chests_given = ?6,
+          stats = json_set(COALESCE(stats, '{}'), '$.offerStreak', ?10)
         WHERE player_id = ?1 AND favour = ?7 AND chest_cost = ?8 AND chests_given = ?9`
-    ).bind(pid, pot.favour, pot.tier, pot.cost, pot.best, pot.chests, ps.favour, ps.chest_cost, ps.chests_given).run();
+    ).bind(pid, pot.favour, pot.tier, pot.cost, pot.best, pot.chests, ps.favour, ps.chest_cost, ps.chests_given, run.streak).run();
     if (w.meta.changes) break;
     if (attempt >= 4) throw new Refusal("The door is busy. Try again.", 503);
   }
@@ -170,7 +172,7 @@ async function offerOne(db, pid, scrollId, { now, rand, tz }) {
 
   // He only ever praises, and only what actually lifted the scroll.
   const hint = sc.hint && (TRAITS[sc.hint] || LIFTS[sc.hint])?.hint && rand() < CHESTS.hintChance ? (TRAITS[sc.hint] || LIFTS[sc.hint]).hint : null;
-  return { rarity: sc.rarity, hint, lean: leanOf(pot), chest: given, xp };
+  return { rarity: sc.rarity, hint, lean: leanOf(pot), chest: given, xp, streak: run.streak, streakMul: run.mul };
 }
 
 /* One scroll (`scrollId`) or a handful at once (`scrollIds`). A handful
@@ -191,6 +193,7 @@ async function offer(db, pid, body, ctx) {
     offered: done.length, rarity: Math.max(...done.map(r => r.rarity)),
     hint: hints[0] || null, hints, lean: last.lean,
     chest: chests[0] || null, chests, xp: done.reduce((s, r) => s + r.xp, 0),
+    streak: last.streak, streakMul: last.streakMul, boosted: done.filter(r => r.streakMul > 1).length,
   };
 }
 

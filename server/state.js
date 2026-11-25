@@ -170,6 +170,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     frame: ps.frame, bio: ps.bio || "", selectedTitle: currentTitle(ps.selected_title),
     pinnedIds: ps.pinned_ids ? JSON.parse(ps.pinned_ids) : null,
     iconCoin: stats.iconCoin || null, cabFrame: Number.isInteger(stats.cabFrame) ? stats.cabFrame : null,
+    offerStreak: stats.offerStreak || 0,
     ownedFrames: parseList(ps.owned_frames), ownedTitles: parseList(ps.owned_titles),
     ownedFx: parseList(ps.owned_fx), profileFx: ps.profile_fx || null,
     coins: all.filter(r => !r.dusty).map(coinOut),

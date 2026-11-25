@@ -929,3 +929,21 @@ test("the first book: by the 8th chest a player with only the primer finds THE H
   chest(3);
   assert.ok(!(await go("open", { chestId: "k_f3" })).result.tome, "and only the once");
 });
+
+test("a streak: from the third rare-or-better scroll in a row, favour x1.5; anything less breaks it", async () => {
+  const { db, pid } = await world();
+  const go = driver(db, pid, () => 0.5, Date.parse("2026-11-20T10:00:00Z"));
+  db.raw.prepare(`UPDATE player_state SET favour = 0, chest_tier = 4, chest_cost = 100000 WHERE player_id = ?`).run(pid);
+  const give = async rarity => {
+    db.raw.prepare(`INSERT INTO scrolls (id, player_id, rarity, seed, created_at) VALUES (?, ?, ?, 7, 1)`).run("s_" + give.n, pid, rarity);
+    const r = (await go("offer", { scrollId: "s_" + give.n++ })).result;
+    return { ...r, favour: db.raw.prepare(`SELECT favour FROM player_state WHERE player_id = ?`).get(pid).favour };
+  };
+  give.n = 0;
+  let r = await give(2); assert.equal(r.streak, 1); assert.equal(r.favour, 4);
+  r = await give(3); assert.equal(r.streak, 2); assert.equal(r.favour, 13);
+  r = await give(2); assert.equal(r.streak, 3); assert.equal(r.streakMul, 1.5); assert.equal(r.favour, 19, "4 x1.5");
+  r = await give(4); assert.equal(r.favour, 49, "20 x1.5");
+  assert.equal((await loadState(db, pid)).offerStreak, 4);
+  r = await give(1); assert.equal(r.streak, 0); assert.equal(r.streakMul, 1); assert.equal(r.favour, 51, "broken: plain 2");
+});
