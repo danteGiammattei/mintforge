@@ -204,10 +204,11 @@ canvas { image-rendering: pixelated; }
 .title-void    { color: #c890ff; animation: titleVoidPulse 2.4s steps(8) infinite; }
 /* ooze: pale, sickly-green letters with a dark green edge, slime
  * hanging off their feet, oozing longer, and now and then a drop falling */
-.title-ooze  { position: relative; display: inline-block; color: #c8f0bc;
+/* its own line height, so the drips start at the letters whatever the line they sit in */
+.title-ooze  { position: relative; display: inline-block; line-height: 1; color: #c8f0bc;
   text-shadow: 1px 1px 0 #2a5a3a, -1px 0 0 #1c3c2a, 0 -1px 0 #1c3c2a, 0 0 8px rgba(110,200,120,.45); }
 
-.title-ooze::before { content: ""; position: absolute; left: 0; right: 0; top: calc(100% - .3em); height: 1.15em; pointer-events: none;
+.title-ooze::before { content: ""; position: absolute; left: 0; right: 0; top: calc(100% - .15em); height: 1.15em; pointer-events: none;
   transform-origin: top; animation: titleOoze 2.6s steps(8) infinite alternate; background:
     linear-gradient(#8fd896,#2a5a3a) 7% 0 / 2px 55% no-repeat,   linear-gradient(#8fd896,#2a5a3a) 16% 0 / 2px 25% no-repeat,
     linear-gradient(#c8f0bc,#2a5a3a) 29% 0 / 3px 80% no-repeat,  linear-gradient(#8fd896,#2a5a3a) 38% 0 / 2px 35% no-repeat,
