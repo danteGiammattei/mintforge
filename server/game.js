@@ -21,7 +21,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { analyse, rollScroll, measure, TRAITS, LIFTS, likeness } from "../shared/sigil.js";
-import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL, SECRET, FUSE } from "../shared/tuning.js";
+import { SCRIBE, CHESTS, XP, FORGE, ENGRAVE, MATERIAL, ASTRAL, SECRET, FUSE, STREAK } from "../shared/tuning.js";
 import {
   levelOf, offerScroll, streakAfter, leanOf, rollCoin, nextGift,
   xpForSeal, xpForOffer, xpForBrush,
@@ -137,72 +137,84 @@ async function seal(db, pid, body, { now, rand, tz }) {
 
 /* ─── offer ───────────────────────────────────────────────────────── */
 
-async function offerOne(db, pid, scrollId, { now, rand, tz }) {
-  const sc = await db.prepare(
-    `DELETE FROM scrolls WHERE id = ?1 AND player_id = ?2 RETURNING rarity, hint`
-  ).bind(scrollId, pid).first();
-  if (!sc) return null;
-
-  let pot, chest, grade = 0, run;
-  for (let attempt = 0; ; attempt++) {
-    const ps = await db.prepare(
-      `SELECT favour, chest_tier, chest_cost, pot_best, chests_given, json_extract(stats, '$.offerStreak') AS streak FROM player_state WHERE player_id = ?1`
-    ).bind(pid).first();
-    grade = Math.max(ps.pot_best || 0, sc.rarity);                  // the best scroll in the pot that pays
-    run = streakAfter(ps.streak || 0, sc.rarity);                   // fine scrolls one after another pay more
-    ({ pot, chest } = offerScroll(
-      { favour: ps.favour, tier: ps.chest_tier, cost: ps.chest_cost, best: ps.pot_best, chests: ps.chests_given },
-      sc.rarity, rand, run.mul));
-    const w = await db.prepare(
-      `UPDATE player_state SET favour = ?2, chest_tier = ?3, chest_cost = ?4, pot_best = ?5, chests_given = ?6,
-          stats = json_set(COALESCE(stats, '{}'), '$.offerStreak', ?10)
-        WHERE player_id = ?1 AND favour = ?7 AND chest_cost = ?8 AND chests_given = ?9`
-    ).bind(pid, pot.favour, pot.tier, pot.cost, pot.best, pot.chests, ps.favour, ps.chest_cost, ps.chests_given, run.streak).run();
-    if (w.meta.changes) break;
-    if (attempt >= 4) throw new Refusal("The door is busy. Try again.", 503);
-  }
-
-  const xp = xpForOffer(sc.rarity);
-  const stmts = [db.prepare(
-    `UPDATE player_state SET xp = xp + ?2, stats = ${bump("offered")} WHERE player_id = ?1`).bind(pid, xp)];
-  let given = null;
-  if (chest != null) {
-    // while an event runs, a share of his chests are the event's
-    const ev = eventOn(localDay(now, tz));
-    given = { id: "k_" + randomHex(8), tier: chest, ...(eventChest(ev, rand) ? { season: ev.season } : {}) };
-    stmts.push(
-      db.prepare(`INSERT INTO chests (id, player_id, tier, created_at, season, grade) VALUES (?1, ?2, ?3, ?4, ?5, ?6)`)
-        .bind(given.id, pid, chest, now, given.season || null, given.season ? grade : 0),
-      db.prepare(`UPDATE player_state SET stats = ${bump("chests")} WHERE player_id = ?1`).bind(pid),
-    );
-  }
-  await db.batch(stmts);
-
-  // He only ever praises, and only what actually lifted the scroll.
-  const hint = sc.hint && (TRAITS[sc.hint] || LIFTS[sc.hint])?.hint && rand() < CHESTS.hintChance ? (TRAITS[sc.hint] || LIFTS[sc.hint]).hint : null;
-  return { rarity: sc.rarity, hint, lean: leanOf(pot), chest: given, xp, streak: run.streak, streakMul: run.mul };
-}
-
 /* One scroll (`scrollId`) or a handful at once (`scrollIds`). A handful
- * is exactly the same as offering them one after another, in order —
- * each fills the pot, each can release a chest, each can earn a remark —
- * so offering together is a convenience and never a better or worse deal. */
-async function offer(db, pid, body, ctx) {
-  const ids = Array.isArray(body.scrollIds) ? [...new Set(body.scrollIds.filter(idOk))].slice(0, SCRIBE.scrollCap)
-            : idOk(body.scrollId) ? [body.scrollId] : [];
-  if (!ids.length) throw new Refusal("Which scroll?");
-  const done = [];
-  for (const id of ids) { const r = await offerOne(db, pid, id, ctx); if (r) done.push(r); }
-  if (!done.length) throw new Refusal("That scroll is gone", 404);
-  const last = done[done.length - 1];
-  const hints = [...new Set(done.map(r => r.hint).filter(Boolean))];
-  const chests = done.map(r => r.chest).filter(Boolean);
-  return {
-    offered: done.length, rarity: Math.max(...done.map(r => r.rarity)),
-    hint: hints[0] || null, hints, lean: last.lean,
-    chest: chests[0] || null, chests, xp: done.reduce((s, r) => s + r.xp, 0),
-    streak: last.streak, streakMul: last.streakMul, boosted: done.filter(r => r.streakMul > 1).length,
-  };
+ * goes over plainest first, so its fine scrolls arrive one after another
+ * and a streak is never broken by a common tucked between them: the same
+ * as a careful player handing them over in that order, one by one. Each
+ * fills the pot, each can release a chest, each can earn a remark.
+ *
+ * All of it is reckoned in one pass and written in one batch, whatever
+ * the size of the handful: the claim on the pot goes first and holds
+ * only if the pot and every scroll are still as read; everything after
+ * it is tied to the claim's token. */
+async function offer(db, pid, body, { now, rand, tz }) {
+  const want = Array.isArray(body.scrollIds) ? [...new Set(body.scrollIds.filter(idOk))].slice(0, SCRIBE.scrollCap)
+             : idOk(body.scrollId) ? [body.scrollId] : [];
+  if (!want.length) throw new Refusal("Which scroll?");
+  const wantJson = JSON.stringify(want);
+
+  for (let attempt = 0; ; attempt++) {
+    const [ps, found] = await Promise.all([
+      db.prepare(
+        `SELECT favour, chest_tier, chest_cost, pot_best, chests_given, json_extract(stats, '$.offerStreak') AS streak
+           FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+      db.prepare(
+        `SELECT id, rarity, hint FROM scrolls WHERE player_id = ?1 AND id IN (SELECT value FROM json_each(?2))`
+      ).bind(pid, wantJson).all(),
+    ]);
+    const rows = (found.results || []).sort((a, b) => a.rarity - b.rarity || want.indexOf(a.id) - want.indexOf(b.id));
+    if (!rows.length) throw new Refusal("That scroll is gone", 404);
+
+    const ev = eventOn(localDay(now, tz));
+    let pot = { favour: ps.favour, tier: ps.chest_tier, cost: ps.chest_cost, best: ps.pot_best, chests: ps.chests_given };
+    let streak = ps.streak || 0, peak = 0, boosted = 0, xp = 0;
+    const chests = [], hints = [];
+    for (const sc of rows) {
+      const grade = Math.max(pot.best || 0, sc.rarity);              // the best scroll in the pot that pays
+      const run = streakAfter(streak, sc.rarity);                    // fine scrolls one after another pay more
+      streak = run.streak; peak = Math.max(peak, streak); if (run.mul > 1) boosted++;
+      const step = offerScroll(pot, sc.rarity, rand, run.mul);
+      pot = step.pot;
+      xp += xpForOffer(sc.rarity);
+      if (step.chest != null) {
+        // while an event runs, a share of his chests are the event's
+        chests.push({ id: "k_" + randomHex(8), tier: step.chest, ...(eventChest(ev, rand) ? { season: ev.season } : {}), grade });
+      }
+      // He only ever praises, and only what actually lifted the scroll.
+      const h = sc.hint && (TRAITS[sc.hint] || LIFTS[sc.hint])?.hint;
+      if (h && rand() < CHESTS.hintChance && !hints.includes(h)) hints.push(h);
+    }
+
+    const ids = JSON.stringify(rows.map(r => r.id)), tok = randomHex(8);
+    const guard = `EXISTS (SELECT 1 FROM player_state WHERE player_id = ${pid | 0} AND json_extract(stats, '$.offer') = '${tok}')`;
+    const res = await db.batch([
+      db.prepare(
+        `UPDATE player_state SET favour = ?2, chest_tier = ?3, chest_cost = ?4, pot_best = ?5, chests_given = ?6, xp = xp + ?7,
+            stats = json_set(COALESCE(stats, '{}'), '$.offerStreak', ?8, '$.offer', ?9,
+                             '$.offered', COALESCE(json_extract(stats, '$.offered'), 0) + ?10,
+                             '$.chests', COALESCE(json_extract(stats, '$.chests'), 0) + ?11)
+          WHERE player_id = ?1 AND favour = ?12 AND chest_cost = ?13 AND chests_given = ?14
+            AND (SELECT COUNT(*) FROM scrolls WHERE player_id = ?1 AND id IN (SELECT value FROM json_each(?15))) = ?10`
+      ).bind(pid, pot.favour, pot.tier, pot.cost, pot.best, pot.chests, xp, streak, tok, rows.length, chests.length,
+             ps.favour, ps.chest_cost, ps.chests_given, ids),
+      db.prepare(`DELETE FROM scrolls WHERE player_id = ?1 AND id IN (SELECT value FROM json_each(?2)) AND ${guard}`).bind(pid, ids),
+      ...chests.map(c => db.prepare(
+        `INSERT INTO chests (id, player_id, tier, created_at, season, grade) SELECT ?1, ?2, ?3, ?4, ?5, ?6 WHERE ${guard}`
+      ).bind(c.id, pid, c.tier, now, c.season || null, c.season ? c.grade : 0)),
+      db.prepare(`UPDATE player_state SET stats = json_remove(stats, '$.offer') WHERE player_id = ?1 AND ${guard}`).bind(pid),
+    ]);
+    if (!res[0]?.meta?.changes) {
+      if (attempt >= 4) throw new Refusal("The door is busy. Try again.", 503);
+      continue;                                                       // something moved: read again
+    }
+    const given = chests.map(({ grade: _g, ...c }) => c);
+    return {
+      offered: rows.length, rarity: rows[rows.length - 1].rarity,
+      hint: hints[0] || null, hints, lean: leanOf(pot),
+      chest: given[0] || null, chests: given, xp,
+      streak, streakMul: boosted ? STREAK.mul : 1, streakPeak: peak, boosted,
+    };
+  }
 }
 
 /* ─── visit: he may have something for you ────────────────────────── */

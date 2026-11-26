@@ -38,7 +38,7 @@ export default function Door() {
       lean: () => live.current.lean / CHESTS.leanSteps,
       offer: scrolls => live.current.act("offer", { scrollIds: scrolls.map(s => s.id) }).then(r => {
         // the one part of his reckoning you are shown: a run of fine scrolls
-        if (r?.boosted) setTimeout(() => ui.toast(`STREAK ×${r.streakMul} · ${r.streak} IN A ROW`, "magic"), 1400);
+        if (r?.boosted) setTimeout(() => ui.toast(`STREAK ×${r.streakMul} · ${r.streakPeak || r.streak} IN A ROW`, "magic"), 1400);
         return r;
       }),
       visit: () => live.current.act("visit"),

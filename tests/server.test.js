@@ -452,7 +452,9 @@ test("offering several scrolls at once is the same as offering them in turn", as
   const idsA = rar.map(r => plant(a.db, a.pid, r, "closed")), idsB = rar.map(r => plant(b.db, b.pid, r, "closed"));
   const goA = driver(a.db, a.pid, seeded(77));
   let chestsA = 0;
-  for (const id of idsA) { const r = await goA("offer", { scrollId: id }); chestsA += r.result.chests.length; }
+  // a handful goes over plainest first (ties in the order given)
+  const inTurn = idsA.map((id, i) => [rar[i], i, id]).sort((p, q) => p[0] - q[0] || p[1] - q[1]).map(p => p[2]);
+  for (const id of inTurn) { const r = await goA("offer", { scrollId: id }); chestsA += r.result.chests.length; }
   const all = await driver(b.db, b.pid, seeded(77))("offer", { scrollIds: [...idsB, idsB[0], "s_not_mine"] });
   assert.equal(all.result.offered, rar.length);
   assert.equal(all.result.chests.length, chestsA);
@@ -941,6 +943,34 @@ test("a streak: from the third rare-or-better scroll in a row, favour x1.5; anyt
   r = await give(4); assert.equal(r.favour, 49, "20 x1.5");
   assert.equal((await loadState(db, pid)).offerStreak, 4);
   r = await give(1); assert.equal(r.streak, 0); assert.equal(r.streakMul, 1); assert.equal(r.favour, 51, "broken: plain 2");
+});
+
+test("a handful keeps its fine scrolls together: commons go first and never break the streak", async () => {
+  const { db, pid } = await world();
+  const go = driver(db, pid, () => 0.5, Date.parse("2026-11-20T10:00:00Z"));
+  db.raw.prepare(`UPDATE player_state SET favour = 0, chest_tier = 4, chest_cost = 100000 WHERE player_id = ?`).run(pid);
+  const rar = [2, 0, 3, 0, 2, 4, 1, 2];
+  const ids = rar.map((r, i) => { const id = "s_h" + i; db.raw.prepare(`INSERT INTO scrolls (id, player_id, rarity, seed, created_at) VALUES (?, ?, ?, 7, 1)`).run(id, pid, r); return id; });
+  const r = (await go("offer", { scrollIds: ids })).result;
+  // in order: 0 0 1 (2) then 2 2 2 3 4 — the 3rd, 4th and 5th rare-or-better pay half again
+  assert.deepEqual([r.offered, r.streak, r.streakPeak, r.boosted, r.streakMul], [8, 5, 5, 3, 1.5]);
+  const plain = 1 + 1 + 2 + 4 + 4, boosted = Math.round(4 * 1.5) + Math.round(9 * 1.5) + Math.round(20 * 1.5);
+  assert.equal(db.raw.prepare(`SELECT favour FROM player_state WHERE player_id = ?`).get(pid).favour, plain + boosted);
+  const s = await loadState(db, pid);
+  assert.deepEqual([s.scrolls.length, s.offerStreak, s.stats.offered], [0, 5, 8]);
+});
+
+test("a handful whose pot moved under it reads again, and never pays twice", async () => {
+  const { db, pid } = await world();
+  const id = "s_race";
+  db.raw.prepare(`INSERT INTO scrolls (id, player_id, rarity, seed, created_at) VALUES (?, ?, 2, 7, 1)`).run(id, pid);
+  // a stale read: the scroll is gone by the time the batch runs
+  const real = db.batch.bind(db);
+  let once = true;
+  db.batch = async stmts => { if (once) { once = false; db.raw.prepare(`DELETE FROM scrolls WHERE id = ?`).run(id); } return real(stmts); };
+  const before = db.raw.prepare(`SELECT favour FROM player_state WHERE player_id = ?`).get(pid).favour;
+  await refuses(driver(db, pid, () => 0.5)("offer", { scrollIds: [id] }), 404);
+  assert.equal(db.raw.prepare(`SELECT favour FROM player_state WHERE player_id = ?`).get(pid).favour, before);
 });
 
 test("a secret title for a perfect copy: 100% likeness earns The Faultless Hand, once", async () => {

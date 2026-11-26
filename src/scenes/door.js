@@ -527,7 +527,7 @@ function stepGive() {
         // chest is, in words, by the same measure as his posture
         S.say = [...(S.res.hints || [])];
         // a run of fine scrolls: he says so, and pays the more for it
-        if (S.res.boosted) S.say.unshift(`${S.res.streak} FINE ONES IN A ROW. HE PAYS HALF AGAIN FOR THAT.`);
+        if (S.res.boosted) S.say.unshift(`${S.res.streakPeak || S.res.streak} FINE ONES IN A ROW. HE PAYS HALF AGAIN FOR THAT.`);
         else if (S.res.streak === STREAK.at - 1) S.say.push("TWO FINE ONES. ONE MORE AND HE PAYS HALF AGAIN.");
         if (!(S.res.chests || []).length) S.say.push(LEAN_LINES[Math.min(LEAN_LINES.length - 1, S.res.lean | 0)]);
         if (S.say.length) speak(S.say.shift());
