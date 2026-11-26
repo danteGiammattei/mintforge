@@ -3,6 +3,10 @@ name = "mintforge-clock"
 main = "index.js"
 compatibility_date = "2025-04-01"
 
+# beside the database, since nearly all it does is talk to it
+[placement]
+mode = "smart"
+
 [triggers]
 crons = ["* * * * *"]
 

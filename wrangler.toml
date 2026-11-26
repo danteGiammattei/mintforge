@@ -2,6 +2,13 @@ name = "mintforge"
 compatibility_date = "2025-04-01"
 pages_build_output_dir = "dist"
 
+# Smart Placement: run the functions next to the D1 database rather than
+# next to each player. A request makes several trips to the database and
+# the player only one to the function, so the trips that repeat are the
+# ones made short. (Cloudflare takes ~15 minutes after a deploy to place it.)
+[placement]
+mode = "smart"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "mintforge"
