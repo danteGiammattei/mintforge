@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
  *
  * The art is public/splash.png when there is one; until then, a candle. */
 
-export const STUDIO = "PROJECT THOTH";     // the studio's name, as shown at launch
+export const STUDIO = "RAINFALL STUDIOS";  // the studio's name, as shown at launch
 export const STUDIO_MS = 2200;             // the studio card, start to finish
 export const SPLASH_MIN_MS = 2600;         // the least the splash is shown
 
