@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { GameContext } from "./lib/GameContext.js";
 import { useGameState } from "./state/useGameState.js";
 import { OverlayProvider, useUi } from "./ui/Overlay.jsx";
-import { TITLES, TITLE_LEVELS, FRAMES, PREMIUM_TITLES } from "./lib/data.js";
+import { TITLES, TITLE_LEVELS, FRAMES, PREMIUM_TITLES, titleById } from "./lib/data.js";
 import { RewardHost, useCelebrate } from "./components/Reward.jsx";
 import { preloadFirst, preloadBanner, warmAfter } from "./lib/preload.js";
 import LoadScreen from "./components/LoadScreen.jsx";
@@ -24,6 +24,7 @@ import ForgeRoom from "./screens/ForgeRoom.jsx";
 const loadTavern = () => import("./screens/Tavern.jsx");
 const Tavern = lazy(loadTavern);
 import Profile from "./screens/Profile.jsx";
+const Ranks = lazy(() => import("./screens/Ranks.jsx"));
 
 /* ══════════════════════════════════════════════════════════════════════
  *  MintForge — the shell
@@ -36,7 +37,8 @@ import Profile from "./screens/Profile.jsx";
  *  the door.
  * ══════════════════════════════════════════════════════════════════════ */
 
-const SCREENS = { scribe: Scribe, door: Door, satchel: Satchel, vault: Vault, forge: ForgeRoom, tavern: Tavern, profile: Profile };
+// "ranks" has no place in the nav yet: the top bar's trophy opens it
+const SCREENS = { scribe: Scribe, door: Door, satchel: Satchel, vault: Vault, forge: ForgeRoom, tavern: Tavern, profile: Profile, ranks: Ranks };
 const BARE = new Set(["scribe", "door"]);
 const TAB_KEY = "mintforge:tab";
 
@@ -88,6 +90,7 @@ function SignWatch({ news }) {
     if (news?.sets?.length) celebrate({ kind: "sets", sets: news.sets });
     if (news?.house?.title) celebrate({ kind: "title", label: PREMIUM_TITLES.find(t => t.id === news.house.title)?.label || news.house.title, from: "house", line: news.house.line });
     if (news?.auction?.length) celebrate({ kind: "auction", notes: news.auction });
+    for (const c of news?.crowns || []) { const t = titleById(c.title); if (t) celebrate({ kind: "title", label: t.label, from: "crown", line: c.line }); }
   }, [news, celebrate]);
   return null;
 }
@@ -124,7 +127,7 @@ function Game({ game }) {
     if (!(game.stats.visits > 0)) return "door";
     let saved = null;
     try { saved = sessionStorage.getItem(TAB_KEY); } catch { /* fine */ }
-    return TABS.some(t => t[0] === saved) ? saved : "scribe";
+    return TABS.some(t => t[0] === saved) || saved === "ranks" ? saved : "scribe";
   });
   const setTab = useCallback(id => {
     setTabRaw(id);
@@ -160,7 +163,8 @@ function Game({ game }) {
       <div className="app">
         <a className="sr-only" href="#main">Skip to the game</a>
         {!BARE.has(tab) && <TopBar marks={game.marks} level={game.level} xp={game.xp} onRetry={game.retrySaves}
-                                   daily={game.dailyReady} onDaily={() => setTab("door")}/>}
+                                   daily={game.dailyReady} onDaily={() => setTab("door")}
+                                   ranks={tab === "ranks"} onRanks={() => setTab("ranks")}/>}
         <main id="main" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: BARE.has(tab) ? "env(safe-area-inset-top, 0px)" : 0 }}>
           {/* held back while the story plays, so the door's welcome waits for its end */}
           {!story && <Suspense key={tab} fallback={<div className="page"><p className="t-dim blink" style={{ padding: 24, textAlign: "center" }}>…</p></div>}><Screen/></Suspense>}

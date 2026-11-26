@@ -4,7 +4,7 @@ import { useUi } from "../ui/Overlay.jsx";
 import { useSocial } from "../state/useSocial.js";
 import { lvl } from "../lib/coin.js";
 import { hydrate } from "../lib/coinview.js";
-import { FRAMES, PREMIUM_TITLES } from "../lib/data.js";
+import { FRAMES, titleByLabel } from "../lib/data.js";
 import { gradeInk } from "../components/CabinetFrame.jsx";
 import CoinModal from "../components/CoinModal.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
@@ -14,7 +14,7 @@ import PublicProfile from "../components/PublicProfile.jsx";
  * Find players, follow them, look in their cabinets. */
 
 export const TitleText = ({ label }) => {
-  const p = PREMIUM_TITLES.find(t => t.label === label);
+  const p = titleByLabel(label);
   return p ? <span className={`title-${p.effect}`}>{label}</span> : <span>{label}</span>;
 };
 

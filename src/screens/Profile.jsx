@@ -5,7 +5,7 @@ import { useUi } from "../ui/Overlay.jsx";
 import { feel, isMuted, setMuted } from "../lib/feel.js";
 import { unlockedTitles, coinRarity } from "../lib/coin.js";
 import { journalCounts, cabinetScore, setsDone } from "../../shared/economy.js";
-import { FRAMES, PREMIUM_TITLE_BY_ID, TITLES, TITLE_LEVELS } from "../lib/data.js";
+import { FRAMES, titleById, TITLES, TITLE_LEVELS } from "../lib/data.js";
 import CoinModal from "../components/CoinModal.jsx";
 import CabinetFrame, { gradeInk } from "../components/CabinetFrame.jsx";
 import { CABINET_SCORE } from "../../shared/tuning.js";
@@ -123,9 +123,9 @@ function EditProfile({ g, onDone }) {
         <h2 className="t-title" style={{ margin: "0 0 12px" }}>TITLE</h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {titles.map(t => <button key={t} className="chip" aria-pressed={g.selectedTitle === t} onClick={() => g.setSelectedTitle(t)}>{t}</button>)}
-          {g.ownedTitles.map(id => PREMIUM_TITLE_BY_ID[id] && (
-            <button key={id} className="chip" aria-pressed={g.selectedTitle === PREMIUM_TITLE_BY_ID[id].label} onClick={() => g.setSelectedTitle(PREMIUM_TITLE_BY_ID[id].label)}>
-              <TitleText label={PREMIUM_TITLE_BY_ID[id].label}/>
+          {g.ownedTitles.map(id => titleById(id) && (
+            <button key={id} className="chip" aria-pressed={g.selectedTitle === titleById(id).label} onClick={() => g.setSelectedTitle(titleById(id).label)}>
+              <TitleText label={titleById(id).label}/>
             </button>
           ))}
         </div>

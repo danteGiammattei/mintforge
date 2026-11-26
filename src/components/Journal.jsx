@@ -7,7 +7,7 @@ import { mkCoin } from "../lib/coin.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { LEDGER_MARKS } from "../../shared/economy.js";
 import { GIFTS, CHESTS } from "../../shared/tuning.js";
-import { PREMIUM_TITLE_BY_ID } from "../lib/data.js";
+import { titleById } from "../lib/data.js";
 
 /* ─── JOURNAL ─────────────────────────────────────────────────────────────
  * Every kind of coin you have ever cleaned or won: eleven metals by six
@@ -22,7 +22,7 @@ function prize(kinds) {
   if (!r) return "SOMETHING";
   if (r.type === "marks") return `${r.n.toLocaleString()} MARKS`;
   if (r.type === "chest") return `${/^[AEIOU]/.test(CHESTS.names[r.tier]) ? "AN" : "A"} ${CHESTS.names[r.tier]} CHEST`;
-  if (r.type === "title") return `A TITLE: ${(PREMIUM_TITLE_BY_ID[r.id]?.label || r.id).toUpperCase()}`;
+  if (r.type === "title") return `A TITLE: ${(titleById(r.id)?.label || r.id).toUpperCase()}`;
   return "SOMETHING";
 }
 

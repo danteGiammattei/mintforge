@@ -58,16 +58,16 @@ export function useGameState() {
   const [news, setNews] = useState(null);
   const remember = state => {
     for (const k of LISTS) if (k in state) held.current[k] = listHash(state[k]);
-    if (state.signBonus?.length) { const signs = state.signBonus; setNews(n => ({ signs, n: (n?.n || 0) + 1 })); }
-    delete state.signBonus;
-    if (state.relicBonus?.length) { const relics = state.relicBonus; setNews(n => ({ relics, n: (n?.n || 0) + 1 })); }
-    delete state.relicBonus;
-    if (state.setBonus?.length) { const sets = state.setBonus; setNews(n => ({ sets, n: (n?.n || 0) + 1 })); }
-    delete state.setBonus;
-    if (state.houseGift) { const house = state.houseGift; setNews(n => ({ house, n: (n?.n || 0) + 1 })); }
-    delete state.houseGift;
-    if (state.auctionNotes?.length) { const auction = state.auctionNotes; setNews(n => ({ auction, n: (n?.n || 0) + 1 })); }
-    delete state.auctionNotes;
+    // gathered first and set once: two kinds in one load are both told
+    const fresh = {};
+    if (state.signBonus?.length) fresh.signs = state.signBonus;
+    if (state.relicBonus?.length) fresh.relics = state.relicBonus;
+    if (state.setBonus?.length) fresh.sets = state.setBonus;
+    if (state.houseGift) fresh.house = state.houseGift;
+    if (state.auctionNotes?.length) fresh.auction = state.auctionNotes;
+    if (state.crowned?.length) fresh.crowns = state.crowned;
+    for (const k of ["signBonus", "relicBonus", "setBonus", "houseGift", "auctionNotes", "crowned"]) delete state[k];
+    if (Object.keys(fresh).length) setNews(n => ({ ...fresh, n: (n?.n || 0) + 1 }));
   };
   const apply = useCallback(state => {
     remember(state);

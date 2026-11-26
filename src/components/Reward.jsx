@@ -4,7 +4,7 @@ import { present, loadGifts } from "../lib/presentArt.js";
 import { PROFILE_FX, RELICS, relicOf } from "../../shared/events.js";
 import { useGame } from "../lib/GameContext.js";
 import { feel } from "../lib/feel.js";
-import { FRAMES, PREMIUM_TITLES, METALS } from "../lib/data.js";
+import { FRAMES, PREMIUM_TITLES, METALS, titleByLabel } from "../lib/data.js";
 import { SCRIBE, DAILY, CHESTS, ASTRAL } from "../../shared/tuning.js";
 import { TOME_BY_ID } from "../../shared/tomes.js";
 import { RARITY } from "../../shared/sigil.js";
@@ -102,11 +102,11 @@ function Body({ r }) {
           {/* a long title in two lines, each its own effect, so a drip or a
               spark hangs from letters and not from the space beside them */}
           {splitTitle(r.label).map((line, i) => {
-            const fx = PREMIUM_TITLES.find(t => t.label === r.label)?.effect;
+            const fx = titleByLabel(r.label)?.effect;
             return fx ? <span key={i} className={`title-${fx}`}>{line}</span> : <span key={i}>{line}</span>;
           })}
         </div>
-        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>{r.from === "house" ? (r.line || "A GIFT FROM THE HOUSE.") : r.from === "gift" ? "HE DOES NOT GIVE THIS TO JUST ANYONE."
+        <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>{r.from === "house" || r.from === "crown" ? (r.line || "A GIFT FROM THE HOUSE.") : r.from === "gift" ? "HE DOES NOT GIVE THIS TO JUST ANYONE."
           : r.from === "faultless" ? "A COPY HE CANNOT FAULT. FEW HANDS EVER MAKE ONE."
           : r.from === "first_star" ? "A STAR AMONG YOUR FIRST FIFTY COINS. THE SKY NOTICED YOU EARLY." : "IT IS YOURS TO WEAR."}</p>
       </>
@@ -318,8 +318,8 @@ function Card({ r, onClose }) {
 
   const [head0, sub0] = HEADS[r.kind];
   const sub = r.kind === "signs" && r.signs.length > 1 ? "THE SKY PAYS WHAT IT OWES" : sub0;
-  const head = r.from === "house" ? "A GIFT FROM THE HOUSE" : r.kind === "relics" && r.relics.some(b => b.set) ? "THE MAGI'S GIFTS" : r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
-  const subline = r.from === "level" || r.from === "house" ? "" : r.from === "chest" ? "IT WAS IN THE PRESENT"
+  const head = r.from === "house" ? "A GIFT FROM THE HOUSE" : r.from === "crown" ? "RANK ONE" : r.kind === "relics" && r.relics.some(b => b.set) ? "THE MAGI'S GIFTS" : r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
+  const subline = r.from === "level" || r.from === "house" || r.from === "crown" ? "" : r.from === "chest" ? "IT WAS IN THE PRESENT"
                 : r.kind === "daily" && g.event ? `A GIFT FOR ${g.event.name}` : r.kind === "event" ? eventLeft(r.to) : r.kind === "relics" && r.relics.some(b => b.set) ? "THE SET IS WHOLE" : sub;
   // something wearable can be put on from here
   const wear = r.kind === "title" ? { on: g.selectedTitle === r.label, go: () => g.setSelectedTitle(r.label) }
@@ -373,6 +373,9 @@ export function giftToReward(what) {
 
 // a title over 16 letters, split into two lines as evenly as its words allow
 function splitTitle(label) {
+  // a dated title (a crown: "First of Oceania · Q4 2026") breaks at its dot
+  const dot = String(label).split(" · ");
+  if (dot.length === 2) return dot;
   const words = String(label).split(" ");
   if (label.length <= 16 || words.length < 2) return [label];
   let best = 1, gap = Infinity;
