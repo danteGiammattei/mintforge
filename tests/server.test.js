@@ -1115,6 +1115,36 @@ test("fuse: two at once on the same coins: one stands, the other takes nothing",
   assert.equal(s.coins.filter(c => c.rarity === 2 && c.metalIdx === 2).length, 1);
 });
 
+test("fuse with a coin to keep: the three go, the fourth comes out a rarity finer, itself", async () => {
+  const { db, pid } = await world();
+  const { fuseFee } = await import("../server/game.js");
+  const go = driver(db, pid, seeded(5), Date.parse("2026-11-20T10:00:00Z"));
+  db.raw.prepare(`UPDATE player_state SET marks = 100000 WHERE player_id = ?`).run(pid);
+  const coin = (id, metal, rarity, extra = {}) => db.raw.prepare(
+    `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty, nickname) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, ?)`
+  ).run(id, pid, 300 + id.length, metal, extra.shiny ? 1 : 0, extra.locked ? 1 : 0, rarity, extra.nick ?? null);
+  ["a", "b", "c"].forEach(x => coin("c_f" + x, 3, 2));
+  coin("c_keep", 3, 2, { shiny: true, locked: true, nick: "OLD FAITHFUL" });
+  const fee = fuseFee(db.raw.prepare(`SELECT * FROM coins WHERE id LIKE 'c_f%'`).all());
+  const r = (await go("fuse", { coinIds: ["c_fa", "c_fb", "c_fc"], targetId: "c_keep" })).result;
+  assert.deepEqual([r.coin.id, r.coin.rarity, r.kept, r.fee], ["c_keep", 3, true, fee]);
+  const k = db.raw.prepare(`SELECT * FROM coins WHERE id = 'c_keep'`).get();
+  assert.deepEqual([k.rarity, k.seed, k.shiny, k.locked, k.nickname], [3, 306, 1, 1, "OLD FAITHFUL"], "its face, shine, lock and name kept");
+  assert.equal(db.raw.prepare(`SELECT COUNT(*) AS n FROM coins WHERE id LIKE 'c_f%'`).get().n, 0, "the three are gone");
+  const s = await loadState(db, pid);
+  assert.equal(s.journal.c["3:3"], 1);
+  assert.equal(s.marks, 100000 - fee);
+
+  // a target must match, can't be one of the three, and must be there
+  ["d", "e", "g"].forEach(x => coin("c_f" + x, 3, 2)); coin("c_other", 4, 2); coin("c_low", 3, 1);
+  const three = ["c_fd", "c_fe", "c_fg"];
+  await assert.rejects(go("fuse", { coinIds: three, targetId: "c_other" }), /must match/);
+  await assert.rejects(go("fuse", { coinIds: three, targetId: "c_low" }), /must match/);
+  await assert.rejects(go("fuse", { coinIds: three, targetId: "c_fd" }), /kept/);
+  await assert.rejects(go("fuse", { coinIds: three, targetId: "c_nope" }), /gone/);
+  assert.equal(db.raw.prepare(`SELECT COUNT(*) AS n FROM coins WHERE id IN ('c_fd','c_fe','c_fg')`).get().n, 3, "a refusal takes nothing");
+});
+
 test("seven chests: each holds only its own band of metals", async () => {
   const { rollCoin } = await import("../shared/economy.js");
   const { COIN_METAL_BY_CHEST } = await import("../shared/tuning.js");
