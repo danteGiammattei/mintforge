@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
  *
  * The art is public/splash.png when there is one; until then, a candle.
  * The studio's logo is public/studio-logo.png, the game's public/logo.png;
- * until they are added, each name in type. */
+ * without them, each name in type. */
 
 export const STUDIO = "RAINFALL STUDIOS";  // the studio's name, as shown at launch
 export const STUDIO_MS = 2200;             // the studio card, start to finish
@@ -25,7 +25,7 @@ export function StudioCard() {
       <div className="studio-card" style={{ display: "grid", justifyItems: "center", gap: 10, padding: "0 16px" }}>
         {logo
           ? <img src="/studio-logo.png" alt={STUDIO} onError={() => setLogo(false)}
-                 style={{ width: "min(64vw, 280px)", height: "auto", imageRendering: "pixelated" }}/>
+                 style={{ width: "min(66vw, 280px)", height: "auto" }}/>
           : <>
               <span className="t-big" style={{ fontSize: 32, letterSpacing: ".18em", paddingLeft: ".18em", color: "var(--bone)" }}>{word}</span>
               {kind && <span className="t-title" style={{ letterSpacing: ".6em", paddingLeft: ".6em", color: "var(--bone-dim)" }}>{kind}</span>}
@@ -71,16 +71,36 @@ function Candle() {
   );
 }
 
-/* the game's logo when it has been added (public/logo.png), else its name in type */
+/* The game's logo (public/logo.png), alive: a glint crossing the letters
+ * now and then, embers rising from under it, a faint ring turning behind.
+ * The effects are drawn here rather than baked into the image, so they
+ * stay sharp at any size. Without the image, the name in type. */
+const EMBERS = Array.from({ length: 14 }, (_, i) => ({ x: 30 + ((i * 37) % 41), d: (i * 0.53) % 3.2, t: 2.4 + (i % 4) * 0.5, s: i % 3 ? 2 : 3 }));
 function GameLogo() {
   const [img, setImg] = useState(true);
-  if (img) return <img src="/logo.png" alt="MintForge" onError={() => setImg(false)}
-                       style={{ width: "min(82vw, 380px)", height: "auto", imageRendering: "pixelated", filter: "drop-shadow(0 6px 18px #000c)" }}/>;
-  return <h1 className="t-big" style={{ margin: 0, fontSize: 40, letterSpacing: ".12em", color: "#f3d48a", textShadow: "0 4px 0 #3a2410, 0 0 24px #f0b05055" }}>MINTFORGE</h1>;
+  if (!img) return <h1 className="t-big" style={{ margin: 0, fontSize: 40, letterSpacing: ".12em", color: "#f3d48a", textShadow: "0 4px 0 #3a2410, 0 0 24px #f0b05055" }}>MINTFORGE</h1>;
+  return (
+    <div className="logo-live" style={{ width: "min(86vw, 400px)" }}>
+      <span className="logo-ring" aria-hidden/>
+      {EMBERS.map((e, i) => <span key={i} className="logo-ember" aria-hidden
+        style={{ left: e.x + "%", width: e.s, height: e.s, animationDelay: e.d + "s", animationDuration: e.t + "s" }}/>)}
+      <img src="/logo.png" alt="MintForge" onError={() => setImg(false)} style={{ width: "100%", height: "auto", display: "block", position: "relative" }}/>
+      <span className="logo-glint" aria-hidden/>
+    </div>
+  );
+}
+
+/* the bar: a forged trough, filling with molten gold */
+function Bar({ progress }) {
+  const p = Math.round(Math.max(0, Math.min(1, progress)) * 1000) / 10;
+  return (
+    <div className="forge-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(p)} aria-label="Loading">
+      <i style={{ width: p + "%" }}/>
+    </div>
+  );
 }
 
 export function Splash({ progress = 0, line }) {
-  const cells = 20, lit = Math.round(Math.max(0, Math.min(1, progress)) * cells);
   return (
     <main className="app splash-in" aria-busy="true" style={{ position: "relative", background: "#000", overflow: "hidden" }}>
       <Art/>
@@ -90,11 +110,7 @@ export function Splash({ progress = 0, line }) {
         <GameLogo/>
       </div>
       <div style={{ position: "absolute", left: 24, right: 24, bottom: "calc(env(safe-area-inset-bottom, 0px) + 7vh)", display: "grid", gap: 10, justifyItems: "center" }}>
-        <div aria-hidden style={{ display: "flex", gap: 3, width: "100%", maxWidth: 320 }}>
-          {Array.from({ length: cells }, (_, i) => (
-            <span key={i} style={{ flex: 1, height: 10, background: i < lit ? "var(--candle)" : "#1a1510", boxShadow: "0 0 0 2px #000" }}/>
-          ))}
-        </div>
+        <Bar progress={progress}/>
         <p className="t-dim" role="status" style={{ margin: 0, minHeight: "1.4em" }}>{line}</p>
       </div>
     </main>
