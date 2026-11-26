@@ -13,9 +13,16 @@ import PublicProfile from "../components/PublicProfile.jsx";
 /* ─── FRIENDS ─────────────────────────────────────────────────────────────
  * Find players, follow them, look in their cabinets. */
 
+// effects that hang something under the letters (the ooze's drips): each
+// word its own piece, so a title that wraps drips from every line's
+// letters, not from under the last line across the whole width
+const HANGS = new Set(["ooze"]);
 export const TitleText = ({ label }) => {
   const p = titleByLabel(label);
-  return p ? <span className={`title-${p.effect}`}>{label}</span> : <span>{label}</span>;
+  if (!p) return <span>{label}</span>;
+  if (!HANGS.has(p.effect)) return <span className={`title-${p.effect}`}>{label}</span>;
+  const words = String(label).split(" ");
+  return <span style={{ lineHeight: 2 }}>{words.map((w, i) => <span key={i}><span className={`title-${p.effect}`}>{w}</span>{i < words.length - 1 ? " " : ""}</span>)}</span>;
 };
 
 function PlayerRow({ p, onOpen, right }) {
