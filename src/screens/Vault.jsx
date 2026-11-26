@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { MiniCoin } from "../components/SetGems.jsx";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
@@ -157,8 +158,10 @@ export default function Vault() {
               <button className="chip" aria-pressed={filter === -1} onClick={() => setFilter(-1)}>ALL {g.coins.length}</button>
               {METALS.map((m, i) => counts[i] > 0 && (
                 <button key={i} className="chip" aria-pressed={filter === i} onClick={() => setFilter(i)}
-                        style={filter === i ? { borderColor: m.hl, color: m.hl, background: "var(--stone-2)" } : { color: m.hl }}>
-                  {m.name} {counts[i]}
+                        aria-label={`${m.name}, ${counts[i]}`} title={m.name.toUpperCase()}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, color: m.hl,
+                                 ...(filter === i ? { borderColor: m.hl, background: "var(--stone-2)" } : {}) }}>
+                  <MiniCoin metal={i} size={18}/>{counts[i]}
                 </button>
               ))}
             </div>

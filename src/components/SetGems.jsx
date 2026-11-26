@@ -27,6 +27,31 @@ export function Gem({ metal, lit, size = 18 }) {
   );
 }
 
+// 11 × 11, a struck coin: dark rim, a face lit from the top left, a pip
+const FACE = [
+  "...aaaaa...",
+  "..abbbbba..",
+  ".abccbbbba.",
+  "abccbbbbbda",
+  "abcbbbbbbda",
+  "abbbbebbbda",
+  "abbbbbbbdda",
+  "abbbbbbddda",
+  ".abbbbddda.",
+  "..adddddda.",
+  "...aaaaa...",
+];
+/* A metal as a small coin, in its own colours (the vault's filters) */
+export function MiniCoin({ metal, size = 16 }) {
+  const M = METALS[metal];
+  const col = { a: M.dark, b: M.base, c: M.hl, d: M.mid, e: M.eng || M.dark };
+  return (
+    <svg viewBox="0 0 11 11" width={size} height={size} shapeRendering="crispEdges" aria-hidden style={{ display: "block", flexShrink: 0 }}>
+      {FACE.flatMap((row, y) => [...row].map((ch, x) => ch === "." ? null : <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={col[ch]}/>))}
+    </svg>
+  );
+}
+
 export default function SetGems({ sets = [] }) {
   const done = new Set(sets);
   const names = METALS.slice(0, METAL_SETS.metals).map((m, i) => done.has(i) ? m.name : null).filter(Boolean);
