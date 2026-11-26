@@ -9,7 +9,8 @@ import { useEffect, useState } from "react";
  * game opens on the door with nothing left to wait for.
  *
  * The art is public/splash.png when there is one; until then, a candle.
- * The studio's logo is public/studio-logo.png; until then, its name in type. */
+ * The studio's logo is public/studio-logo.png, the game's public/logo.png;
+ * until they are added, each name in type. */
 
 export const STUDIO = "RAINFALL STUDIOS";  // the studio's name, as shown at launch
 export const STUDIO_MS = 2200;             // the studio card, start to finish
@@ -70,6 +71,14 @@ function Candle() {
   );
 }
 
+/* the game's logo when it has been added (public/logo.png), else its name in type */
+function GameLogo() {
+  const [img, setImg] = useState(true);
+  if (img) return <img src="/logo.png" alt="MintForge" onError={() => setImg(false)}
+                       style={{ width: "min(82vw, 380px)", height: "auto", imageRendering: "pixelated", filter: "drop-shadow(0 6px 18px #000c)" }}/>;
+  return <h1 className="t-big" style={{ margin: 0, fontSize: 40, letterSpacing: ".12em", color: "#f3d48a", textShadow: "0 4px 0 #3a2410, 0 0 24px #f0b05055" }}>MINTFORGE</h1>;
+}
+
 export function Splash({ progress = 0, line }) {
   const cells = 20, lit = Math.round(Math.max(0, Math.min(1, progress)) * cells);
   return (
@@ -78,7 +87,7 @@ export function Splash({ progress = 0, line }) {
       {/* the name up top, the bar along the foot, over a darkening at each edge */}
       <div aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(#000c, transparent 28%, transparent 68%, #000e)" }}/>
       <div style={{ position: "absolute", left: 0, right: 0, top: "calc(env(safe-area-inset-top, 0px) + 9vh)", textAlign: "center" }}>
-        <h1 className="t-big" style={{ margin: 0, fontSize: 40, letterSpacing: ".12em", color: "#f3d48a", textShadow: "0 4px 0 #3a2410, 0 0 24px #f0b05055" }}>MINTFORGE</h1>
+        <GameLogo/>
       </div>
       <div style={{ position: "absolute", left: 24, right: 24, bottom: "calc(env(safe-area-inset-bottom, 0px) + 7vh)", display: "grid", gap: 10, justifyItems: "center" }}>
         <div aria-hidden style={{ display: "flex", gap: 3, width: "100%", maxWidth: 320 }}>
