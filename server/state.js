@@ -16,8 +16,10 @@ import { SCRIBE, ASTRAL, CABINET_SCORE, METAL_SETS } from "../shared/tuning.js";
 import { heldSigns } from "./signs.js";
 import { STARTER, cravedPage } from "../shared/tomes.js";
 import { eventOn, RELICS, relicOf } from "../shared/events.js";
-import { FRAMES, TITLES, TITLE_LEVELS, PREMIUM_TITLES, currentTitle } from "../src/lib/data.js";
+import { FRAMES, TITLES, TITLE_LEVELS, titleByLabel, currentTitle } from "../src/lib/data.js";
 import { Refusal } from "./http.js";
+import { vaultValue, keepRankStmts } from "./ranks.js";
+import { regionOk } from "../shared/ranks.js";
 
 export const parseList = (txt) => { try { const v = JSON.parse(txt || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } };
 export const parseObj  = (txt) => { try { const v = JSON.parse(txt || "{}"); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; } catch { return {}; } };
@@ -156,14 +158,16 @@ async function payRelics(db, pid, ps, rows) {
 /* the tomes a player has: always the primer, whatever the row says */
 export const tomesOf = raw => { const t = parseList(raw); return t.includes(STARTER) ? t : [STARTER, ...t]; };
 
-export async function loadState(db, pid, now = Date.now(), tz = 0) {
+/* `region`: the continent this request came from (functions/api/_utils.js
+ * regionOf), kept the first time it is known, for the leaderboards. */
+export async function loadState(db, pid, now = Date.now(), tz = 0, region = null) {
   // an auction run out and not yet settled by the clock is settled now,
   // so a coin won is in the vault this very load
   await settleDue(db, now, 5);
   // every read at once: one round trip to the database, not two
   const [ps, coins, scrolls, chests] = await Promise.all([
     db.prepare(
-      `SELECT players.username, s.xp, s.marks, s.frame, s.bio, s.selected_title, s.pinned_ids,
+      `SELECT players.username, players.region, s.vault_value, s.xp, s.marks, s.frame, s.bio, s.selected_title, s.pinned_ids,
               s.owned_frames, s.owned_titles, s.owned_fx, s.profile_fx, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
               s.journal, s.well_level, s.tomes
          FROM player_state s JOIN players ON players.id = s.player_id
@@ -175,6 +179,10 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   ]);
   if (!ps) throw new Refusal("State missing — your account may need recreating", 500);
   const all = coins.results || [];
+  // the leaderboards: this vault's worth, and where in the world it is
+  const value = vaultValue(all);
+  const keep = keepRankStmts(db, pid, { value, oldValue: ps.vault_value, region, oldRegion: ps.region });
+  if (keep.length) await db.batch(keep);
   await signOldAstrals(db, pid, all);
   const signBonus = await paySigns(db, pid, ps, all);
   const relicBonus = await payRelics(db, pid, ps, all);
@@ -189,6 +197,15 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     ).bind(pid).run();
     if (took?.meta?.changes) houseGift = stats.houseGift;
   }
+  // crowns from the leaderboards (server/ranks.js crownDue), told once
+  let crowned = null;
+  if (Array.isArray(stats.crowned) && stats.crowned.length) {
+    const took = await db.prepare(
+      `UPDATE player_state SET stats = json_remove(stats, '$.crowned') WHERE player_id = ?1 AND json_extract(stats, '$.crowned') IS NOT NULL`
+    ).bind(pid).run();
+    if (took?.meta?.changes) crowned = stats.crowned;
+  }
+  delete stats.crowned;
   delete stats.lastVisitAt;
   const daily = stats.daily || {};
   delete stats.daily;
@@ -227,6 +244,9 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     ...(setBonus.length ? { setBonus } : {}),
     ...(auctionNotes.length ? { auctionNotes } : {}),
     ...(houseGift ? { houseGift } : {}),
+    ...(crowned ? { crowned } : {}),
+    region: regionOk(ps.region) ? ps.region : regionOk(region) ? region : null,
+    vaultValue: value,
   };
 }
 
@@ -235,7 +255,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
 export function titleAllowed(label, level, ownedTitles) {
   const i = TITLES.indexOf(label);
   if (i >= 0) return level >= TITLE_LEVELS[i];
-  const p = PREMIUM_TITLES.find(t => t.label === label);
+  const p = titleByLabel(label);
   return !!p && ownedTitles.includes(p.id);
 }
 export function frameAllowed(id, level, ownedFrames) {

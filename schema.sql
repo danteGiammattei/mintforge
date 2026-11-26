@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS players (
   password_salt   TEXT    NOT NULL,
   created_at      INTEGER NOT NULL,
   last_seen_at    INTEGER NOT NULL,
-  pin_iter        INTEGER NOT NULL DEFAULT 10000      -- PBKDF2 rounds this hash was made with
+  pin_iter        INTEGER NOT NULL DEFAULT 10000,     -- PBKDF2 rounds this hash was made with
+  region          TEXT                                -- continent first seen from, for the leaderboards (migration 029)
 );
 
 CREATE TABLE IF NOT EXISTS player_state (
@@ -43,6 +44,7 @@ CREATE TABLE IF NOT EXISTS player_state (
   tomes           TEXT    NOT NULL DEFAULT '["primer"]',   -- shared/tomes.js ids (migration 020)
   owned_fx        TEXT    NOT NULL DEFAULT '[]',           -- profile effects owned (migration 021)
   profile_fx      TEXT,                                    -- the one worn, or none
+  vault_value     INTEGER NOT NULL DEFAULT 0,              -- the worth of every clean coin held, for the leaderboards (migration 029)
   FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
 
@@ -235,4 +237,16 @@ CREATE TABLE IF NOT EXISTS notice_reports (
   notice_id   TEXT    NOT NULL,
   player_id   INTEGER NOT NULL,
   PRIMARY KEY (notice_id, player_id)
+);
+
+-- The leaderboards (migration 029; shared/ranks.js, server/ranks.js)
+CREATE INDEX IF NOT EXISTS players_region_idx ON players(region);
+CREATE INDEX IF NOT EXISTS player_state_value_idx ON player_state(vault_value);
+CREATE TABLE IF NOT EXISTS crowns (
+  season     TEXT    NOT NULL,             -- "2026Q4"
+  board      TEXT    NOT NULL,             -- "G" for the world, else a region ("OC", "EU", …)
+  player_id  INTEGER NOT NULL,
+  value      INTEGER NOT NULL,             -- their vault's worth when crowned
+  at         INTEGER NOT NULL,
+  PRIMARY KEY (season, board)
 );

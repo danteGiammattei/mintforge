@@ -35,6 +35,7 @@ import { mkCoin, coinValue, deriveRarity } from "../src/lib/coin.js";
 import { FRAMES, PREMIUM_TITLES } from "../src/lib/data.js";
 import { Refusal, randomHex, cryptoRand } from "./http.js";
 import { loadState, parseList, parseObj, coinOut, tomesOf } from "./state.js";
+import { hydrate, ranks } from "./ranks.js";
 import { stall, buy } from "./stall.js";
 import { auctions, list, bid, withdraw } from "./auction.js";
 import { board, post, unpost, report } from "./board.js";
@@ -484,15 +485,6 @@ async function brush(db, pid, body, { now }) {
 
 /* ─── sell ────────────────────────────────────────────────────────── */
 
-const hydrate = r => {
-  const c = mkCoin(r.seed >>> 0, 1, r.metal_idx);
-  c.shiny = !!r.shiny;
-  if (r.rarity != null) c.rarity = r.rarity;
-  if (MATERIAL.byTier.includes(r.material) && r.material) c.material = r.material;
-  if (r.season && SEASONS[r.season]) c.season = r.season;
-  if (relicOf(r.relic)) c.relic = r.relic;
-  return c;
-};
 const placeholders = (n, from) => Array.from({ length: n }, (_, i) => `?${i + from}`).join(",");
 
 async function sell(db, pid, body) {
@@ -668,7 +660,7 @@ async function gamble(db, pid, body, { now, rand }) {
 
 /* ─── dispatch ────────────────────────────────────────────────────── */
 
-const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, fuse, well, stall, buy, auctions, list, bid, withdraw, board, post, unpost, report };
+const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, fuse, well, stall, buy, auctions, list, bid, withdraw, board, post, unpost, report, ranks };
 
 export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, tz = 0 } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;

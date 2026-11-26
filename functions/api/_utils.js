@@ -17,6 +17,10 @@ export async function guarded(fn) {
   }
 }
 
+/* The continent this request came from, as Cloudflare saw it ("OC",
+ * "EU", …), for the leaderboards; null when it isn't known. */
+export const regionOf = request => (typeof request.cf?.continent === "string" ? request.cf.continent : null);
+
 /* The player's time zone, minutes east of UTC, from their device. */
 export const tzOf = request => {
   const v = Number(request.headers.get("X-TZ-Offset"));

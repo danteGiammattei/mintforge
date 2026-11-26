@@ -9,6 +9,7 @@
 import { RARITY_VALUE_MUL } from "../../shared/tuning.js";
 
 /* ─── METALS ──────────────────────────────────────────────────────────── */
+import { crownOf, crownByLabel } from "../../shared/ranks.js";
 export const METALS = [
   { name:"Copper",  base:"#c47a30", mid:"#9a5218", dark:"#3e1e06", hl:"#eeaa70", eng:"#5a2e0a", accent:"#c47a30", flash:"rgba(196,122,48,.18)", rarity:"Common" },
   { name:"Bronze",  base:"#9a7240", mid:"#7a5428", dark:"#3a2010", hl:"#d4a060", eng:"#6a4218", accent:"#9a7240", flash:"rgba(154,114,64,.18)", rarity:"Uncommon" },
@@ -185,6 +186,10 @@ export const PREMIUM_TITLES = [
 ];
 export const PREMIUM_TITLE_BY_ID  = Object.fromEntries(PREMIUM_TITLES.map(t => [t.id, t]));
 export const PREMIUM_TITLE_LABELS = new Set(PREMIUM_TITLES.map(t => t.label));
+/* Any title worn by id or by label: the fixed ones above, or a crown
+ * from the leaderboards (shared/ranks.js), whose label is made from its id. */
+export const titleById = id => PREMIUM_TITLE_BY_ID[id] || crownOf(id);
+export const titleByLabel = label => PREMIUM_TITLES.find(t => t.label === label) || crownByLabel(label);
 
 /* ─── BRUSHES ─────────────────────────────────────────────────────────── */
 // `alpha` is how much dirt one pass lifts. Better brushes are gifts too.

@@ -8,12 +8,15 @@
  *   npx wrangler deploy --config workers/clock/wrangler.toml
  */
 import { settleDue } from "../../server/auction.js";
+import { crownDue } from "../../server/ranks.js";
 
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async () => {
       // up to a few hundred a minute; anything past that waits a minute
       for (let i = 0; i < 8; i++) if (await settleDue(env.DB, Date.now(), 25) < 25) break;
+      // and when a season has ended, its leaderboards are crowned (server/ranks.js)
+      await crownDue(env.DB, Date.now());
     })());
   },
 };

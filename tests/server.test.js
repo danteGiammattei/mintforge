@@ -22,8 +22,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 028 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql", "migrations/025_seven_chests.sql", "migrations/026_star_touched_fifty.sql", "migrations/027_notice_board.sql", "migrations/028_luck_of_a_thousand_lifetimes.sql"]);
+test("migrations 009 and 011 to 029 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql", "migrations/025_seven_chests.sql", "migrations/026_star_touched_fifty.sql", "migrations/027_notice_board.sql", "migrations/028_luck_of_a_thousand_lifetimes.sql", "migrations/029_leaderboards.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -1278,4 +1278,97 @@ test("migration 028: Luck of a Thousand Lifetimes for DanteDaddy alone, told onc
   run();
   assert.ok(!(await loadState(db, pid)).houseGift, "and not again after a rerun");
   assert.ok(!(await loadState(db, other)).ownedTitles.includes("thousand_lifetimes"), "nobody else");
+});
+
+/* ─── leaderboards ────────────────────────────────────────────────── */
+import { crownDue, vaultValue, ranks } from "../server/ranks.js";
+import { seasonOf, seasonEnd, endedSeasons, crownOf, crownByLabel } from "../shared/ranks.js";
+
+test("ranks: seasons are calendar quarters, and nothing before Q4 2026 is ever crowned", () => {
+  assert.equal(seasonOf(Date.parse("2026-11-26T05:00:00Z")), "2026Q4");
+  assert.equal(seasonEnd("2026Q4"), Date.parse("2027-01-01T00:00:00Z"));
+  assert.deepEqual(endedSeasons(Date.parse("2026-12-31T23:59:59Z")), []);
+  assert.deepEqual(endedSeasons(Date.parse("2027-04-02T00:00:00Z")), ["2026Q4", "2027Q1"]);
+  const c = crownOf("crown:OC:2026Q4");
+  assert.equal(c.label, "First of Oceania · Q4 2026");
+  assert.equal(crownOf("crown:G:2027Q1").label, "Richest Vault · Q1 2027");
+  assert.equal(crownByLabel("First of Oceania · Q4 2026").id, "crown:OC:2026Q4");
+  assert.equal(crownByLabel("Richest Vault · Q1 2027").id, "crown:G:2027Q1");
+  assert.equal(crownOf("crown:XX:2026Q4"), null);
+});
+
+test("ranks: a region is kept from the first load, and the vault's worth follows its coins", async () => {
+  const { db, pid } = await world("roamer");
+  const plantCoin = (id, metal, rarity, dusty = 0) => db.raw.prepare(
+    `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?, ?, 77, ?, 0, 0, ?, 1, ?)`).run(id, pid, metal, rarity, dusty);
+  plantCoin("c_v1", 4, 2); plantCoin("c_v2", 6, 3); plantCoin("c_v3", 9, 4, 1);
+  let s = await loadState(db, pid, Date.now(), 0, "ZZ");
+  assert.equal(s.region, null, "an unknown continent is not kept");
+  s = await loadState(db, pid, Date.now(), 0, "OC");
+  s = await loadState(db, pid, Date.now(), 0, "EU");
+  assert.equal(db.raw.prepare(`SELECT region FROM players WHERE id = ?`).get(pid).region, "OC", "kept from the first sighting");
+  const rows = db.raw.prepare(`SELECT * FROM coins WHERE player_id = ?`).all(pid);
+  const worth = vaultValue(rows);
+  assert.equal(worth, rows.filter(r => !r.dusty).reduce((n, r) => n + coinValue(Object.assign(mkCoin(r.seed, 1, r.metal_idx), { rarity: r.rarity })), 0), "the dusty one doesn't count");
+  assert.equal(s.vaultValue, worth);
+  assert.equal(db.raw.prepare(`SELECT vault_value v FROM player_state WHERE player_id = ?`).get(pid).v, worth);
+  await driver(db, pid, seeded(1))("sell", { coinIds: ["c_v2"] });
+  assert.ok(db.raw.prepare(`SELECT vault_value v FROM player_state WHERE player_id = ?`).get(pid).v < worth, "selling lowers it");
+});
+
+test("ranks: the world's board and a region's, and where you stand", async () => {
+  const db = makeDb();
+  const mk = async (name, region, value) => {
+    const r = await register(db, { username: name, pin: "4821", ip: "1.1.1." + name.length, now: 1000 });
+    const id = r.body.player.id;
+    db.raw.prepare(`UPDATE players SET region = ? WHERE id = ?`).run(region, id);
+    db.raw.prepare(`UPDATE player_state SET vault_value = ? WHERE player_id = ?`).run(value, id);
+    return id;
+  };
+  const me = await mk("kiwi", "OC", 500);
+  await mk("aussie", "OC", 900); await mk("brit", "EU", 2000); await mk("nobody", "EU", 0); await mk("yank", "NA", 700);
+  // the board itself (through act, the state load after it would re-count these hand-set values from coins)
+  const go = b => ranks(db, me, b ? { board: b } : {}, { now: Date.parse("2026-11-26T05:00:00Z") }).then(result => ({ result }));
+  const w = (await go()).result;
+  assert.deepEqual(w.rows.map(r => r.username), ["brit", "aussie", "yank", "kiwi"], "nobody with nothing is left off");
+  assert.deepEqual([w.board, w.me.rank, w.me.value, w.region, w.season, w.endsAt], ["G", 4, 500, "OC", "2026Q4", Date.parse("2027-01-01T00:00:00Z")]);
+  const oc = (await go("OC")).result;
+  assert.deepEqual([oc.rows.map(r => r.username), oc.me.rank], [["aussie", "kiwi"], 2]);
+  const eu = (await go("EU")).result;
+  assert.deepEqual([eu.rows.map(r => r.username), eu.me.rank], [["brit"], null], "not your region: no rank on it");
+  await refuses(go("XX"), 400);
+});
+
+test("ranks: when a season ends, each board's first is crowned once, from their coins as they are", async () => {
+  const db = makeDb();
+  const mk = async (name, region) => {
+    const r = await register(db, { username: name, pin: "4821", ip: "2.2.2." + name.length, now: 1000 });
+    db.raw.prepare(`UPDATE players SET region = ? WHERE id = ?`).run(region, r.body.player.id);
+    return r.body.player.id;
+  };
+  const coin = (pid, id, metal, rarity) => db.raw.prepare(
+    `INSERT INTO coins (id, player_id, seed, metal_idx, shiny, locked, rarity, acquired_at, dusty) VALUES (?, ?, 5, ?, 0, 0, ?, 1, 0)`).run(id, pid, metal, rarity);
+  const kiwi = await mk("kiwi", "OC"), aussie = await mk("aussie", "OC"), brit = await mk("brit", "EU");
+  coin(kiwi, "c_k1", 9, 4); coin(aussie, "c_a1", 5, 2); coin(brit, "c_b1", 8, 3);
+  for (const p of [kiwi, aussie, brit]) await loadState(db, p);
+  // a stale value: the aussie's row says rich, but the coins say otherwise
+  db.raw.prepare(`UPDATE player_state SET vault_value = 99999999 WHERE player_id = ?`).run(aussie);
+
+  assert.equal(await crownDue(db, Date.parse("2026-12-31T23:59:00Z")), 0, "not yet");
+  const at = Date.parse("2027-01-01T00:01:00Z");
+  assert.equal(await crownDue(db, at), 3, "the world, Oceania and Europe");
+  assert.equal(await crownDue(db, at + 60e3), 0, "and only once");
+  const owned = p => JSON.parse(db.raw.prepare(`SELECT owned_titles t FROM player_state WHERE player_id = ?`).get(p).t || "[]");
+  assert.deepEqual(owned(kiwi).sort(), ["crown:G:2026Q4", "crown:OC:2026Q4"], "re-counted: the kiwi is richest");
+  assert.deepEqual(owned(brit), ["crown:EU:2026Q4"]);
+  assert.deepEqual(owned(aussie), []);
+  const s = await loadState(db, kiwi);
+  assert.deepEqual(s.crowned.map(c => c.title).sort(), ["crown:G:2026Q4", "crown:OC:2026Q4"]);
+  assert.match(s.crowned.find(c => c.title === "crown:OC:2026Q4").line, /RICHEST VAULT IN OCEANIA AT THE END OF Q4 2026/);
+  assert.equal((await loadState(db, kiwi)).crowned, undefined, "told once");
+  // and it can be worn
+  await patchCosmetics(db, kiwi, { state: { selectedTitle: "First of Oceania · Q4 2026" } });
+  await assert.rejects(patchCosmetics(db, aussie, { state: { selectedTitle: "First of Oceania · Q4 2026" } }), /not yours/);
+  const board = (await act(db, kiwi, { action: "ranks", board: "OC" }, { now: at })).result;
+  assert.deepEqual(board.crowns.map(c => [c.season, c.username]), [["2026Q4", "kiwi"]]);
 });
