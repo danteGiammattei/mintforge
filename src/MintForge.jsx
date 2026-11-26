@@ -5,7 +5,7 @@ import { OverlayProvider, useUi } from "./ui/Overlay.jsx";
 import { TITLES, TITLE_LEVELS, FRAMES, PREMIUM_TITLES, titleById } from "./lib/data.js";
 import { RewardHost, useCelebrate } from "./components/Reward.jsx";
 import { preloadFirst, preloadBanner, warmAfter } from "./lib/preload.js";
-import LoadScreen from "./components/LoadScreen.jsx";
+import { StudioCard, Splash as BootSplash, STUDIO_MS, SPLASH_MIN_MS } from "./components/Boot.jsx";
 import { useWar } from "./state/useWar.js";
 import { feel } from "./lib/feel.js";
 import AuthScreen from "./components/AuthScreen.jsx";
@@ -13,7 +13,6 @@ import BottomNav, { TABS } from "./components/BottomNav.jsx";
 import TopBar from "./components/TopBar.jsx";
 import Guide, { guideStep, journalSeen } from "./components/Guide.jsx";
 import { setAppIcon } from "./lib/appIcon.js";
-import Opening, { introSeen } from "./components/Opening.jsx";
 import Scribe from "./screens/Scribe.jsx";
 import Door from "./screens/Door.jsx";
 import Satchel from "./screens/Satchel.jsx";
@@ -40,7 +39,6 @@ const Ranks = lazy(() => import("./screens/Ranks.jsx"));
 // "ranks" has no place in the nav yet: the top bar's trophy opens it
 const SCREENS = { scribe: Scribe, door: Door, satchel: Satchel, vault: Vault, forge: ForgeRoom, tavern: Tavern, profile: Profile, ranks: Ranks };
 const BARE = new Set(["scribe", "door"]);
-const TAB_KEY = "mintforge:tab";
 
 function Splash({ children }) {
   return (
@@ -122,17 +120,9 @@ function WarNudge({ invites, inTavern }) {
 }
 
 function Game({ game }) {
-  // A new player starts at the door, where the first chest is waiting.
-  const [tab, setTabRaw] = useState(() => {
-    if (!(game.stats.visits > 0)) return "door";
-    let saved = null;
-    try { saved = sessionStorage.getItem(TAB_KEY); } catch { /* fine */ }
-    return TABS.some(t => t[0] === saved) || saved === "ranks" ? saved : "scribe";
-  });
-  const setTab = useCallback(id => {
-    setTabRaw(id);
-    try { sessionStorage.setItem(TAB_KEY, id); } catch { /* fine */ }
-  }, []);
+  // Every launch ends at the door (components/Boot.jsx)
+  const [tab, setTabRaw] = useState("door");
+  const setTab = useCallback(id => setTabRaw(id), []);
   useEffect(() => { document.title = `${TABS.find(t => t[0] === tab)?.[2] || ""} · MintForge`; }, [tab]);
 
 
@@ -144,10 +134,7 @@ function Game({ game }) {
   const [, nudge] = useState(0);
   const guide = guideStep(game);
   const sawJournal = useCallback(() => { journalSeen(); nudge(n => n + 1); }, []);
-  // the opening story: once, for a new player, and whenever the journal asks
-  const [story, setStory] = useState(() => !introSeen() && !(game.stats?.visits > 0));
-  const replayStory = useCallback(() => setStory(true), []);
-  const ctx = useMemo(() => ({ ...game, tab, setTab, war, sawJournal, replayStory }), [game, tab, setTab, war, sawJournal, replayStory]);
+  const ctx = useMemo(() => ({ ...game, tab, setTab, war, sawJournal }), [game, tab, setTab, war, sawJournal]);
   const warBadge = war.invites.length || (war.table?.status === "playing" && !war.table.youFlipped ? "!" : 0);
   const Screen = SCREENS[tab] || Scribe;
   const waiting = game.chests.length + game.dusty.length;
@@ -157,7 +144,7 @@ function Game({ game }) {
       <RewardHost>
       <LevelWatch level={game.level}/>
       <SignWatch news={game.news}/>
-      <EventWatch event={game.event} hold={story}/>
+      <EventWatch event={game.event} hold={false}/>
       <DailyNudge ready={game.dailyReady} onDoor={tab === "door"}/>
       <WarNudge invites={war.invites} inTavern={tab === "tavern"}/>
       <div className="app">
@@ -166,35 +153,57 @@ function Game({ game }) {
                                    daily={game.dailyReady} onDaily={() => setTab("door")}
                                    ranks={tab === "ranks"} onRanks={() => setTab("ranks")}/>}
         <main id="main" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: BARE.has(tab) ? "env(safe-area-inset-top, 0px)" : 0 }}>
-          {/* held back while the story plays, so the door's welcome waits for its end */}
-          {!story && <Suspense key={tab} fallback={<div className="page"><p className="t-dim blink" style={{ padding: 24, textAlign: "center" }}>…</p></div>}><Screen/></Suspense>}
+          {<Suspense key={tab} fallback={<div className="page"><p className="t-dim blink" style={{ padding: 24, textAlign: "center" }}>…</p></div>}><Screen/></Suspense>}
         </main>
         <Guide step={guide} tab={tab} setTab={setTab} bare={BARE.has(tab)} onSkip={() => nudge(n => n + 1)}/>
         <BottomNav tab={tab} setTab={setTab} guide={guide && guide.tab !== tab ? guide.tab : null} badges={{ satchel: waiting, door: game.dailyReady && tab !== "door" ? "!" : 0, tavern: tab !== "tavern" ? warBadge : 0 }}/>
       </div>
-      {story && <Opening onDone={() => setStory(false)}/>}
       </RewardHost>
     </GameContext.Provider>
   );
 }
 
+/* What the splash says as it goes: what it is waiting on, in his words */
+const BOOT_LINES = ["LIGHTING THE CANDLE", "HE IS COUNTING THE COINS", "DUSTING THE SHELVES", "THE INK IS STILL WET", "SOMEONE IS AT THE DOOR"];
+// the screens behind the door's corners and the nav, fetched while the splash holds
+const warmScreens = () => Promise.all([loadTavern(), import("./screens/Ranks.jsx")]).catch(() => {});
+
 export default function MintForge() {
   const game = useGameState();
   const { boot } = game;
+  // the way in (components/Boot.jsx): the studio card, then the splash
+  // for at least SPLASH_MIN_MS, then the door
+  const [stage, setStage] = useState("studio");
+  useEffect(() => { const t = setTimeout(() => setStage("splash"), STUDIO_MS); return () => clearTimeout(t); }, []);
+  const [splashAt, setSplashAt] = useState(0);
+  const [now, setNow] = useState(0);
+  const splashing = stage === "splash" && boot.status !== "anon" && boot.status !== "error";
+  useEffect(() => {
+    if (!splashing) return;
+    setSplashAt(t => t || Date.now());
+    const i = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(i);
+  }, [splashing]);
+
   // the chests, the cabinet frames and the font are small: wait for them
-  // (or for them to fail) behind the loading screen, then your banner
-  // once we know it, then warm the rest quietly once the game is open
+  // (or for them to fail), then your banner once we know it
   const [art, setArt] = useState({ done: 0, total: 3, ready: false });
   useEffect(() => { preloadFirst((done, total) => setArt(a => ({ ...a, done, total }))).then(() => setArt(a => ({ ...a, ready: true }))); }, []);
   const [banner, setBanner] = useState(false);
   const frame = game.snap?.frame;
   useEffect(() => { if (frame !== undefined && !banner) preloadBanner(frame).then(() => setBanner(true)); }, [frame, banner]);
+  // and while the splash holds, the rest: every coin painted ahead (so the
+  // vault opens without a stall) and the other screens fetched
   const warmed = useRef(false);
-  const open = boot.status === "ready" && !!game.snap && art.ready && banner;
-  useEffect(() => { if (open && !warmed.current) { warmed.current = true; warmAfter(game.coins); setTimeout(() => loadTavern().catch(() => {}), 4000); } }, [open, game.coins]);
+  const ready = boot.status === "ready" && !!game.snap && art.ready && banner;
+  useEffect(() => { if (boot.status === "ready" && game.snap && !warmed.current) { warmed.current = true; warmAfter(game.coins); warmScreens(); } }, [boot.status, game.snap, game.coins]);
+
+  const held = splashAt ? Math.min(1, (now - splashAt) / SPLASH_MIN_MS) : 0;
+  const open = ready && held >= 1;
 
   let body;
-  if (boot.status === "anon") body = <AuthScreen onAuthed={game.onAuthed}/>;
+  if (stage === "studio") body = <StudioCard/>;
+  else if (boot.status === "anon") body = <AuthScreen onAuthed={game.onAuthed}/>;
   else if (boot.status === "error") body = (
     <Splash>
       <p className="t-blood" role="alert" style={{ margin: 0, maxWidth: 300 }}>{boot.error}</p>
@@ -204,9 +213,11 @@ export default function MintForge() {
     </Splash>
   );
   else if (!open) {
-    // the state counts for half the wax, the art for the rest
-    const p = ((boot.status === "ready" && game.snap ? 1 : 0) + (banner ? 0.5 : 0) + 1.5 * (art.done / art.total)) / 3;
-    body = <LoadScreen progress={p}/>;
+    // the state counts for half, the art for the rest; the bar never runs
+    // ahead of the time the splash is held for, so it fills as one motion
+    const loaded = ((boot.status === "ready" && game.snap ? 1 : 0) + (banner ? 0.5 : 0) + 1.5 * (art.done / art.total)) / 3;
+    const line = BOOT_LINES[Math.floor(((now || Date.now()) - (splashAt || Date.now())) / 1600) % BOOT_LINES.length];
+    body = <BootSplash progress={Math.min(loaded, held)} line={line + "…"}/>;
   }
   else body = <Game game={game}/>;
 
