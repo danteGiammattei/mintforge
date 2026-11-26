@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 
 export const STUDIO = "RAINFALL STUDIOS";  // the studio's name, as shown at launch
 export const STUDIO_MS = 2200;             // the studio card, start to finish
-export const SPLASH_MIN_MS = 2600;         // the least the splash is shown
+export const SPLASH_MIN_MS = 4000;         // the least the splash is shown
 
 export function StudioCard() {
   // the logo when it has been added (public/studio-logo.png), else the name set in type
@@ -40,25 +40,34 @@ export function StudioCard() {
  * placeholder. The art is laid as "cover" by hand, on a stage of its own
  * proportions that always fills the screen, so the candlelight drawn over
  * it stays on its flame however the phone crops it. */
-const ART = { src: "/splash.webp", w: 853, h: 1844, flame: [50.1, 37.9] };   // the flame, in % of the art
+/* The loading screens: one is chosen at random each launch. To add one,
+ * put its image in public/ and a line here: its size, and where any warm
+ * light in it sits (in % of the image) to flicker; leave `lights` empty
+ * for a screen that should hold still. */
+const ARTS = [
+  { src: "/splash.webp", w: 853, h: 1844, lights: [[50.1, 37.9]] },        // the candle on the desk
+];
 function Art() {
   const [missing, setMissing] = useState(false);
+  const [ART] = useState(() => ARTS[Math.floor(Math.random() * ARTS.length)]);
   if (missing) return (
     <div aria-hidden style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center",
                               background: "radial-gradient(circle at 50% 42%, #2a1d0c 0, #0b0805 45%, #000 80%)" }}>
       <Candle/>
     </div>
   );
-  const [fx, fy] = ART.flame;
   return (
     <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
       <div style={{ position: "absolute", left: "50%", top: "50%", translate: "-50% -50%",
                     width: `max(100vw, calc(100dvh * ${ART.w / ART.h}))`, aspectRatio: `${ART.w} / ${ART.h}` }}>
         <img src={ART.src} alt="" onError={() => setMissing(true)} style={{ width: "100%", height: "100%", display: "block" }}/>
-        {/* the room, breathing with the candle */}
-        <span className="candle-room" style={{ "--fx": fx + "%", "--fy": fy + "%" }}/>
-        {/* and the halo round the flame itself */}
-        <span className="candle-halo" style={{ left: fx + "%", top: fy + "%" }}/>
+        {/* each warm light: the room breathing with it, and a halo round it */}
+        {ART.lights.map(([fx, fy], i) => (
+          <span key={i}>
+            <span className="candle-room" style={{ "--fx": fx + "%", "--fy": fy + "%", animationDelay: -i * 0.7 + "s" }}/>
+            <span className="candle-halo" style={{ left: fx + "%", top: fy + "%", animationDelay: -i * 0.7 + "s" }}/>
+          </span>
+        ))}
       </div>
     </div>
   );
