@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
@@ -23,7 +23,10 @@ export default function Board() {
   const g = useGame(), ui = useUi(), soc = useSocial(g.api, true);
   const [list, setList] = useState(null), [err, setErr] = useState(null), [writing, setWriting] = useState(false);
   const open = g.level >= BOARD.minLevel;
-  const load = useCallback(() => g.act("board").then(r => { setList(r.list); setErr(null); }).catch(e => setErr(e.message)), [g]);
+  // through a ref: every act brings a new game state, and a load that
+  // changed with it would fetch again, and again, forever
+  const live = useRef(g); live.current = g;
+  const load = useCallback(() => live.current.act("board").then(r => { setList(r.list); setErr(null); }).catch(e => setErr(e.message)), []);
   useEffect(() => { if (open) load(); }, [open, load]);
 
   if (!open) return (

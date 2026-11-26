@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
@@ -40,8 +40,11 @@ export default function Auction() {
   const line = useMemo(() => LINES[Math.floor(Math.random() * LINES.length)], []);
   const open = g.level >= AUCTION.minLevel;
 
-  const load = useCallback(() => g.act("auctions").then(r => { setFeed(r.list); setSkew(r.now - Date.now()); setErr(null); })
-    .catch(e => setErr(e.message || "THE BACK ROOM IS SHUT")), [g]);
+  // through a ref: every act brings a new game state, and a load that
+  // changed with it would fetch again, and again, forever
+  const live = useRef(g); live.current = g;
+  const load = useCallback(() => live.current.act("auctions").then(r => { setFeed(r.list); setSkew(r.now - Date.now()); setErr(null); })
+    .catch(e => setErr(e.message || "THE BACK ROOM IS SHUT")), []);
   useEffect(() => {
     if (!open) return;
     load();
