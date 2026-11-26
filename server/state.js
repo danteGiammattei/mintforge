@@ -181,6 +181,14 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
   const setBonus = await paySets(db, pid, ps, all);
   const auctionNotes = await takeNotes(db, pid);
   const stats = parseObj(ps.stats);
+  // a gift from the house (given by hand, e.g. migrations/028), told once
+  let houseGift = null;
+  if (stats.houseGift) {
+    const took = await db.prepare(
+      `UPDATE player_state SET stats = json_remove(stats, '$.houseGift') WHERE player_id = ?1 AND json_extract(stats, '$.houseGift') IS NOT NULL`
+    ).bind(pid).run();
+    if (took?.meta?.changes) houseGift = stats.houseGift;
+  }
   delete stats.lastVisitAt;
   const daily = stats.daily || {};
   delete stats.daily;
@@ -218,6 +226,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0) {
     ...(relicBonus.length ? { relicBonus } : {}),
     ...(setBonus.length ? { setBonus } : {}),
     ...(auctionNotes.length ? { auctionNotes } : {}),
+    ...(houseGift ? { houseGift } : {}),
   };
 }
 

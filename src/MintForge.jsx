@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { GameContext } from "./lib/GameContext.js";
 import { useGameState } from "./state/useGameState.js";
 import { OverlayProvider, useUi } from "./ui/Overlay.jsx";
-import { TITLES, TITLE_LEVELS, FRAMES } from "./lib/data.js";
+import { TITLES, TITLE_LEVELS, FRAMES, PREMIUM_TITLES } from "./lib/data.js";
 import { RewardHost, useCelebrate } from "./components/Reward.jsx";
 import { preloadFirst, preloadBanner, warmAfter } from "./lib/preload.js";
 import LoadScreen from "./components/LoadScreen.jsx";
@@ -86,6 +86,7 @@ function SignWatch({ news }) {
     if (news?.signs?.length) celebrate({ kind: "signs", signs: news.signs });
     if (news?.relics?.length) celebrate({ kind: "relics", relics: news.relics });
     if (news?.sets?.length) celebrate({ kind: "sets", sets: news.sets });
+    if (news?.house?.title) celebrate({ kind: "title", label: PREMIUM_TITLES.find(t => t.id === news.house.title)?.label || news.house.title, from: "house", line: news.house.line });
     if (news?.auction?.length) celebrate({ kind: "auction", notes: news.auction });
   }, [news, celebrate]);
   return null;

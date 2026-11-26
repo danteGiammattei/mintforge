@@ -178,6 +178,8 @@ export const PREMIUM_TITLES = [
   // secret: never listed until earned
   { id:"faultless",      label:"The Faultless Hand",      minLvl:1, effect:"astral", secret: true },   // a copy at 100% likeness (server/game.js seal)
   { id:"first_star",     label:"Star-Touched",            minLvl:1, effect:"astral", secret: true },   // an astral coin among your first fifty (server/game.js open)
+  // one of a kind, given by hand (migrations/028): never earned, only granted
+  { id:"thousand_lifetimes", label:"Luck of a Thousand Lifetimes", minLvl:1, effect:"ooze", secret: true },
   // events (shared/events.js): only ever from the event's chests
   { id:"long_night",     label:"Santa's Little Helper",   minLvl:1, effect:"frost" },
 ];

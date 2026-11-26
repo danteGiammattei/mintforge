@@ -22,8 +22,8 @@ const post = (token, body) => new Request("http://x/api", {
 
 /* ─── schema ──────────────────────────────────────────────────────── */
 
-test("migrations 009 and 011 to 027 bring the pre-rebuild schema to schema.sql exactly", async () => {
-  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql", "migrations/025_seven_chests.sql", "migrations/026_star_touched_fifty.sql", "migrations/027_notice_board.sql"]);
+test("migrations 009 and 011 to 028 bring the pre-rebuild schema to schema.sql exactly", async () => {
+  const db = makeDb(["tests/fixtures/schema_pre009.sql", "migrations/009_grassroots.sql", "migrations/011_journal_names_wells.sql", "migrations/012_tidy_and_seal_log.sql", "migrations/013_war.sql", "migrations/014_war_picks.sql", "migrations/015_materials.sql", "migrations/016_astral_signs.sql", "migrations/017_new_ladder.sql", "migrations/018_stall.sql", "migrations/019_sign_bonus.sql", "migrations/020_tomes.sql", "migrations/021_long_night.sql", "migrations/022_magi.sql", "migrations/023_auction.sql", "migrations/024_secret_titles.sql", "migrations/025_seven_chests.sql", "migrations/026_star_touched_fifty.sql", "migrations/027_notice_board.sql", "migrations/028_luck_of_a_thousand_lifetimes.sql"]);
   const fresh = makeDb();
   const cols = (d, t) => d.raw.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name).sort();
   const tables = d => d.raw.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all().map(r => r.name);
@@ -1202,4 +1202,20 @@ test("board: three reports from different players take a notice down (but its au
   await as(dan, "report", { noticeId: id });
   assert.equal((await as(ben, "board")).result.list.length, 0, "three: down");
   assert.equal((await as(amy, "board")).result.list.length, 1, "its author still sees it");
+});
+
+test("migration 028: Luck of a Thousand Lifetimes for DanteDaddy alone, told once", async () => {
+  const { db, pid } = await world("DanteDaddy");
+  const other = (await register(db, { username: "someone", pin: "4821", ip: "4.4.4.4", now: 1000 })).body.player.id;
+  const { readFileSync } = await import("node:fs");
+  const run = () => db.raw.exec(readFileSync("migrations/028_luck_of_a_thousand_lifetimes.sql", "utf8"));
+  run(); run();
+  const s = await loadState(db, pid);
+  assert.deepEqual(s.ownedTitles.filter(t => t === "thousand_lifetimes"), ["thousand_lifetimes"], "theirs, once");
+  assert.equal(s.houseGift.title, "thousand_lifetimes");
+  assert.match(s.houseGift.line, /GODS HAVE SMILED/);
+  assert.ok(!(await loadState(db, pid)).houseGift, "told once");
+  run();
+  assert.ok(!(await loadState(db, pid)).houseGift, "and not again after a rerun");
+  assert.ok(!(await loadState(db, other)).ownedTitles.includes("thousand_lifetimes"), "nobody else");
 });
