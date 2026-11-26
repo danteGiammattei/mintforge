@@ -615,7 +615,7 @@ function seal() {
     if (!alive) return;
     const steps = Array.isArray(res.steps) ? res.steps : [];
     S.result = { rarity: res.scroll.rarity, base: res.base ?? res.scroll.rarity, steps, familiar: !!res.familiar,
-                 likeness: typeof res.likeness === "number" ? res.likeness : null, poor: !!res.poor };
+                 likeness: typeof res.likeness === "number" ? res.likeness : null, poor: !!res.poor, faint: !!res.faint };
     S.phase = "sealed"; S.sealT = Math.min(S.sealT, 29); S.fresh = false; S.lifted = 0;
     if (!steps.length) bus.feel("rarity" + res.scroll.rarity);
     bus.say("SEALED. A " + RARITY[res.scroll.rarity].n + " SCROLL."
