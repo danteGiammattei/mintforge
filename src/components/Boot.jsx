@@ -8,18 +8,28 @@ import { useEffect, useState } from "react";
  * spent painting coins and fetching screens ahead (MintForge.jsx), so the
  * game opens on the door with nothing left to wait for.
  *
- * The art is public/splash.png when there is one; until then, a candle. */
+ * The art is public/splash.png when there is one; until then, a candle.
+ * The studio's logo is public/studio-logo.png; until then, its name in type. */
 
 export const STUDIO = "RAINFALL STUDIOS";  // the studio's name, as shown at launch
 export const STUDIO_MS = 2200;             // the studio card, start to finish
 export const SPLASH_MIN_MS = 2600;         // the least the splash is shown
 
 export function StudioCard() {
+  // the logo when it has been added (public/studio-logo.png), else the name set in type
+  const [logo, setLogo] = useState(true);
+  const [word, kind] = STUDIO.split(" ");
   return (
     <main className="app" aria-label={STUDIO} style={{ alignItems: "center", justifyContent: "center", background: "#000" }}>
-      <div className="studio-card" style={{ display: "grid", justifyItems: "center", gap: 10 }}>
-        <span className="t-big" style={{ letterSpacing: ".3em", color: "var(--bone)", paddingLeft: ".3em" }}>{STUDIO}</span>
-        <span className="t-label" style={{ letterSpacing: ".4em", paddingLeft: ".4em" }}>PRESENTS</span>
+      <div className="studio-card" style={{ display: "grid", justifyItems: "center", gap: 10, padding: "0 16px" }}>
+        {logo
+          ? <img src="/studio-logo.png" alt={STUDIO} onError={() => setLogo(false)}
+                 style={{ width: "min(64vw, 280px)", height: "auto", imageRendering: "pixelated" }}/>
+          : <>
+              <span className="t-big" style={{ fontSize: 32, letterSpacing: ".18em", paddingLeft: ".18em", color: "var(--bone)" }}>{word}</span>
+              {kind && <span className="t-title" style={{ letterSpacing: ".6em", paddingLeft: ".6em", color: "var(--bone-dim)" }}>{kind}</span>}
+            </>}
+        <span className="t-label" style={{ letterSpacing: ".4em", paddingLeft: ".4em", marginTop: 14 }}>PRESENTS</span>
       </div>
     </main>
   );
