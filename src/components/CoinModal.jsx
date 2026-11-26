@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { SEASONS } from "../../shared/events.js";
-import { drawCoin, coinRarity, coinValue, shapeOf } from "../lib/coin.js";
+import { drawCoin, coinRarity, coinValue, shapeOf, SPACE_LOOP, LAVA_LOOP } from "../lib/coin.js";
+import { onAuraFrame, auraStill } from "../lib/aura.js";
 import Aura from "./Aura.jsx";
 import { RARITIES, SHAPE_NAMES, METAL } from "../lib/data.js";
 import PixelIcon from "../ui/PixelIcon.jsx";
@@ -25,10 +26,19 @@ export default function CoinModal({ coin, onClose, onToggleLock, onSell, onToggl
   const m = matterOf(coin);
   const r = RARITIES[coinRarity(coin)];
 
+  // painted, and kept moving as in the vault: a lava coin's river, a
+  // void coin's sky and a fire coin's flames drift on the shared clock
   useEffect(() => {
-    if (cvRef.current) drawCoin(cvRef.current, coin, SIZE);
+    const cv = cvRef.current;
+    if (!cv) return;
+    drawCoin(cv, coin, SIZE);
+    const drifts = (coin.metalIdx === METAL.void || coin.metalIdx === METAL.fire || coin.metalIdx === METAL.lava) && !coin.material;
+    if (!drifts || auraStill()) return;
+    return onAuraFrame(coin.metalIdx === METAL.lava
+      ? f => drawCoin(cv, coin, SIZE, { phase: Math.floor(f / 2) % LAVA_LOOP })
+      : f => drawCoin(cv, coin, SIZE, { phase: f % SPACE_LOOP }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coin.seed, coin.metalIdx, coin.shiny]);
+  }, [coin.seed, coin.metalIdx, coin.shiny, coin.material, coin.season, coin.relic, coin.sign]);
 
   // Inertial spin — when not dragging, velocity decays and rotation drifts
   useEffect(() => {
