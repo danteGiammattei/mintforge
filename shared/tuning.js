@@ -200,14 +200,16 @@ export const ENGRAVE = { cost: 250, maxLength: 14 };
 export const GAMBLE = {
   toss:     { coins: 1, win: 0.5 },                 // tier up, or lost
   // out of 100 (November 2026): the jackpot is an astral coin whatever was
-  // staked, so it is kept to one spin in a hundred
+  // staked, so it is kept to two spins in a hundred. `show` is a slice's
+  // size as drawn when it differs from its odds: the jackpot is drawn as
+  // wide as it always was, so it can still be seen go by
   roulette: [
     { outcome: "lose",    label: "LOSE",    weight: 45 },
-    { outcome: "same",    label: "SAME",    weight: 22 },
+    { outcome: "same",    label: "SAME",    weight: 21 },
     { outcome: "up1",     label: "TIER UP", weight: 19 },
     { outcome: "x2",      label: "x2 BACK", weight: 8  },
     { outcome: "up2",     label: "TIER +2", weight: 5  },
-    { outcome: "jackpot", label: "JACKPOT", weight: 1  },
+    { outcome: "jackpot", label: "JACKPOT", weight: 2, show: 4 },
   ],
   // A coin dropped through eight rows of pegs, bouncing left or right at
   // each with even odds, lands in one of nine slots. Odds follow from the

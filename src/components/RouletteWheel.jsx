@@ -26,11 +26,14 @@ export default function RouletteWheel({ spinning, target, onLanded }) {
   const st = useRef({ ang: 0, raf: 0, mode: "rest", from: 0, to: 0, t0: 0, dur: 0, last: 0, landed: null });
 
   const secs = useMemo(() => {
-    const tot = GAMBLE.roulette.reduce((s, v) => s + v.weight, 0);
+    // drawn by `show` where a slice has one (shared/tuning.js), else by its odds;
+    // the wheel lands on the sector the server chose, wherever it is drawn
+    const size = s => s.show ?? s.weight;
+    const tot = GAMBLE.roulette.reduce((n, v) => n + size(v), 0);
     let cum = 0;
     return GAMBLE.roulette.map(s => {
-      const start = (cum / tot) * Math.PI * 2, span = (s.weight / tot) * Math.PI * 2;
-      cum += s.weight;
+      const start = (cum / tot) * Math.PI * 2, span = (size(s) / tot) * Math.PI * 2;
+      cum += size(s);
       return { ...s, start, span, fill: hex(SECTOR_COLOURS[s.outcome][0]), edge: hex(SECTOR_COLOURS[s.outcome][1]) };
     });
   }, []);
