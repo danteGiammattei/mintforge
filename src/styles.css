@@ -4,7 +4,9 @@
  *  The two canvas scenes set the rules and every HTML screen follows
  *  them: near-black grounds, one accent per side of the door (cold green
  *  for his magic, candle gold for the player's own things), hard square
- *  edges, Silkscreen for every word. No gradients-as-decoration, no
+ *  edges, Silkscreen for headings, buttons, tabs and numbers, and Pixelify
+ *  Sans (taller, narrower, easier to read at length) for running text:
+ *  paragraphs, dim lines and labels. No gradients-as-decoration, no
  *  rounded cards, no emoji.
  *
  *  Type sits on a 4px grid — 12, 16, 24 — so each glyph pixel is a whole
@@ -17,6 +19,7 @@
 
 @import "@fontsource/silkscreen/400.css";
 @import "@fontsource/silkscreen/700.css";
+@import "@fontsource/pixelify-sans/400.css";
 
 @tailwind base;
 @tailwind components;
@@ -32,7 +35,7 @@
   --line:      #2c3340;
   --line-hi:   #4a5466;
   --bone:      #d2d9d0;
-  --bone-dim:  #98a19a;
+  --bone-dim:  #adb6ae;
   --mute:      #5b6270;
   --candle:    #e0b860;
   --candle-lo: #3a2c10;
@@ -83,6 +86,9 @@ canvas { image-rendering: pixelated; }
   .t-title { font-size: 16px; line-height: 1.25; color: var(--bone); }
   .t-big   { font-size: 24px; line-height: 1.1; }
   .t-label { font-size: 12px; color: var(--bone-dim); }
+  /* running text in the reading face; a size set inline still wins */
+  p, .t-dim, .t-label { font-family: "Pixelify Sans", "Silkscreen", ui-monospace, monospace; font-size: 15px; letter-spacing: .03em; }
+  p { line-height: 1.45; }
   .t-gold  { color: var(--candle); }
   .t-magic { color: var(--magic); }
   .t-blood { color: var(--blood); }
