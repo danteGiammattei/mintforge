@@ -1,16 +1,21 @@
 import PixelIcon from "../ui/PixelIcon.jsx";
 
-/* Seven tabs, the door in the middle (November 2026): draw, open, keep
- * on its left; work, play, you on its right. Friends live under
- * Profile. Icons only (seven names don't fit a phone); each keeps its
+/* Five tabs, the door in the middle: draw and keep on its left, work
+ * and play on its right. The satchel, the event, the ranks and your
+ * profile are reached from the door's corners (screens/Door.jsx), so
+ * they are screens without a tab (OFF_NAV). Icons only; each keeps its
  * name for screen readers and as a tooltip. */
 export const TABS = [
   ["scribe",  "quill",   "SCRIBE"],
-  ["satchel", "satchel", "SATCHEL"],
   ["vault",   "vault",   "VAULT"],
   ["door",    "door",    "DOOR"],
   ["forge",   "anvil",   "FORGE"],
   ["tavern",  "die",     "TAVERN"],
+];
+export const OFF_NAV = [
+  ["satchel", "satchel", "SATCHEL"],
+  ["event",   "snow",    "EVENT"],
+  ["ranks",   "trophy",  "RANKS"],
   ["profile", "face",    "PROFILE"],
 ];
 

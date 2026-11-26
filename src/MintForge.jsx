@@ -9,7 +9,7 @@ import { StudioCard, Splash as BootSplash, STUDIO_MS, SPLASH_MIN_MS } from "./co
 import { useWar } from "./state/useWar.js";
 import { feel } from "./lib/feel.js";
 import AuthScreen from "./components/AuthScreen.jsx";
-import BottomNav, { TABS } from "./components/BottomNav.jsx";
+import BottomNav, { TABS, OFF_NAV } from "./components/BottomNav.jsx";
 import TopBar from "./components/TopBar.jsx";
 import Guide, { guideStep, journalSeen } from "./components/Guide.jsx";
 import { setAppIcon } from "./lib/appIcon.js";
@@ -24,6 +24,7 @@ const loadTavern = () => import("./screens/Tavern.jsx");
 const Tavern = lazy(loadTavern);
 import Profile from "./screens/Profile.jsx";
 const Ranks = lazy(() => import("./screens/Ranks.jsx"));
+const EventPage = lazy(() => import("./screens/EventPage.jsx"));
 
 /* ══════════════════════════════════════════════════════════════════════
  *  MintForge — the shell
@@ -36,8 +37,9 @@ const Ranks = lazy(() => import("./screens/Ranks.jsx"));
  *  the door.
  * ══════════════════════════════════════════════════════════════════════ */
 
-// "ranks" has no place in the nav yet: the top bar's trophy opens it
-const SCREENS = { scribe: Scribe, door: Door, satchel: Satchel, vault: Vault, forge: ForgeRoom, tavern: Tavern, profile: Profile, ranks: Ranks };
+// the satchel, the event, the ranks and the profile have no tab: the door's corners open them
+const SCREENS = { scribe: Scribe, door: Door, satchel: Satchel, vault: Vault, forge: ForgeRoom, tavern: Tavern, profile: Profile, ranks: Ranks, event: EventPage };
+const ALL_TABS = [...TABS, ...OFF_NAV];
 const BARE = new Set(["scribe", "door"]);
 
 function Splash({ children }) {
@@ -123,7 +125,7 @@ function Game({ game }) {
   // Every launch ends at the door (components/Boot.jsx)
   const [tab, setTabRaw] = useState("door");
   const setTab = useCallback(id => setTabRaw(id), []);
-  useEffect(() => { document.title = `${TABS.find(t => t[0] === tab)?.[2] || ""} · MintForge`; }, [tab]);
+  useEffect(() => { document.title = `${ALL_TABS.find(t => t[0] === tab)?.[2] || ""} · MintForge`; }, [tab]);
 
 
   const war = useWar(game.api, game.refresh, tab === "tavern");
@@ -150,13 +152,12 @@ function Game({ game }) {
       <div className="app">
         <a className="sr-only" href="#main">Skip to the game</a>
         {!BARE.has(tab) && <TopBar marks={game.marks} level={game.level} xp={game.xp} onRetry={game.retrySaves}
-                                   daily={game.dailyReady} onDaily={() => setTab("door")}
-                                   ranks={tab === "ranks"} onRanks={() => setTab("ranks")}/>}
+                                   daily={game.dailyReady} onDaily={() => setTab("door")}/>}
         <main id="main" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", paddingTop: BARE.has(tab) ? "env(safe-area-inset-top, 0px)" : 0 }}>
           {<Suspense key={tab} fallback={<div className="page"><p className="t-dim blink" style={{ padding: 24, textAlign: "center" }}>…</p></div>}><Screen/></Suspense>}
         </main>
         <Guide step={guide} tab={tab} setTab={setTab} bare={BARE.has(tab)} onSkip={() => nudge(n => n + 1)}/>
-        <BottomNav tab={tab} setTab={setTab} guide={guide && guide.tab !== tab ? guide.tab : null} badges={{ satchel: waiting, door: game.dailyReady && tab !== "door" ? "!" : 0, tavern: tab !== "tavern" ? warBadge : 0 }}/>
+        <BottomNav tab={tab} setTab={setTab} guide={guide && guide.tab !== tab ? guide.tab : null} badges={{ door: (waiting || game.dailyReady) && tab !== "door" ? "!" : 0, tavern: tab !== "tavern" ? warBadge : 0 }}/>
       </div>
       </RewardHost>
     </GameContext.Provider>

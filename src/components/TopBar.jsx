@@ -15,7 +15,7 @@ const EXPLAIN = {
       + "YOUR LEVEL RISES AS YOU SEAL, OFFER AND BRUSH. IT EARNS TITLES AND BANNERS FOR YOUR PROFILE.",
   yes: "GOT IT",
 };
-export default function TopBar({ marks, level, xp, onRetry, daily, onDaily, ranks, onRanks }) {
+export default function TopBar({ marks, level, xp, onRetry, daily, onDaily }) {
   const state = useSyncExternalStore(sync.subscribe, sync.get), ui = useUi();
   const explain = () => ui.notify(EXPLAIN);
   const lo = lvlMin(level), hi = lvlMax(level);
@@ -36,12 +36,6 @@ export default function TopBar({ marks, level, xp, onRetry, daily, onDaily, rank
           <span className="meter" style={{ flex: 1, maxWidth: 140, display: "block" }}><i style={{ width: pct + "%", background: "var(--magic)" }}/></span>
         </span>
       </button>
-      {onRanks && (
-        <button className="btn" style={{ minHeight: 44, minWidth: 44, padding: "0 10px", color: ranks ? "var(--candle)" : undefined }} onClick={onRanks}
-                aria-label="The ranks: the richest vaults" aria-current={ranks ? "page" : undefined} title="RANKS">
-          <PixelIcon name="trophy" size={11}/>
-        </button>
-      )}
       {daily && state !== "unsaved" && (
         <button className="btn btn-magic" style={{ minHeight: 44, padding: "0 10px" }} onClick={onDaily} aria-label="Today's gift is waiting at the door">
           <PixelIcon name="door" size={11}/>GIFT

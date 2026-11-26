@@ -19,6 +19,7 @@
  *    bus.toDesk()         the player asked to go and draw
  *    bus.more()           true while he still has something waiting (the daily gift)
  *    bus.coach()          a line for a player who has never offered, or null
+ *    bus.mode(m)          the scene's mode as it changes ("idle", "drawer", "give", …)
  *    bus.toStall()        he has walked away to his stall: show it
  *    bus.season()         the season of the event running today
  *                        (shared/events.js), or null: the door is dressed
@@ -615,8 +616,11 @@ function stepBack() {
 
 function stepHands() { S.reach += (S.want - S.reach) * (S.phase === "withdraw" ? 0.05 : 0.035); }
 
+let lastMode = null;
 function frame() {
   S.t++;
+  // the screen around the scene steps aside while he is busy (bus.mode)
+  if (S.mode !== lastMode) { lastMode = S.mode; bus.mode?.(S.mode); }
   const flick = view.calm ? 0.94 : 0.9 + Math.sin(S.t * 0.03) * 0.05 + Math.sin(S.t * 0.11) * 0.03 + Math.random() * 0.03;
 
   // the drawer slides

@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import PixelIcon from "../ui/PixelIcon.jsx";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
 import { feel } from "../lib/feel.js";
@@ -30,6 +31,7 @@ export default function Door() {
   cel.current = celebrate;
   const ref = useRef(null), scene = useRef(null), live = useRef(g);
   const [stall, setStall] = useState(false);
+  const [mode, setMode] = useState("idle");          // the scene's: its corners step aside unless idle
   live.current = g;
 
   useEffect(() => {
@@ -54,6 +56,7 @@ export default function Door() {
         if (what.type !== "chest") feel("gift");
       },
       toDesk: () => live.current.setTab("scribe"),
+      mode: setMode,
       toStall: () => { keepStallSeen(); setStall(true); },
       // his lantern: lit once his cheapest chest is within your marks
       season: () => live.current.event?.season || null,
@@ -72,6 +75,7 @@ export default function Door() {
     <section className="scene" style={{ background: `rgb(${SURROUND})`, position: "relative" }} aria-label="The door">
       <canvas ref={ref} role="img" aria-label="A door standing ajar. Something small waits in the gap with one hand held out, palm up."
               style={{ touchAction: "none", display: "block" }}/>
+      {!stall && <Corners g={g} hidden={mode !== "idle"}/>}
       {stall && <Suspense fallback={null}><Stall onClose={() => { setStall(false); scene.current?.back(); }}/></Suspense>}
       <div className="sr-only">
         {!stall && <button onClick={() => scene.current?.toStall()}>Follow him to his stall</button>}
@@ -82,5 +86,37 @@ export default function Door() {
         ))}
       </div>
     </section>
+  );
+}
+
+/* The door's corners: what is yours on the left (the satchel, and the
+ * season's snow), the wider world on the right (the ranks, your profile).
+ * Small and dark so the scene stays the thing; gone while he is busy. */
+function Corners({ g, hidden }) {
+  const waiting = g.chests.length + g.dusty.length;
+  // the first chest's way in breathes, as the guide's tab did
+  const nudge = waiting > 0 && !(g.stats.brushed > 0);
+  const Btn = ({ icon, label, to, badge, tint, glow }) => (
+    <button onClick={() => { feel("tap"); g.setTab(to); }} title={label}
+            aria-label={badge ? `${label}, ${badge} waiting` : label}
+            style={{ position: "relative", width: 44, height: 44, display: "grid", placeItems: "center", padding: 0,
+                     background: "rgba(8,9,12,.66)", border: "2px solid var(--line)", color: tint || "var(--bone)", font: "inherit",
+                     ...(glow ? { animation: "guideGlow 1.4s ease-in-out infinite", color: "var(--candle)" } : {}) }}>
+      <PixelIcon name={icon} size={22}/>
+      {badge ? <span className="badge" style={{ position: "absolute", top: -7, right: -7 }}>{badge > 9 ? "9+" : badge}</span> : null}
+    </button>
+  );
+  const col = side => ({ position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 10px)", [side]: 10, display: "grid", gap: 8 });
+  return (
+    <div aria-hidden={hidden || undefined} style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: hidden ? 0 : 1, transition: "opacity .2s" }}>
+      <div style={{ ...col("left"), pointerEvents: hidden ? "none" : "auto" }}>
+        <Btn icon="satchel" label="SATCHEL" to="satchel" badge={waiting} glow={nudge}/>
+        <Btn icon="snow" label={g.event ? "THE LONG NIGHT" : "COMING SOON"} to="event" tint="#bfe6f5"/>
+      </div>
+      <div style={{ ...col("right"), pointerEvents: hidden ? "none" : "auto" }}>
+        <Btn icon="trophy" label="RANKS" to="ranks" tint="var(--candle)"/>
+        <Btn icon="face" label="PROFILE" to="profile"/>
+      </div>
+    </div>
   );
 }
