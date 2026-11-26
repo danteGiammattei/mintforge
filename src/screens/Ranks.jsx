@@ -47,7 +47,7 @@ export default function Ranks() {
 
         <div className="seg" role="tablist" aria-label="Board" style={{ overflowX: "auto" }}>
           {BOARDS.map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={board === k} onClick={() => pick(k)} style={{ flex: "1 0 auto", padding: "0 8px" }}
+            <button key={k} role="tab" aria-selected={board === k} onClick={() => pick(k)} style={{ flex: "1 1 auto", minWidth: 0, padding: "0 4px" }}
                     aria-label={k === BOARD_WORLD ? "The world" : REGIONS[k].name}>
               {label}{data?.region === k ? " ★" : ""}
             </button>

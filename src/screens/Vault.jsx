@@ -22,9 +22,19 @@ const SORTS = [
   ["value",  "VALUE",  (a, b) => coinValue(b) - coinValue(a)],
 ];
 
+// a name's width in Silkscreen's own pixels (8 to the em): M, N, V, W, X
+// and Y are a pixel wider than most, I a good deal narrower, so a count
+// of letters is not enough to know whether a name fits its tile
+const GLYPH = { I: 3, "'": 3, ".": 3, " ": 4, E: 5, F: 5, L: 5, T: 5, Z: 5, "-": 5, M: 7, N: 7, V: 7, W: 7, X: 7, Y: 7 };
+const unitsOf = t => [...t.toUpperCase()].reduce((n, ch) => n + (GLYPH[ch] ?? 6), 0);
+// what fits a tile on the narrowest phone: at 12px, then a size smaller
+const FITS = 44, FITS_SMALL = 54;
 const tileName = coin => {
   const n = coinName(coin);
-  return { text: n.length > 10 ? n.slice(0, 9) + "…" : n, small: n.length > 8 };
+  if (unitsOf(n) <= FITS) return { text: n, small: false };
+  let t = n;
+  while (t.length > 1 && unitsOf(t) > FITS_SMALL) t = t.slice(0, -2) + "…";
+  return { text: t, small: true };
 };
 export function CoinTile({ coin, selected, pinned, disabled, onClick, label }) {
   const m = matterOf(coin), r = RARITIES[coinRarity(coin)];
