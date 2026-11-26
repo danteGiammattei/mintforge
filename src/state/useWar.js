@@ -1,11 +1,12 @@
-/* War at the tavern, as the client sees it: GET /api/war on a timer,
- * often while a table is open or the War view is showing, rarely
- * otherwise (only to hear of a challenge), never while the app is hidden.
+/* War at the tavern, as the client sees it: GET /api/war on a timer:
+ * quickly only while a table is in play, every few seconds in the tavern
+ * (a challenge should land while you are there), and rarely anywhere
+ * else, only to hear of one; never while the app is hidden.
  * Coins move in and out of the vault as tables open and settle, so the
  * game state is fetched again whenever the table changes hands. */
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const FAST = 1200, SLOW = 8000;
+const FAST = 1200, NEAR = 5000, FAR = 30000;
 
 export function useWar(api, refreshGame, watching) {
   const [war, setWar] = useState({ table: null, invites: [], recent: [] });
@@ -24,19 +25,21 @@ export function useWar(api, refreshGame, watching) {
 
   const poll = useCallback(() => api.getWar().then(take).catch(e => setError(e.message)), [api, take]);
 
-  const busy = !!war.table || watching;
+  // a table in play: quick; your challenge waiting on them, or the tavern
+  // open: every few seconds; anywhere else: now and then
+  const every = war.table?.status === "playing" ? FAST : war.table || watching ? NEAR : FAR;
   useEffect(() => {
     let t = null, dead = false;
     const tick = () => {
       if (dead) return;
       if (document.visibilityState === "visible") poll();
-      t = setTimeout(tick, busy ? FAST : SLOW);
+      t = setTimeout(tick, every);
     };
     tick();
     const wake = () => { if (document.visibilityState === "visible") poll(); };
     document.addEventListener("visibilitychange", wake);
     return () => { dead = true; clearTimeout(t); document.removeEventListener("visibilitychange", wake); };
-  }, [poll, busy]);
+  }, [poll, every]);
 
   const move = useCallback(async (op, payload = {}) => {
     const r = await api.war(op, payload);

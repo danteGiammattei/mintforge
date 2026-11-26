@@ -48,7 +48,8 @@ export default function Auction() {
   useEffect(() => {
     if (!open) return;
     load();
-    const poll = setInterval(load, 30_000), clock = setInterval(() => tick(t => t + 1), 1000);
+    // the block is refreshed every half minute, and only while it can be seen
+    const poll = setInterval(() => { if (document.visibilityState === "visible") load(); }, 30_000), clock = setInterval(() => tick(t => t + 1), 1000);
     return () => { clearInterval(poll); clearInterval(clock); };
   }, [open, load]);
 

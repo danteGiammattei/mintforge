@@ -60,7 +60,10 @@ export function createOutbox({ send, storageKey, onRefused }) {
   }
 
   const onOnline = () => { if (pending) schedule(0); };
+  // the app put away or closed: send what is waiting now, not in a moment
+  const onHide = () => { if (document.visibilityState === "hidden" && pending) { clearTimeout(timer); flush(); } };
   window.addEventListener("online", onOnline);
+  document.addEventListener("visibilitychange", onHide);
   persist();
   if (pending) schedule(0);
 
@@ -69,10 +72,10 @@ export function createOutbox({ send, storageKey, onRefused }) {
     queue(change) {
       pending = merge(pending, change);
       persist();
-      schedule(600);
+      schedule(1500);             // a burst of choices (pinning a cabinet, say) goes as one
     },
     pending: () => merge(inAir, pending),
     retryNow: () => schedule(0),
-    stop() { dead = true; clearTimeout(timer); window.removeEventListener("online", onOnline); sync.setQueue(0, false); },
+    stop() { dead = true; clearTimeout(timer); window.removeEventListener("online", onOnline); document.removeEventListener("visibilitychange", onHide); sync.setQueue(0, false); },
   };
 }
