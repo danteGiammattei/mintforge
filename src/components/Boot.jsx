@@ -36,17 +36,30 @@ export function StudioCard() {
   );
 }
 
-/* the splash art if it has been added, else the placeholder */
+/* The splash art if it has been added (public/splash.webp), else the
+ * placeholder. The art is laid as "cover" by hand, on a stage of its own
+ * proportions that always fills the screen, so the candlelight drawn over
+ * it stays on its flame however the phone crops it. */
+const ART = { src: "/splash.webp", w: 853, h: 1844, flame: [50.1, 37.9] };   // the flame, in % of the art
 function Art() {
   const [missing, setMissing] = useState(false);
-  if (!missing) return (
-    <img src="/splash.png" alt="" onError={() => setMissing(true)}
-         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", imageRendering: "pixelated" }}/>
-  );
-  return (
+  if (missing) return (
     <div aria-hidden style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center",
                               background: "radial-gradient(circle at 50% 42%, #2a1d0c 0, #0b0805 45%, #000 80%)" }}>
       <Candle/>
+    </div>
+  );
+  const [fx, fy] = ART.flame;
+  return (
+    <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: "50%", top: "50%", translate: "-50% -50%",
+                    width: `max(100vw, calc(100dvh * ${ART.w / ART.h}))`, aspectRatio: `${ART.w} / ${ART.h}` }}>
+        <img src={ART.src} alt="" onError={() => setMissing(true)} style={{ width: "100%", height: "100%", display: "block" }}/>
+        {/* the room, breathing with the candle */}
+        <span className="candle-room" style={{ "--fx": fx + "%", "--fy": fy + "%" }}/>
+        {/* and the halo round the flame itself */}
+        <span className="candle-halo" style={{ left: fx + "%", top: fy + "%" }}/>
+      </div>
     </div>
   );
 }

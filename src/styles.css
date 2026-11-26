@@ -334,3 +334,28 @@ canvas { image-rendering: pixelated; }
   .logo-ring, .logo-ember, .logo-glint, .forge-bar > i::after { animation: none; }
   .logo-ember { display: none; }
 }
+
+/* the splash art's candle, alive (components/Boot.jsx Art): a halo round
+ * the flame and the room's light rising and falling with it, on an uneven
+ * beat so it reads as a flame and not a pulse */
+.candle-halo {
+  position: absolute; width: 22%; aspect-ratio: 1; translate: -50% -55%; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, #ffd27a 0, #ff9a3088 22%, #ff7a1a22 48%, transparent 70%);
+  mix-blend-mode: screen; animation: candleHalo 2.3s steps(1) infinite;
+}
+.candle-room {
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: soft-light;
+  background: radial-gradient(circle at var(--fx) var(--fy), #ffb45a 0, #ff9a3066 18%, transparent 52%);
+  animation: candleRoom 2.3s steps(1) infinite;
+}
+@keyframes candleHalo {
+  0%   { opacity: .85; scale: 1; }     9% { opacity: .65; scale: .94; }   17% { opacity: .95; scale: 1.05; }
+  26%  { opacity: .75; scale: .98; }  34% { opacity: .9;  scale: 1.02; }  47% { opacity: .55; scale: .9; }
+  53%  { opacity: .8;  scale: 1; }    64% { opacity: 1;   scale: 1.07; }  72% { opacity: .7;  scale: .96; }
+  83%  { opacity: .9;  scale: 1.03; } 91% { opacity: .6;  scale: .93; }
+}
+@keyframes candleRoom {
+  0%   { opacity: .55; }  9% { opacity: .4; }  17% { opacity: .65; }  26% { opacity: .5; }  34% { opacity: .6; }
+  47%  { opacity: .3; }  53% { opacity: .5; }  64% { opacity: .7; }  72% { opacity: .45; }  83% { opacity: .6; }  91% { opacity: .38; }
+}
+@media (prefers-reduced-motion: reduce) { .candle-halo, .candle-room { animation: none; } }
