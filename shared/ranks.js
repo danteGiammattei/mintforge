@@ -10,7 +10,7 @@
  * Seasons are calendar quarters, in UTC. When one ends, the first of
  * each board (the world, and each region with anyone on it) is crowned
  * with a title of their own to keep, named for the board and the
- * season: "Richest Vault · Q4 2026", "First of Oceania · Q4 2026". */
+ * season: "Richest Vault · Q4 2026", "Rank #1 Oceania · Q4 2026". */
 
 export const RANKS = {
   firstSeason: "2026Q4",   // nothing before this is ever crowned
@@ -58,11 +58,11 @@ export function crownOf(id) {
   const m = /^crown:([A-Z]{1,2}):(\d{4}Q[1-4])$/.exec(id || "");
   if (!m || (m[1] !== BOARD_WORLD && !regionOk(m[1]))) return null;
   const [, board, season] = m;
-  const label = board === BOARD_WORLD ? `Richest Vault · ${seasonName(season)}` : `First of ${REGIONS[board].name} · ${seasonName(season)}`;
+  const label = board === BOARD_WORLD ? `Richest Vault · ${seasonName(season)}` : `Rank #1 ${REGIONS[board].name} · ${seasonName(season)}`;
   // the world's crown in starlight, a region's in gold
   return { id, board, season, label, effect: board === BOARD_WORLD ? "astral" : "shimmer", minLvl: 1, secret: true };
 }
-const LABEL = /^(?:Richest Vault|First of ([A-Za-z ]+)) · Q([1-4]) (\d{4})$/;
+const LABEL = /^(?:Richest Vault|Rank #1 ([A-Za-z ]+)) · Q([1-4]) (\d{4})$/;
 export function crownByLabel(label) {
   const m = LABEL.exec(label || "");
   if (!m) return null;

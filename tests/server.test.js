@@ -1290,9 +1290,10 @@ test("ranks: seasons are calendar quarters, and nothing before Q4 2026 is ever c
   assert.deepEqual(endedSeasons(Date.parse("2026-12-31T23:59:59Z")), []);
   assert.deepEqual(endedSeasons(Date.parse("2027-04-02T00:00:00Z")), ["2026Q4", "2027Q1"]);
   const c = crownOf("crown:OC:2026Q4");
-  assert.equal(c.label, "First of Oceania · Q4 2026");
+  assert.equal(c.label, "Rank #1 Oceania · Q4 2026");
   assert.equal(crownOf("crown:G:2027Q1").label, "Richest Vault · Q1 2027");
-  assert.equal(crownByLabel("First of Oceania · Q4 2026").id, "crown:OC:2026Q4");
+  assert.equal(crownByLabel("Rank #1 Oceania · Q4 2026").id, "crown:OC:2026Q4");
+  assert.equal(crownByLabel("Rank #1 North America · Q4 2026").id, "crown:NA:2026Q4");
   assert.equal(crownByLabel("Richest Vault · Q1 2027").id, "crown:G:2027Q1");
   assert.equal(crownOf("crown:XX:2026Q4"), null);
 });
@@ -1367,8 +1368,8 @@ test("ranks: when a season ends, each board's first is crowned once, from their 
   assert.match(s.crowned.find(c => c.title === "crown:OC:2026Q4").line, /RICHEST VAULT IN OCEANIA AT THE END OF Q4 2026/);
   assert.equal((await loadState(db, kiwi)).crowned, undefined, "told once");
   // and it can be worn
-  await patchCosmetics(db, kiwi, { state: { selectedTitle: "First of Oceania · Q4 2026" } });
-  await assert.rejects(patchCosmetics(db, aussie, { state: { selectedTitle: "First of Oceania · Q4 2026" } }), /not yours/);
+  await patchCosmetics(db, kiwi, { state: { selectedTitle: "Rank #1 Oceania · Q4 2026" } });
+  await assert.rejects(patchCosmetics(db, aussie, { state: { selectedTitle: "Rank #1 Oceania · Q4 2026" } }), /not yours/);
   const board = (await act(db, kiwi, { action: "ranks", board: "OC" }, { now: at })).result;
   assert.deepEqual(board.crowns.map(c => [c.season, c.username]), [["2026Q4", "kiwi"]]);
 });

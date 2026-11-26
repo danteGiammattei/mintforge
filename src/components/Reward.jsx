@@ -373,7 +373,7 @@ export function giftToReward(what) {
 
 // a title over 16 letters, split into two lines as evenly as its words allow
 function splitTitle(label) {
-  // a dated title (a crown: "First of Oceania · Q4 2026") breaks at its dot
+  // a dated title (a crown: "Rank #1 Oceania · Q4 2026") breaks at its dot
   const dot = String(label).split(" · ");
   if (dot.length === 2) return dot;
   const words = String(label).split(" ");
