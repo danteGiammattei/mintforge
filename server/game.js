@@ -661,10 +661,24 @@ async function gamble(db, pid, body, { now, rand }) {
 /* ─── dispatch ────────────────────────────────────────────────────── */
 
 const ACTIONS = { seal, offer, visit, open, brush, sell, gamble, forge, restrike, engrave, fuse, well, stall, buy, auctions, list, bid, withdraw, board, post, unpost, report, ranks };
+/* Actions that only look: they change nothing of the player's, so they
+ * take no op id and send back no state, only their result. (One that
+ * finds it did change something after all, as the auction listing does
+ * when it settles a sale, says so with `_state` and gets the state.) */
+const READS = new Set(["stall", "auctions", "board", "ranks"]);
 
 export async function act(db, pid, body, { now = Date.now(), rand = cryptoRand, tz = 0 } = {}) {
   const fn = body && typeof body.action === "string" && Object.hasOwn(ACTIONS, body.action) ? ACTIONS[body.action] : null;
   if (!fn) throw new Refusal("Unknown action");
+  if (READS.has(body.action)) {
+    const result = await fn(db, pid, body, { now, rand, tz });
+    if (!result?._state) return { result };
+    delete result._state;
+    const state = await loadState(db, pid, now, tz);
+    const have = body?.have && typeof body.have === "object" ? body.have : {};
+    for (const k of LISTS) if (typeof have[k] === "string" && have[k] === listHash(state[k])) delete state[k];
+    return { result, state };
+  }
   const opId = typeof body.opId === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(body.opId) ? body.opId : null;
 
   if (opId) {

@@ -142,12 +142,14 @@ const out = (a, pid) => {
 
 export async function auctions(db, pid, body, { now }) {
   await gate(db, pid);
-  await settleDue(db, now);
+  const settled = await settleDue(db, now);
   await stockHouse(db, now);
   const rows = (await db.prepare(
     `SELECT a.*, p.username AS seller_name FROM auctions a LEFT JOIN players p ON p.id = a.seller_id
      WHERE a.settled = 0 ORDER BY a.ends_at LIMIT 80`).all()).results || [];
-  return { now, cut: AUCTION.cut, list: rows.map(a => out(a, pid)) };
+  // settling may have moved this player's coins or marks: say so, and the
+  // reply carries their state (server/game.js act, READS)
+  return { now, cut: AUCTION.cut, list: rows.map(a => out(a, pid)), ...(settled ? { _state: true } : {}) };
 }
 
 export async function list(db, pid, body, { now }) {

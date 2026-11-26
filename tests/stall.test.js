@@ -83,10 +83,11 @@ test("an oddity bought is owned, and the stall stops offering it", async () => {
 test("an action leaves out the lists the client already has", async () => {
   const { listHash, LISTS } = await import("../shared/listhash.js");
   const { go } = await setup();
-  const full = (await go({ action: "stall" })).state;
+  await go({ action: "visit" });                       // anything he had waiting, taken first
+  const full = (await go({ action: "visit" })).state;
   for (const k of LISTS) assert.ok(k in full, k);
   const have = Object.fromEntries(LISTS.map(k => [k, listHash(full[k])]));
-  const lean = (await go({ action: "stall", have })).state;
+  const lean = (await go({ action: "visit", have })).state;
   for (const k of LISTS) assert.ok(!(k in lean), `${k} left out`);
   assert.equal(lean.marks, full.marks);
   // buying a chest changes the chests: those come back, the rest stay out
@@ -119,12 +120,12 @@ test("a star sign found for the first time pays 10,000 marks, once ever, however
   ).bind(id, pid, sign, dusty).run();
   // dusty: not yet, so the popup does not give the reveal away
   await put("c_aries001", 0, 1);
-  assert.equal((await go({ action: "stall" })).state.signBonus, undefined);
+  assert.equal((await go({ action: "visit" })).state.signBonus, undefined);
   assert.equal(await marksOf(), 0);
   const r1 = await go({ action: "brush", coinId: "c_aries001" });
   assert.deepEqual(r1.state.signBonus, [{ sign: 0, marks: 10000 }]);
   assert.equal(r1.state.marks, 10000);
-  assert.equal((await go({ action: "stall" })).state.signBonus, undefined, "paid once");
+  assert.equal((await go({ action: "visit" })).state.signBonus, undefined, "paid once");
   // let it go, find Aries again: nothing
   await db.prepare(`DELETE FROM coins WHERE id = 'c_aries001'`).run();
   await put("c_aries002", 0, 1);
@@ -132,7 +133,7 @@ test("a star sign found for the first time pays 10,000 marks, once ever, however
   assert.equal(await marksOf(), 10000);
   // a sign that arrives clean (won at war, say) pays on the next load
   await put("c_leo00001", 4, 0);
-  assert.deepEqual((await go({ action: "stall" })).state.signBonus, [{ sign: 4, marks: 10000 }]);
+  assert.deepEqual((await go({ action: "visit" })).state.signBonus, [{ sign: 4, marks: 10000 }]);
   assert.equal(await marksOf(), 20000);
 });
 
@@ -143,7 +144,13 @@ test("signs held before the bonus began (migration 019) are back paid, once", as
   db.raw.exec(readFileSync(new URL("../migrations/019_sign_bonus.sql", import.meta.url), "utf8"));
   // then sold before the next load: still paid, it was theirs
   await db.prepare(`DELETE FROM coins WHERE id = 'c_virgo001'`).run();
-  assert.deepEqual((await go({ action: "stall" })).state.signBonus, [{ sign: 5, marks: 10000 }]);
-  assert.equal((await go({ action: "stall" })).state.signBonus, undefined);
+  assert.deepEqual((await go({ action: "visit" })).state.signBonus, [{ sign: 5, marks: 10000 }]);
+  assert.equal((await go({ action: "visit" })).state.signBonus, undefined);
   assert.equal(await marksOf(), 10000);
+});
+
+test("a look at the stall, the board or the ranks sends back no state", async () => {
+  const { go } = await setup();
+  const r = await go({ action: "stall" });
+  assert.ok(r.result.wares); assert.equal(r.state, undefined);
 });

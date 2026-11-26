@@ -11,7 +11,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { levelOf, leanOf, inkFor, dailyGift, dailyStreak, dailyWait, localDay, setsDone } from "../shared/economy.js";
-import { settleDue, takeNotes } from "./auction.js";
+import { settleOne, takeNotes } from "./auction.js";
 import { SCRIBE, ASTRAL, CABINET_SCORE, METAL_SETS } from "../shared/tuning.js";
 import { heldSigns } from "./signs.js";
 import { STARTER, cravedPage } from "../shared/tomes.js";
@@ -161,22 +161,30 @@ export const tomesOf = raw => { const t = parseList(raw); return t.includes(STAR
 /* `region`: the continent this request came from (functions/api/_utils.js
  * regionOf), kept the first time it is known, for the leaderboards. */
 export async function loadState(db, pid, now = Date.now(), tz = 0, region = null) {
-  // an auction run out and not yet settled by the clock is settled now,
-  // so a coin won is in the vault this very load
-  await settleDue(db, now, 5);
-  // every read at once: one round trip to the database, not two
-  const [ps, coins, scrolls, chests] = await Promise.all([
+  // Every read in one batch: one round trip to the database. Alongside the
+  // player's own rows, two small checks that usually find nothing: an
+  // auction of theirs run out and not yet settled by the clock (settled
+  // now, so a coin won is in the vault this very load), and whether any
+  // auction notes are waiting (taken, and so written, only when there are).
+  const reads = () => db.batch([
     db.prepare(
       `SELECT players.username, players.region, s.vault_value, s.xp, s.marks, s.frame, s.bio, s.selected_title, s.pinned_ids,
               s.owned_frames, s.owned_titles, s.owned_fx, s.profile_fx, s.favour, s.chest_cost, s.gifts, s.stats, s.last_seal_at,
               s.journal, s.well_level, s.tomes
          FROM player_state s JOIN players ON players.id = s.player_id
-        WHERE s.player_id = ?1`
-    ).bind(pid).first(),
-    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material, sign, season, relic FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid).all(),
-    db.prepare(`SELECT id, rarity, seed FROM scrolls WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
-    db.prepare(`SELECT id, tier, season FROM chests WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid).all(),
+        WHERE s.player_id = ?1`).bind(pid),
+    db.prepare(`SELECT id, seed, metal_idx, shiny, locked, rarity, dusty, nickname, material, sign, season, relic FROM coins WHERE player_id = ?1 ORDER BY acquired_at DESC, id`).bind(pid),
+    db.prepare(`SELECT id, rarity, seed FROM scrolls WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid),
+    db.prepare(`SELECT id, tier, season FROM chests WHERE player_id = ?1 ORDER BY created_at, id`).bind(pid),
+    db.prepare(`SELECT * FROM auctions WHERE settled = 0 AND ends_at <= ?2 AND (seller_id = ?1 OR bidder_id = ?1) ORDER BY ends_at LIMIT 5`).bind(pid, now),
+    db.prepare(`SELECT COUNT(*) AS n FROM auction_notes WHERE player_id = ?1`).bind(pid),
   ]);
+  let [psR, coins, scrolls, chests, due, notesR] = await reads();
+  if (due.results?.length) {
+    for (const a of due.results) await settleOne(db, a, now);
+    [psR, coins, scrolls, chests, , notesR] = await reads();
+  }
+  const ps = psR.results?.[0] || null;
   if (!ps) throw new Refusal("State missing — your account may need recreating", 500);
   const all = coins.results || [];
   // the leaderboards: this vault's worth, and where in the world it is
@@ -187,7 +195,7 @@ export async function loadState(db, pid, now = Date.now(), tz = 0, region = null
   const signBonus = await paySigns(db, pid, ps, all);
   const relicBonus = await payRelics(db, pid, ps, all);
   const setBonus = await paySets(db, pid, ps, all);
-  const auctionNotes = await takeNotes(db, pid);
+  const auctionNotes = notesR.results?.[0]?.n ? await takeNotes(db, pid) : [];
   const stats = parseObj(ps.stats);
   // a gift from the house (given by hand, e.g. migrations/028), told once
   let houseGift = null;

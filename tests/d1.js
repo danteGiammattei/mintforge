@@ -21,7 +21,9 @@ export function makeDb(schemaFiles = ["schema.sql"]) {
     prepare: sql => new Stmt(db, sql),
     async batch(stmts) {
       db.exec("BEGIN");
-      try { const out = []; for (const s of stmts) out.push(await s.run()); db.exec("COMMIT"); return out; }
+      // like D1: a statement that reads (a SELECT, or RETURNING) gives its rows
+      const reads = st => /^\s*(SELECT|WITH)\b/i.test(st.sql) || /\bRETURNING\b/i.test(st.sql);
+      try { const out = []; for (const s of stmts) out.push(reads(s) ? { ...(await s.all()), meta: { changes: 0 } } : await s.run()); db.exec("COMMIT"); return out; }
       catch (e) { db.exec("ROLLBACK"); throw e; }
     },
   };
