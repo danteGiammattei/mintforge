@@ -551,9 +551,9 @@ function paintCoin(coin, back = false, phase = 0) {
   const key = `${coin.seed}:${coin.metalIdx}:${coin.shape}:${coin.material || ""}:${coin.sign ?? ""}:${coin.shiny ? 1 : 0}:${coin.season || ""}:${coin.relic || ""}:${back ? 1 : 0}:${phase}`;
   if (painted.has(key)) return painted.get(key);
   const relic = relicOf(coin.relic);
-  const out = relic ? paintRelic(coin, back) : coin.metalIdx === METAL.astral && coin.sign != null ? paintAstral(coin, back) : paintFresh(coin, back, phase);
+  const out = relic ? (relic.of.vessel === "lantern" ? paintLantern(coin, back) : paintRelic(coin, back)) : coin.metalIdx === METAL.astral && coin.sign != null ? paintAstral(coin, back) : paintFresh(coin, back, phase);
   if (coin.shiny && (relic || (coin.metalIdx === METAL.astral && coin.sign != null))) shine(out.getContext("2d"), coin);
-  if (coin.season) frost(out.getContext("2d"), coin);
+  if (coin.season) (SEASONS[coin.season]?.look === "lunar" ? lacquer : frost)(out.getContext("2d"), coin);
   if (painted.size > 1600) painted.delete(painted.keys().next().value);
   painted.set(key, out);
   return out;
@@ -695,6 +695,85 @@ function frost(g, coin) {
     else if (!edge && h < 0.03) mixTo(i, SNOW, 0.75);                        // flakes caught on the face
   }
   g.putImageData(img, 0, 0);
+}
+
+/* The Lantern Days' finish (season lunar27): a coin dipped in red lacquer
+ * and gilded. The face warms toward red, the upper rim catches gold leaf
+ * where the light falls, the lower rim stays deep lacquer, and a few
+ * flecks of gold sit on the face. */
+const LACQ = [196, 44, 34], LACQ_DEEP = [120, 20, 18], GILT = [255, 214, 110], GILT_HI = [255, 240, 180];
+function lacquer(g, coin) {
+  const img = g.getImageData(0, 0, SZ, SZ), d = img.data;
+  const inn = (x, y) => x >= 0 && y >= 0 && x < SZ && y < SZ && d[(y * SZ + x) * 4 + 3] > 96;
+  const hash = (x, y) => { let n = (x * 668265263 + y * 374761393 + (coin.seed >>> 0)) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+  const mixTo = (i, c, k) => { for (let j = 0; j < 3; j++) d[i + j] = Math.round(d[i + j] + (c[j] - d[i + j]) * k); };
+  const out = new Uint8Array(SZ * SZ);
+  for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) out[y * SZ + x] = inn(x, y) ? 0 : 1;
+  const outside = (x, y) => x < 0 || y < 0 || x >= SZ || y >= SZ || out[y * SZ + x] === 1;
+  for (let y = 0; y < SZ; y++) for (let x = 0; x < SZ; x++) {
+    if (out[y * SZ + x]) continue;
+    const i = (y * SZ + x) * 4, h = hash(x, y);
+    mixTo(i, LACQ, 0.34);                                                     // the lacquer over everything
+    const edge = outside(x, y - 1) || outside(x - 1, y) || outside(x + 1, y) || outside(x, y + 1);
+    const edge2 = !edge && (outside(x, y - 2) || outside(x - 2, y) || outside(x + 2, y) || outside(x, y + 2));
+    const lit = x + y < SZ * 1.05;                                            // gold leaf where the light falls, upper left
+    if (edge && lit) mixTo(i, h < 0.3 ? GILT_HI : GILT, 0.9);
+    else if (edge) mixTo(i, LACQ_DEEP, 0.75);
+    else if (edge2 && lit) mixTo(i, h < 0.4 ? GILT_HI : GILT, 0.75);           // a band of gold leaf two deep
+    else if (edge2) mixTo(i, LACQ_DEEP, 0.4);
+    else if (h < 0.012) mixTo(i, GILT_HI, 0.85);                              // a few flecks of gold on the face
+  }
+  g.putImageData(img, 0, 0);
+}
+
+/* ─── the Three Star Gods (shared/events.js RELICS stargods) ──────────
+ * Each in a red paper lantern rather than a snow globe: ribbed red paper
+ * glowing from within, gilt caps above and below, a tassel, and the god's
+ * emblem in gold on its face. The back is the lantern from behind, plain. */
+const LANTERN_ART = {
+  bat:   { rows: ["....#.#....", "....###....", "#..#####..#", "##.#####.##", "###########", "###########", "##.#####.##", "#...###...#", ".....#....."], gold: true },
+  ingot: { rows: ["#.........#", "##.......##", ".##.###.##.", ".#########.", "..#######..", "...#####...", "....###...."], gold: true },
+  peach: { rows: ["...gg......", "....gg.....", "...####....", "..#######..", ".#########.", ".####o####.", ".#########.", "..#######..", "...#####...", "....###...."], gold: false },
+};
+function paintLantern(coin, back) {
+  const rel = relicOf(coin.relic), art = LANTERN_ART[rel.emblem];
+  const off = document.createElement("canvas"); off.width = SZ; off.height = SZ;
+  const g = off.getContext("2d"), img = g.createImageData(SZ, SZ), d = img.data;
+  const set = (x, y, c) => { x = Math.round(x); y = Math.round(y); if (back) x = SZ - 1 - x; if (x < 0 || y < 0 || x >= SZ || y >= SZ) return; const i = (y * SZ + x) * 4; d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
+  const cx = 31.5, cy = 32, rx = 22, ry = 19;
+  // the cord it hangs by, and the top cap
+  for (let y = 0; y < 8; y++) set(32, y, [90, 60, 24]);
+  for (let y = 8; y < 13; y++) for (let x = 22; x < 42; x++) set(x, y, y === 8 || x === 22 || x === 41 ? [110, 72, 20] : x < 28 ? GILT_HI : x < 36 ? GILT : [200, 150, 60]);
+  // the paper body: ribbed, glowing warmest at its heart
+  for (let y = 12; y < 52; y++) for (let x = 0; x < SZ; x++) {
+    const nx = (x - cx) / rx, ny = (y - cy) / ry, r = nx * nx + ny * ny;
+    if (r > 1) continue;
+    if (r > 0.86) { set(x, y, [92, 14, 12]); continue; }
+    const heat = 1 - Math.min(1, Math.hypot(nx * 0.9, ny) * 1.05);
+    let c = [Math.round(150 + 105 * heat), Math.round(30 + 90 * heat * heat), Math.round(22 + 40 * heat * heat)];
+    const rib = Math.abs(Math.sin(Math.asin(Math.max(-1, Math.min(1, nx))) * 3.5));   // the ribs, closer toward the sides
+    if (rib < 0.12) c = c.map(v => Math.round(v * 0.62));
+    if (nx < -0.45 && ny < -0.2 && r < 0.7) c = c.map(v => Math.min(255, v + 18));   // light on the upper left
+    set(x, y, c);
+  }
+  // the bottom cap and the tassel
+  for (let y = 51; y < 55; y++) for (let x = 24; x < 40; x++) set(x, y, y === 54 || x === 24 || x === 39 ? [110, 72, 20] : x < 30 ? GILT_HI : GILT);
+  for (let y = 55; y < 58; y++) set(32, y, [160, 30, 24]);
+  for (let y = 58; y < 64; y++) for (let x = 29; x < 36; x++) if ((x + y) % 2 || y < 60) set(x, y, y > 61 ? [120, 20, 18] : [190, 40, 30]);
+  // the god's emblem on the face, in gold (or a peach, in its own colours)
+  if (!back) {
+    const rows = art.rows, k = 2, w = rows[0].length * k, h = rows.length * k;
+    const ex = Math.round(32 - w / 2), ey = Math.round(cy - h / 2) + 1;
+    rows.forEach((row, ry2) => [...row].forEach((ch, rx2) => {
+      if (ch === ".") return;
+      const u = rx2 / row.length + ry2 / rows.length;
+      const c = ch === "g" ? [70, 140, 60] : ch === "o" ? [255, 200, 170]
+        : art.gold ? (u < 0.7 ? GILT_HI : u < 1.2 ? GILT : [200, 140, 50]) : (u < 0.7 ? [255, 190, 170] : u < 1.2 ? [236, 140, 120] : [196, 90, 80]);
+      for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) set(ex + rx2 * k + a, ey + ry2 * k + b, c);
+    }));
+  }
+  g.putImageData(img, 0, 0);
+  return off;
 }
 
 export function drawCoin(canvas, coin, px, opts = {}) {

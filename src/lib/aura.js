@@ -123,6 +123,7 @@ export function paintAura(ctx, coin, rarity, frame, M = 8, shine = false, tendri
   const col = hex(RARITIES[rarity].color), seed = coin.seed >>> 0, c = G / 2;
   if (shine) paintShine(put, G, face, inside, seed, frame);
   if (snow === "globe") paintGlobeSnow(put, M, seed, frame);
+  else if (snow === "sparks") paintSparks(put, G, seed, frame);
   else if (snow) paintSnow(put, G, seed, frame, face, inside);
   if (rarity <= 0) {
     const f = frame % LOOP;
@@ -491,6 +492,23 @@ function paintSnow(put, G, seed, frame, face, dist) {
     const big = k % 3 === 0;
     put(x, y, FLAKE, big ? 1 : 0.9);
     if (big) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, FLAKE, 0.6);
+  }
+}
+
+/* A Lunar coin's sparks (season lunar27): gold motes rising past it as
+ * from a lantern or a firecracker, each at its own pace, flickering out
+ * near the top; a few are small crosses. */
+const SPARK = [255, 222, 130], SPARK_HI = [255, 248, 210], SPARK_LO = [232, 120, 60];
+function paintSparks(put, G, seed, frame) {
+  for (let k = 0; k < 12; k++) {
+    const hx = h32(seed + k * 23), hs = h32(seed * 3 + k * 31), hp = h32(seed * 7 + k * 43);
+    const speed = 0.5 + hs * 0.7, span = G + 6;
+    const y = G + 3 - ((hp * span + frame * speed) % span);
+    const x = hx * G + Math.sin((frame + k * 7) * 0.25) * 1.2;
+    const life = y / G;                                    // bright low, fading as they rise
+    const c = life > 0.6 ? SPARK : life > 0.3 ? SPARK_LO : SPARK_LO;
+    put(x, y, k % 4 === 0 ? SPARK_HI : c, 0.35 + 0.6 * life);
+    if (k % 4 === 0 && life > 0.4) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) put(x + dx, y + dy, SPARK, 0.4 * life);
   }
 }
 

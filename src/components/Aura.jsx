@@ -1,4 +1,5 @@
 import { METAL } from "../lib/data.js";
+import { SEASONS, relicOf } from "../../shared/events.js";
 import { useEffect, useRef } from "react";
 import { paintAura, onAuraFrame, auraFrame, auraStill } from "../lib/aura.js";
 import { coinRarity } from "../lib/coin.js";
@@ -16,8 +17,13 @@ export default function Aura({ coin, size, margin = 8, shine = !!coin.shiny, rar
   // the great flame round a fire coin is retired (Nov 2026): its fire
   // burns inside it now. paintAura still knows how, should it come back
   const flames = false;
-  // a frost coin's falling snow (lib/aura.js paintSnow), in front
-  const snow = layer !== "front" ? false : coin.relic ? "globe" : !!coin.season;
+  // a frost coin's falling snow (lib/aura.js paintSnow), in front; a
+  // Lunar coin's rising sparks; inside a Magi's globe, its own snow, and
+  // round a Star God's lantern, sparks again
+  const look = coin.season ? SEASONS[coin.season]?.look : null;
+  const snow = layer !== "front" ? false
+    : coin.relic ? (relicOf(coin.relic)?.of.vessel === "lantern" ? "sparks" : "globe")
+    : look === "lunar" ? "sparks" : !!coin.season;
   const G = 64 + 2 * margin;
 
   useEffect(() => {
