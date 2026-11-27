@@ -8,6 +8,8 @@ import PixelIcon from "../ui/PixelIcon.jsx";
 import { LEDGER_MARKS } from "../../shared/economy.js";
 import { GIFTS, CHESTS } from "../../shared/tuning.js";
 import { titleById } from "../lib/data.js";
+const untilName = iso => new Date(iso + "T00:00:00Z").toLocaleDateString("en-AU", { day: "numeric", month: "long", timeZone: "UTC" }).toUpperCase();
+const dayNum = iso => Date.parse(iso + "T00:00:00Z");
 
 /* ─── JOURNAL ─────────────────────────────────────────────────────────────
  * Every kind of coin you have ever cleaned or won: eleven metals by six
@@ -96,7 +98,7 @@ export default function Journal() {
             </div>
             {e.relics && <Relics set={e.relics} found={j.r || {}}/>}
             <p className="t-dim" style={{ margin: "8px 0 0", fontSize: 12 }}>
-              {g.event?.id === e.id ? "PRESENTS COME THROUGH THE GAP UNTIL 5 JANUARY. THE BETTER THE SCROLLS, THE BETTER THE PRESENT." : "NO MORE WILL BE MADE."}
+              {g.event?.id === e.id ? `${e.present.name}S COME THROUGH THE GAP UNTIL ${untilName(e.to)}. THE BETTER THE SCROLLS, THE BETTER THE ${e.present.name}.` : dayNum(e.from) > dayNum(new Date().toISOString().slice(0, 10)) ? "NOT YET." : "NO MORE WILL BE MADE."}
             </p>
           </section>
         );
@@ -198,7 +200,7 @@ function Relics({ set, found }) {
         })}
       </div>
       <p className="t-dim" style={{ margin: "6px 0 0", fontSize: 12, textAlign: "center" }}>
-        ONE PRESENT IN A HUNDRED. {s.firstBonus.toLocaleString()} MARKS FOR EACH, {s.setBonus.toLocaleString()} FOR ALL THREE.
+        ONE {EVENTS.find(e => e.id === s.event)?.present.name || "PRESENT"} IN A HUNDRED. {s.firstBonus.toLocaleString()} MARKS FOR EACH, {s.setBonus.toLocaleString()} FOR ALL THREE.
       </p>
     </div>
   );

@@ -48,7 +48,7 @@ export default function PublicProfile({ sets = [], festive = false, relics = [],
         <SetGems sets={sets}/>
         {signs.length > 0 && <SignBadges signs={signs}/>}
         {showcase.length > 0 ? (
-          <CabinetFrame rank={cabFrame == null ? cabinet?.rank || 0 : Math.min(cabFrame, cabinet?.rank || 0)} score={cabinet?.score} pad={6} dress={festive ? XMAS_FRAME : null}>
+          <CabinetFrame rank={cabFrame == null ? cabinet?.rank || 0 : Math.min(cabFrame, cabinet?.rank || 0)} score={cabinet?.score} pad={6} dress={festive === "winter" ? XMAS_FRAME : null}>
             <div>
               <div className="between" style={{ marginBottom: 8, gap: 8 }}>
                 <span className="t-label">CABINET</span>
@@ -60,7 +60,7 @@ export default function PublicProfile({ sets = [], festive = false, relics = [],
             </div>
           </CabinetFrame>
         ) : empty}
-        {festive && <Hearth relics={relics}/>}
+        {festive === "winter" && <Hearth relics={relics}/>}
         {children}
       </div>
     </div>

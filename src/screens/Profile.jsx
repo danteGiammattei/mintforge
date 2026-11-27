@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SEASONS } from "../../shared/events.js";
 import { PROFILE_FX } from "../../shared/events.js";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
@@ -190,7 +191,7 @@ function You({ g }) {
   return (
     <>
       <section className="panel" style={{ overflow: "hidden" }} aria-label="Your profile, as others see it">
-        <PublicProfile sets={setsDone(g.journal, g.coins.filter(c => !c.relic).map(c => `${c.metalIdx}:${coinRarity(c)}`))} festive={!!g.event} relics={g.coins.filter(c => c.relic).map(c => c.relic)} cabFrame={g.cabFrame} frame={g.frame} fx={g.profileFx} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
+        <PublicProfile sets={setsDone(g.journal, g.coins.filter(c => !c.relic).map(c => `${c.metalIdx}:${coinRarity(c)}`))} festive={g.event ? SEASONS[g.event.season]?.look : null} relics={g.coins.filter(c => c.relic).map(c => c.relic)} cabFrame={g.cabFrame} frame={g.frame} fx={g.profileFx} username={g.username} level={g.level} title={g.selectedTitle} bio={g.bio}
                        coins={g.coins.length} kinds={journalCounts(g.journal).kinds} shiny={g.coins.filter(c => c.shiny).length}
                        signs={[...new Set(g.coins.filter(c => c.sign != null).map(c => c.sign))]}
                        tomes={g.tomes}

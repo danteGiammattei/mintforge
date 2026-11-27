@@ -38,6 +38,7 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { pageSigil } from "../lib/tomeArt.js";
+import { SEASONS } from "../../shared/events.js";
 import { tiedScroll, TIED } from "../lib/forms.js";
 import { auraFrame, LOOP as AURA_LOOP, PAD as AURA_PAD, TOP as AURA_TOP } from "../lib/spriteAura.js";
 import { RARITY, TRAITS, LIFTS, careOf } from "../../shared/sigil.js";
@@ -74,6 +75,8 @@ const S = {
 const { ctx, view, stop } = stage(cv, { step: frame });
 const plot = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, w | 0, h | 0); };
 
+const look = () => SEASONS[bus.season?.()]?.look || null;
+
 function note(text, hold = 3) { S.note = text; S.noteA = hold; bus.say(text); }
 
 /* ─── the desk, lit by one candle off to the left ─────────────────── */
@@ -90,8 +93,17 @@ function drawRoom(flick) {
   // the desk's far edge
   plot(0, 66, W, 2, P.deskEdge);
   plot(0, 68, W, 3, P.deskA);
+  // in the Lantern Days, two mandarins on the desk's edge, a leaf still on one
+  if (look() === "lunar") {
+    for (const [mx, my] of [[156, 58], [168, 60]]) {
+      plot(mx, my, 9, 8, "#b85a16"); plot(mx + 1, my - 1, 7, 10, "#b85a16");
+      plot(mx + 1, my, 3, 3, "#e89a48"); plot(mx + 2, my, 1, 1, "#f8c070");
+      plot(mx + 1, my + 8, 8, 1, "#5e2a0a");
+    }
+    plot(160, 55, 3, 2, "#2e5a24"); plot(162, 56, 2, 1, "#3e7a30");
+  }
   // on the Long Night, a sprig of pine and holly laid along it
-  if (bus.season?.()) {
+  if (look() === "winter") {
     const X = 150, Y = 64;
     for (let i = 0; i < 34; i++) plot(X + i, Y + (i >> 3), 1, 1, "#3a2a18");            // the twig
     for (let i = 2; i < 32; i += 3) {
@@ -110,7 +122,8 @@ function drawRoom(flick) {
 /* on the Long Night, a mug of hot cocoa to the right of the sheet,
  * steaming in the candlelight */
 function drawCocoa() {
-  if (!bus.season?.()) return;
+  if (look() === "lunar") return drawTea();
+  if (look() !== "winter") return;
   const X = 178, Y = 150;
   plot(X, Y, 11, 12, "#7a2418"); plot(X, Y, 2, 12, "#a8402e"); plot(X + 9, Y, 2, 12, "#4e140e");      // the mug, lit from the left
   plot(X + 11, Y + 3, 3, 1, "#5e1810"); plot(X + 13, Y + 3, 1, 5, "#5e1810"); plot(X + 11, Y + 7, 3, 1, "#5e1810");   // its handle
@@ -119,6 +132,19 @@ function drawCocoa() {
   for (let i = 0; i < 5; i++) {                                                                            // the steam
     const t = view.calm ? (i / 5) : ((S.t * 0.6 + i * 11) % 55) / 55;
     const sx = X + 3 + i % 3 * 2 + Math.sin(t * 7 + i) * 1.5, sy = Y - 2 - t * 22;
+    ctx.globalAlpha = 0.28 * (1 - t); plot(sx, sy, 1, 2, "#d8d0c4");
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* in the Lantern Days, a cup of tea instead, celadon, steaming */
+function drawTea() {
+  const X = 180, Y = 154;
+  plot(X, Y, 10, 8, "#6a8a72"); plot(X, Y, 2, 8, "#8aaa90"); plot(X + 8, Y, 2, 8, "#46604e");
+  plot(X + 1, Y, 8, 1, "#5a3a14"); plot(X - 2, Y + 8, 14, 2, "#3a2a1a"); plot(X - 2, Y + 10, 14, 1, "#120e08");
+  for (let i = 0; i < 4; i++) {
+    const t = view.calm ? (i / 4) : ((S.t * 0.6 + i * 13) % 55) / 55;
+    const sx = X + 3 + i % 3 * 2 + Math.sin(t * 7 + i) * 1.5, sy = Y - 2 - t * 20;
     ctx.globalAlpha = 0.28 * (1 - t); plot(sx, sy, 1, 2, "#d8d0c4");
   }
   ctx.globalAlpha = 1;

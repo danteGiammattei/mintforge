@@ -37,6 +37,8 @@
  * ══════════════════════════════════════════════════════════════════════ */
 
 import { present } from "../lib/presentArt.js";
+import { seasonSprite } from "../lib/envelopeArt.js";
+import { SEASONS, eventById } from "../../shared/events.js";
 import { RAMP } from "../lib/pixelform.js";
 import {
   goblinHand, goblinHandPoint, GOBLIN_HAND, playerHand, PLAYER_HAND,
@@ -148,8 +150,70 @@ function drawLantern() {
  * all, over the room's dark so they always show that the season is on
  * (drawEventFrame): a string of lights across the top, snow along the foot. */
 const SNOWFALL = Array.from({ length: 34 }, (_, i) => ({ x: (i * 13.37) % 1, y: (i * 71.3) % 422, v: 0.25 + ((i * 7) % 10) / 22, ph: i * 1.3 }));
+const lookNow = () => SEASONS[bus.season?.()]?.look || null;
+
+/* The Lantern Days (look "lunar"), the New Year at the door. Through the
+ * slot: a night sky, sky lanterns let go and drifting up, and now and then
+ * a firework bursting far off. On our side: a red paper lantern where the
+ * wreath hangs, and at the wall's foot a bowl's worth of mandarins with a
+ * red envelope leaning on them. The frame (drawEventFrame): lanterns
+ * strung across the top, embers drifting along the foot. */
+const SKYLANTERNS = Array.from({ length: 12 }, (_, i) => ({ x: (i * 0.37) % 1, y: (i * 53.1) % 300, v: 0.12 + ((i * 7) % 5) / 40, ph: i * 1.7 }));
+function paperLantern(x, y, s, lit) {
+  ctx.globalAlpha = 0.18 * lit; px(x - 3 * s, y - 2 * s, 11 * s, 12 * s, "#ff9a50"); ctx.globalAlpha = 1;
+  px(x, y - 3 * s, 5 * s, s, "#c8a040");                                       // its cap
+  px(x - s, y - 2 * s, 7 * s, 6 * s, "#b8281e"); px(x, y - 3 * s + s, 5 * s, 8 * s, "#b8281e");
+  for (let k = 0; k < 3; k++) px(x + (k * 2) * s, y - 2 * s, s, 8 * s, "#8a1a14");   // its ribs
+  ctx.globalAlpha = 0.55 * lit; px(x + s, y, 3 * s, 3 * s, "#ffc070"); ctx.globalAlpha = 1;
+  px(x, y + 6 * s, 5 * s, s, "#c8a040");
+  px(x + 2 * s, y + 7 * s, s, 4 * s, "#c8a040");                               // the tassel
+}
+function drawLunar() {
+  const flick = view.calm ? 1 : 0.85 + 0.15 * Math.sin(S.t * 0.13) * Math.sin(S.t * 0.07 + 1);
+  // the night through the slot, a little warm at its foot
+  const FY = 300;
+  ctx.globalAlpha = 0.35; px(GX, FY - 30, GW, 30, "#3a1a18"); ctx.globalAlpha = 1;
+  px(GX, FY, GW, 12, "#1a1214");
+  for (let i = 0; i < 6; i++) px(GX + 2 + i * 8, FY - 4 - (i % 3) * 2, 6, 4 + (i % 3) * 2, "#120c0e");   // the rooftops far off
+  // a firework, far off, every so often
+  if (!view.calm) {
+    const cyc = S.t % 180, bx = GX + 10 + ((S.t / 180 | 0) * 17) % (GW - 20), byy = 170 + ((S.t / 180 | 0) * 29) % 60;
+    if (cyc < 40) {
+      const r = cyc * 0.45, a = 1 - cyc / 40;
+      for (let k = 0; k < 10; k++) {
+        const t = k / 10 * Math.PI * 2;
+        ctx.globalAlpha = a; px(bx + Math.cos(t) * r, byy + Math.sin(t) * r, 1, 1, k % 2 ? "#ffd27a" : "#ff6a4a");
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+  // sky lanterns, through the slot only, rising
+  for (const l of SKYLANTERNS) {
+    const y = view.calm ? l.y + 60 : FY - ((l.y + S.t * l.v) % 240);
+    const x = GX + 2 + l.x * (GW - 5) + (view.calm ? 0 : Math.sin(S.t * 0.015 + l.ph));
+    const k = Math.min(1, (FY - y) / 30) * Math.min(1, (y - 60) / 40);
+    if (k <= 0) continue;
+    ctx.globalAlpha = 0.25 * k; px(x - 1, y - 1, 4, 4, "#ff9a50");
+    ctx.globalAlpha = k; px(x, y, 2, 2, "#ffb860"); px(x, y, 2, 1, "#ffe0a0");
+  }
+  ctx.globalAlpha = 1;
+  // the lantern by the door, where the wreath would hang
+  px(39, 128, 1, 18, "#2a1a10");
+  paperLantern(36, 150, 2, flick);
+  // mandarins at the wall's foot, an envelope leaning on them
+  ctx.globalAlpha = 0.8;
+  for (const [mx, my] of [[8, 286], [18, 288], [13, 280], [28, 289]]) {
+    px(mx, my, 8, 7, "#c86018"); px(mx + 1, my - 1, 6, 9, "#c86018");
+    px(mx + 1, my, 3, 2, "#f0a050"); px(mx + 3, my - 2, 2, 1, "#2a5a22");
+  }
+  const env = seasonSprite(bus.season(), 0);
+  if (env && env.height > 60) ctx.drawImage(env, 32, 252, 20, 35);
+  ctx.globalAlpha = 1;
+}
+
 function drawWinter() {
   if (!bus.season?.()) return;
+  if (lookNow() === "lunar") return drawLunar();
   const flick = view.calm ? 1 : 0.85 + 0.15 * Math.sin(S.t * 0.13) * Math.sin(S.t * 0.07 + 1);
   // far off, at the slot's foot: the pines and the cabin, under snow
   const FY = 300;
@@ -205,8 +269,29 @@ function drawWinter() {
 }
 
 const BULBS = ["#ff5a4a", "#ffd060", "#5ab0ff", "#6ae07a", "#ff8ad8"];
+function drawLunarFrame() {
+  // a cord swagged along the top, a lantern hung at every low point
+  const sag = x => 2 + Math.round(Math.sin(((x % 49) / 49) * Math.PI) * 4);
+  for (let x = 0; x < W; x++) px(x, sag(x), 1, 1, "#2a1410");
+  for (let i = 0, x = 24; x < W; i++, x += 49) {
+    const lit = view.calm ? 1 : 0.8 + 0.2 * Math.sin(S.t * 0.08 + i);
+    px(x + 1, sag(x), 1, 3, "#2a1410");
+    paperLantern(x - 1, sag(x) + 6, 1, lit);
+  }
+  // embers along the foot, drifting up a little and gone
+  for (let x = 0; x < W; x++) {
+    const h = 2 + (((x * 2654435761) >>> 28) % 3);
+    ctx.globalAlpha = 0.25; px(x, H - h, 1, h, "#5a1a10"); ctx.globalAlpha = 1;
+  }
+  if (!view.calm) for (let k = 0; k < 8; k++) {
+    const t = ((S.t * 0.6 + k * 37) % 90) / 90, ex = (k * 47 + Math.sin(S.t * 0.04 + k) * 4 + W) % W, ey = H - 2 - t * 40;
+    ctx.globalAlpha = 1 - t; px(ex, ey, 1, 1, k % 2 ? "#ffb050" : "#ff7040"); ctx.globalAlpha = 1;
+  }
+}
+
 function drawEventFrame() {
   if (!bus.season?.()) return;
+  if (lookNow() === "lunar") return drawLunarFrame();
   // the wire, swagged between hooks along the top edge
   const sag = x => 3 + Math.round(Math.sin(((x % 49) / 49) * Math.PI) * 5);
   for (let x = 0; x < W; x++) px(x, sag(x), 1, 1, "#1a2018");
@@ -484,7 +569,7 @@ function drawDrawer() {
  * the bottom of the frame — toward us, into the satchel. */
 function drawArriving(cx) {
   const a = S.arriving; if (!a) return;
-  const sp = a.kind === "chest" ? (a.season ? present(a.what?.id ?? a.tier) : chestSprite(a.tier, "slot")) : pouch("slot");
+  const sp = a.kind === "chest" ? (a.season ? seasonSprite(a.season, a.what?.id ?? a.tier) : chestSprite(a.tier, "slot")) : pouch("slot");
   const w = sp.width, h = sp.height;
   const k1 = ease(Math.min(1, a.k / 0.45)), k2 = ease(Math.max(0, (a.k - 0.6) / 0.4));
   const x = Math.round(lerp(cx - 6, GX + (GW - w) / 2, k1));
@@ -545,7 +630,7 @@ function stepGive() {
       const got = S.res?.chests || [];
       endGive();
       for (const c of got) S.queue.push({ kind: "chest", tier: c.tier, season: c.season || null, what: { type: "chest", ...c },
-        line: c.season ? "THAT IS ENOUGH. HE PUSHES A PRESENT THROUGH THE GAP, TIED WITH RIBBON" : "THAT IS ENOUGH. HE PUSHES A CHEST THROUGH THE GAP" });
+        line: c.season ? "THAT IS ENOUGH. " + (eventById(SEASONS[c.season]?.event)?.present.arrives || "HE PUSHES A PRESENT THROUGH THE GAP") : "THAT IS ENOUGH. HE PUSHES A CHEST THROUGH THE GAP" });
     }
   } else if (S.phase === "refuse") {
     S.ourK = Math.max(0, S.ourK - 0.03);

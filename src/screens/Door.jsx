@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { eventNow } from "./EventPage.jsx";
 import PixelIcon from "../ui/PixelIcon.jsx";
 import { useGame } from "../lib/GameContext.js";
 import { useUi } from "../ui/Overlay.jsx";
@@ -94,6 +95,7 @@ export default function Door() {
  * Small and dark so the scene stays the thing; gone while he is busy. */
 function Corners({ g, hidden }) {
   const waiting = g.chests.length + g.dusty.length;
+  const ahead = eventNow();
   // the first chest's way in breathes, as the guide's tab did
   const nudge = waiting > 0 && !(g.stats.brushed > 0);
   const Btn = ({ icon, label, to, badge, tint, glow }) => (
@@ -111,7 +113,7 @@ function Corners({ g, hidden }) {
     <div aria-hidden={hidden || undefined} style={{ position: "absolute", inset: 0, pointerEvents: "none", opacity: hidden ? 0 : 1, transition: "opacity .2s" }}>
       <div style={{ ...col("left"), pointerEvents: hidden ? "none" : "auto" }}>
         <Btn icon="satchel" label="SATCHEL" to="satchel" badge={waiting} glow={nudge}/>
-        <Btn icon="snow" label={g.event ? "THE LONG NIGHT" : "COMING SOON"} to="event" tint="#bfe6f5"/>
+        {ahead && <Btn icon={ahead.ev.icon || "snow"} label={ahead.live ? ahead.ev.name : "COMING SOON"} to="event" tint={ahead.ev.tint || "#bfe6f5"}/>}
       </div>
       <div style={{ ...col("right"), pointerEvents: hidden ? "none" : "auto" }}>
         <Btn icon="trophy" label="RANKS" to="ranks" tint="var(--candle)"/>

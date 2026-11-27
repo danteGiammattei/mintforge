@@ -56,6 +56,7 @@ const ARTS = [
   { src: "/splash-observatory.webp", w: W, h: H, lights: [[56, 64.5]] },                  // the observatory
   { src: "/splash-vault.webp",       w: W, h: H, lights: [[37, 84.5], [41, 53]] },        // the vault
   { src: "/splash-longnight.webp",   w: W, h: H, lights: [[66, 66], [62, 57]], season: "frost26" },   // the Long Night
+  { src: "/splash-lny.webp",         w: W, h: H, lights: [[72, 14], [79, 33]], season: "lunar27" },   // the Lantern Days
 ];
 function pickArt() {
   const ev = eventOn(localDay(Date.now(), -new Date().getTimezoneOffset()));

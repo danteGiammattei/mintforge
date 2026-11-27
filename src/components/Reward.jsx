@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import Sprite from "../ui/Sprite.jsx";
-import { present, loadGifts } from "../lib/presentArt.js";
-import { PROFILE_FX, RELICS, relicOf } from "../../shared/events.js";
+import { loadGifts } from "../lib/presentArt.js";
+import { PROFILE_FX, RELICS, relicOf, eventById, SEASONS } from "../../shared/events.js";
+import { seasonSprite } from "../lib/envelopeArt.js";
 import { useGame } from "../lib/GameContext.js";
 import { feel } from "../lib/feel.js";
 import { FRAMES, PREMIUM_TITLES, METALS, titleByLabel } from "../lib/data.js";
@@ -232,7 +233,7 @@ function Body({ r }) {
         <div className="t-big t-gold row" style={{ justifyContent: "center", gap: 10 }}><PixelIcon name="mark" size={22}/>{total.toLocaleString()}</div>
         <p className="t-dim" style={{ margin: 0, textAlign: "center" }}>
           {set ? "ALL THREE GIFTS, BROUGHT TOGETHER. THE STAR STOPS OVER YOUR VAULT."
-               : `ONE OF THE THREE GIFTS. ${RELICS[found[0].set].firstBonus.toLocaleString()} FOR EACH, THE FIRST TIME; ${RELICS[found[0].set].setBonus.toLocaleString()} MORE FOR ALL THREE.`}
+               : `ONE OF ${RELICS[found[0].set].name}. ${RELICS[found[0].set].firstBonus.toLocaleString()} FOR EACH, THE FIRST TIME; ${RELICS[found[0].set].setBonus.toLocaleString()} MORE FOR ALL THREE.`}
         </p>
       </>
     );
@@ -252,17 +253,18 @@ function Body({ r }) {
     );
   }
   if (r.kind === "event") {
+    const ev = eventById(r.id) || eventById("longnight26"), what = ev.present.name, lunar = ev.look === "lunar";
     return (
       <>
         <div className="row" style={{ justifyContent: "center", gap: 8, alignItems: "flex-end", minHeight: 80 }} aria-hidden>
-          {[3, 7, 11].map(i => <Sprite key={i + (giftsIn ? "p" : "")} make={() => present(i)} dep={i + (giftsIn ? "p" : "")} scale={2}/>)}
+          {(lunar ? [5] : [3, 7, 11]).map(i => <Sprite key={i + (giftsIn ? "p" : "")} make={() => seasonSprite(ev.season, i)} dep={i + ev.season + (giftsIn ? "p" : "")} scale={lunar ? 1 : 2}/>)}
         </div>
-        <div className="t-title" style={{ textAlign: "center", color: "#d8584e" }}>{r.name}</div>
+        <div className="t-title" style={{ textAlign: "center", color: ev.tint }}>{r.name}</div>
         <ul className="t-dim" style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: 6, textAlign: "center" }}>
-          <li>ONE CHEST IN THREE HE GIVES IS A PRESENT.</li>
-          <li>EVERY PRESENT HOLDS A FROST COIN, MADE ONLY NOW.</li>
-          <li>SOME HOLD THE WINTER ALMANAC, A TITLE, OR FROSTFALL.</li>
-          <li>THE BETTER YOUR SCROLLS, THE BETTER THE PRESENT.</li>
+          <li>ONE CHEST IN THREE HE GIVES IS A {what}.</li>
+          <li>EVERY {what} HOLDS A {SEASONS[ev.season].label} COIN, MADE ONLY NOW.</li>
+          <li>SOME HOLD {TOME_BY_ID[ev.tome.id]?.name || "A BOOK"}, A TITLE, OR {(PROFILE_FX[ev.effect.id]?.label || "").toUpperCase()}.</li>
+          <li>THE BETTER YOUR SCROLLS, THE BETTER THE {what}.</li>
         </ul>
       </>
     );
@@ -290,7 +292,7 @@ function Body({ r }) {
 }
 
 const HEADS = {
-  fx:    ["A PROFILE EFFECT", "IT WAS IN THE PRESENT"],
+  fx:    ["A PROFILE EFFECT", "IT WAS IN THE PRESENT"],      // the event's own word for it, below
   well:  ["A DEEPER WELL", "IT SITS ON YOUR DESK NOW"],
   title: ["A NEW TITLE", "HE PUSHED IT THROUGH THE GAP"],
   frame: ["A NEW BANNER", "HE PUSHED IT THROUGH THE GAP"],
@@ -318,8 +320,8 @@ function Card({ r, onClose }) {
 
   const [head0, sub0] = HEADS[r.kind];
   const sub = r.kind === "signs" && r.signs.length > 1 ? "THE SKY PAYS WHAT IT OWES" : sub0;
-  const head = r.from === "house" ? "A GIFT FROM THE HOUSE" : r.from === "crown" ? "RANK ONE" : r.kind === "relics" && r.relics.some(b => b.set) ? "THE MAGI'S GIFTS" : r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
-  const subline = r.from === "level" || r.from === "house" || r.from === "crown" ? "" : r.from === "chest" ? "IT WAS IN THE PRESENT"
+  const head = r.from === "house" ? "A GIFT FROM THE HOUSE" : r.from === "crown" ? "RANK ONE" : r.kind === "relics" && r.relics.some(b => b.set) ? RELICS[r.relics.find(b => b.set).set]?.name || "THE SET" : r.kind === "daily" ? `DAY ${((r.streak - 1) % DAILY.chestEvery) + 1}` : r.kind === "signs" && r.signs.length > 1 ? "NEW STAR SIGNS" : head0;
+  const subline = r.from === "level" || r.from === "house" || r.from === "crown" ? "" : r.from === "chest" ? `IT WAS IN THE ${g.event ? eventById(g.event.id)?.present.name || "PRESENT" : "PRESENT"}`
                 : r.kind === "daily" && g.event ? `A GIFT FOR ${g.event.name}` : r.kind === "event" ? eventLeft(r.to) : r.kind === "relics" && r.relics.some(b => b.set) ? "THE SET IS WHOLE" : sub;
   // something wearable can be put on from here
   const wear = r.kind === "title" ? { on: g.selectedTitle === r.label, go: () => g.setSelectedTitle(r.label) }
