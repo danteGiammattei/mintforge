@@ -127,6 +127,10 @@ export const BANNERS = {
   xmas_square:   "image:/banners/xmas_square.webp",
   xmas_chimneys: "image:/banners/xmas_chimneys.webp",
   xmas_rooftops: "image:/banners/xmas_rooftops.webp",
+  lny_market:    "image:/banners/lny_market.webp",
+  lny_lanterns:  "image:/banners/lny_lanterns.webp",
+  lny_fireworks: "image:/banners/lny_fireworks.webp",
+  lny_dragon:    "image:/banners/lny_dragon.webp",
 };
 export const FRAMES = {
   stone:    { lbl:"Stone",        minLvl:1,  accent:"#8a7560" },
@@ -152,6 +156,10 @@ export const FRAMES = {
   xmas_square:   { lbl:"The Town Square",   minLvl:1, accent:"#e8a850", premium:true, desc:"A tree lit in the square, the Long Night of 2026" },
   xmas_chimneys: { lbl:"Chimney Smoke",     minLvl:1, accent:"#9fd8f0", premium:true, desc:"Snow on every roof, the Long Night of 2026" },
   xmas_rooftops: { lbl:"Over the Rooftops", minLvl:1, accent:"#bfe6f5", premium:true, desc:"One window still lit, the Long Night of 2026" },
+  lny_market:    { lbl:"The Night Market",  minLvl:1, accent:"#ff9a5a", premium:true, desc:"Stalls under lanterns, the Lantern Days of 2027" },
+  lny_lanterns:  { lbl:"A Sky of Lanterns", minLvl:1, accent:"#ffb870", premium:true, desc:"A thousand lights let go, the Lantern Days of 2027" },
+  lny_fireworks: { lbl:"First Fireworks",   minLvl:1, accent:"#ffd27a", premium:true, desc:"The year turns over the river, the Lantern Days of 2027" },
+  lny_dragon:    { lbl:"The Dragon Dance",  minLvl:1, accent:"#e8503c", premium:true, desc:"Through the street at midnight, the Lantern Days of 2027" },
 };
 
 // Returns the style object to spread for a banner background — handles both
@@ -192,6 +200,8 @@ export const PREMIUM_TITLES = [
   { id:"thousand_lifetimes", label:"Luck of a Thousand Lifetimes", minLvl:1, effect:"ooze", secret: true },
   // events (shared/events.js): only ever from the event's chests
   { id:"long_night",     label:"Santa's Little Helper",   minLvl:1, effect:"frost" },
+  // label not final: Dante is choosing between this and "Keeper of Lanterns" (effect "lantern")
+  { id:"lunar27",        label:"Fortune's Favourite",     minLvl:1, effect:"lunar" },
 ];
 export const PREMIUM_TITLE_BY_ID  = Object.fromEntries(PREMIUM_TITLES.map(t => [t.id, t]));
 export const PREMIUM_TITLE_LABELS = new Set(PREMIUM_TITLES.map(t => t.label));

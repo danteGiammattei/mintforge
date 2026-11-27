@@ -9,14 +9,29 @@ import { auraStill } from "../lib/aura.js";
  * on the banner's whatever it covers.
  *
  *   frostfall   snow falling, and frost crept up from the lower edge,
- *               thickest at the corners; still when motion is reduced. */
+ *               thickest at the corners; still when motion is reduced.
+ *   lanternrise paper lanterns rising slowly, swaying, each a warm glow,
+ *               and an ember haze along the lower edge. */
 const W = 96;
+const KINDS = new Set(["frostfall", "lanternrise"]);
+
+/* a lantern, 3 across and 5 tall: gilt cap, red body lit from inside, tassel */
+function lantern(ctx, x, y, a) {
+  ctx.globalAlpha = a * 0.35; ctx.fillStyle = "#ffb060"; ctx.fillRect(x - 1, y, 5, 5);
+  ctx.globalAlpha = a;
+  ctx.fillStyle = "#e8c060"; ctx.fillRect(x, y, 3, 1);
+  ctx.fillStyle = "#d8402c"; ctx.fillRect(x, y + 1, 3, 3);
+  ctx.fillStyle = "#ffc070"; ctx.fillRect(x + 1, y + 2, 1, 1);
+  ctx.fillStyle = "#e8c060"; ctx.fillRect(x + 1, y + 4, 1, 1);
+  ctx.globalAlpha = 1;
+}
 
 export default function ProfileFx({ fx }) {
   const ref = useRef(null);
   useEffect(() => {
     const cv = ref.current;
-    if (!cv || fx !== "frostfall") return;
+    if (!cv || !KINDS.has(fx)) return;
+    const lit = fx === "lanternrise";
     const ctx = cv.getContext("2d");
     let H = 0, flakes = [], rime = [], raf = 0, t = 0, last = 0;
     // sized to what it covers, at 96 across
@@ -33,7 +48,23 @@ export default function ProfileFx({ fx }) {
         return Math.round(1 + corner * 4 + ((x * 2654435761) >>> 28) % 2);
       });
     };
+    const drawLanterns = () => {
+      ctx.clearRect(0, 0, W, H);
+      for (let x = 0; x < W; x++) {                         // embers in the haze along the foot
+        const h = 1 + (((x * 2654435761) >>> 27) % 3);
+        for (let k = 0; k < h; k++) { ctx.fillStyle = `rgba(255,${150 + k * 30},90,${0.32 - k * 0.09})`; ctx.fillRect(x, H - 1 - k, 1, 1); }
+      }
+      const n = Math.max(4, Math.round(W * H / 700));
+      for (let i = 0; i < n; i++) {
+        const v = 0.12 + ((i * 7) % 5) / 30, span = H + 8;
+        const y = Math.round(H + 2 - ((i * 23.7 + t * v) % span));
+        const x = Math.round((i * 41.3) % (W - 4) + Math.sin(t * 0.03 + i) * 2);
+        const a = Math.min(1, (H + 2 - y) / 10) * Math.min(1, (y + 6) / 10);    // fade in at the foot, out at the top
+        if (a > 0) lantern(ctx, x, y, a);
+      }
+    };
     const draw = () => {
+      if (lit) return drawLanterns();
       ctx.clearRect(0, 0, W, H);
       for (let x = 0; x < W; x++) {
         const h = rime[x];
@@ -57,14 +88,14 @@ export default function ProfileFx({ fx }) {
     if (!auraStill()) {
       const loop = now => {
         raf = requestAnimationFrame(loop);
-        if (now - last < 50) return;                       // 20 a second is plenty for snow
+        if (now - last < 50) return;                       // 20 a second is plenty
         last = now; t++; draw();
       };
       raf = requestAnimationFrame(loop);
     }
     return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, [fx]);
-  if (fx !== "frostfall") return null;
+  if (!KINDS.has(fx)) return null;
   return (
     <canvas ref={ref} aria-hidden
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", imageRendering: "pixelated", pointerEvents: "none" }}/>

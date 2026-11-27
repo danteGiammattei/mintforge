@@ -223,6 +223,13 @@ canvas { image-rendering: pixelated; }
 @keyframes titleOoze { 0% { transform: scaleY(.55); } 100% { transform: scaleY(1.1); } }
 @keyframes titleDrop { 0%, 30% { transform: translateY(-4px); opacity: 0; } 40% { opacity: 1; } 100% { transform: translateY(14px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .title-ooze::before, .title-ooze::after { animation: none; } .title-ooze::after { opacity: 0; } }
+/* Lunar New Year (shared/events.js lunar27): red lacquer catching gold, and a lantern's glow */
+.title-lunar   { background: linear-gradient(90deg,#e8483a 0%,#ffd87a 35%,#e8483a 55%,#c02a20 80%,#e8483a 100%); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: titleShimmer 4s steps(16) infinite; filter: drop-shadow(0 0 3px #ff704044); }
+.title-lantern { position: relative; display: inline-block; color: #ffc46a; text-shadow: 0 0 6px #ff8a3a88, 0 0 1px #7a2a10; animation: titleLantern 2.6s steps(10) infinite; }
+.title-lantern::after { content: ""; position: absolute; left: 18%; bottom: 100%; width: 2px; height: 2px; background: #ffd890; box-shadow: 30px 4px 0 #ffb050, 70px 1px 0 #ffd890; animation: titleEmber 2.6s linear infinite; opacity: 0; }
+@keyframes titleLantern { 0%,100% { text-shadow: 0 0 6px #ff8a3a88, 0 0 1px #7a2a10; } 40% { text-shadow: 0 0 10px #ffa04cbb, 0 0 1px #7a2a10; } 70% { text-shadow: 0 0 4px #ff7a3066, 0 0 1px #7a2a10; } }
+@keyframes titleEmber { 0% { transform: translateY(6px); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(-8px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .title-lunar, .title-lantern, .title-lantern::after { animation: none; } }
 .title-astral  { background: linear-gradient(90deg,#fff8a0,#ffd060,#a8d8ff,#c890ff,#fff8a0); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: titleShimmer 4s steps(16) infinite, titleAstralGlow 5s steps(10) infinite; }
 
 /* ── reduced motion: everything holds still ──────────────────────────────
