@@ -76,7 +76,7 @@ function EventWatch({ event, hold }) {
     let seen = null; try { seen = localStorage.getItem(EVENT_SEEN); } catch { /* fine */ }
     if (seen === today) return;
     try { localStorage.setItem(EVENT_SEEN, today); } catch { /* fine */ }
-    celebrate({ kind: "event", name: event.name, to: event.to });
+    celebrate({ kind: "event", id: event.id, name: event.name, to: event.to });
   }, [event?.id, hold, celebrate]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }

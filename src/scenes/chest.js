@@ -16,6 +16,8 @@
 
 import { chestParts, CHEST, dirtClod } from "../lib/forms.js";
 import { presentParts, PRESENT, giftFrame, GIFT } from "../lib/presentArt.js";
+import { envelopeParts, ENVELOPE } from "../lib/envelopeArt.js";
+import { SEASONS, eventById } from "../../shared/events.js";
 import { chestClosed, chestOpening, chestHeight, CHEST_W, OPEN_FRAMES, RATTLE, OPEN_FROM } from "../lib/chestArt.js";
 import { CHESTS } from "../../shared/tuning.js";
 import { stage, FONT, INK, lerp, ease, feather } from "./kit.js";
@@ -38,7 +40,12 @@ export function mount(cv, bus, { tier = 0, season = null, look = 0 } = {}) {
   const bx = Math.round((CW - CHEST.w * SC) / 2), by = 92;
   // on the Long Night it is a present (lib/presentArt.js): its lid, bow
   // and all, lifts off the box and is gone
-  const gift = season ? presentParts(look) : null;
+  // in the Lantern Days it is a red envelope (lib/envelopeArt.js): its
+  // flap lifts from the clasp, and the coin rises out of the pocket
+  const lunar = SEASONS[season]?.look === "lunar";
+  const ev = season ? eventById(SEASONS[season]?.event) : null;
+  const gift = season && !(lunar && envelopeParts()) ? presentParts(look) : null;
+  const ES = 2, EW = ENVELOPE.w * ES, EH = ENVELOPE.h * ES, EY = 200 - EH;
   // the drawn chest, when its sheets are loaded: 32px frames at a whole 4×,
   // standing on the same table line as the procedural one
   const drawn = !gift && !!chestClosed(tier, "candle"), DS = 3;
@@ -70,15 +77,56 @@ export function mount(cv, bus, { tier = 0, season = null, look = 0 } = {}) {
 
     // what is inside shows first as light through the seam
     const strain = S.phase === "hold" ? S.p : Math.max(0, 1 - S.anim / 50);
+    const env = lunar && !gift ? envelopeParts() : null;
+    const seamY = env ? EY + 4 : by + CHEST.lidH * SC;
     if (strain > 0.25) {
-      const g = ctx.createRadialGradient(CW / 2, by + CHEST.lidH * SC, 2, CW / 2, by + CHEST.lidH * SC, 30 + strain * 60);
+      const g = ctx.createRadialGradient(CW / 2, seamY, 2, CW / 2, seamY, 30 + strain * 60);
       g.addColorStop(0, "rgba(236,196,110," + (0.45 * strain) + ")");
       g.addColorStop(1, "rgba(236,196,110,0)");
       ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
     }
 
     const painted = gift && giftFrame(look, 0);
-    if (painted) {
+    if (env) {
+      // the red envelope: held, it trembles and its clasp hops; let go of,
+      // the flap folds up from the clasp and over the top, its lining
+      // showing, light pours out and the coin rises from the pocket
+      const ex = Math.round((CW - EW) / 2) + shake, H = env.hinge * ES;
+      ctx.drawImage(env.inside, ex, EY, EW, EH);
+      let c = 1;                                            // the flap, from down (1) through edge-on (0) to open (-1)
+      // it folds back only so far: it stands open behind the coin, clear of the heading
+      if (S.phase !== "hold" && !S.failed) c = Math.cos(Math.min(1, S.anim / (view.calm ? 1 : 22)) * Math.PI * 0.7);
+      if (c <= 0) {                                         // the flap, folded back: behind the coin
+        const fh = Math.max(1, Math.round(H * -c));
+        ctx.save(); ctx.translate(ex, EY); ctx.scale(1, -1);
+        ctx.drawImage(env.inside, 0, 0, ENVELOPE.w, env.hinge, 0, 0, EW, fh);
+        ctx.restore();
+      }
+      if (S.phase !== "hold" && !S.failed && S.anim > 6) {  // the light inside
+        const gl = ctx.createRadialGradient(CW / 2, EY + 10, 2, CW / 2, EY + 10, 70);
+        gl.addColorStop(0, "rgba(255,196,110,0.32)"); gl.addColorStop(1, "rgba(255,196,110,0)");
+        ctx.fillStyle = gl; ctx.fillRect(0, 0, CW, CH);
+      }
+      if (S.coin && S.phase !== "hold") {                   // the coin, rising out of the pocket, still all dust
+        const rise = view.calm ? 4 : 16, k = ease(Math.min(1, Math.max(0, (S.anim - rise) / 46)));
+        if (S.anim > rise) {
+          const sp = dirtClod(S.coin.seed), cw = sp.width * ES;
+          ctx.drawImage(sp, Math.round(CW / 2 - cw / 2), Math.round(lerp(EY + H - 6, EY - cw / 2, k)), cw, sp.height * ES);
+        }
+        if (k >= 1 && S.phase !== "risen") { S.phase = "risen"; say("A COIN, THICK WITH DUST."); bus.feel("coin"); }
+      }
+      ctx.drawImage(env.front, ex, EY, EW, EH);
+      if (c > 0) {
+        const hop = S.phase === "hold" && S.held && !view.calm && S.p > 0.25 && ((S.t >> (S.p > 0.7 ? 1 : 2)) % 3 === 0) ? ES : 0;
+        const fh = Math.max(1, Math.round(H * c));
+        ctx.drawImage(env.flap, 0, 0, ENVELOPE.w, env.hinge, ex, EY - hop, EW, fh);
+      }
+      if (S.phase === "hold" && S.p > 0.3) {                // light along the top, where the flap meets the pocket
+        ctx.globalAlpha = Math.min(1, (S.p - 0.3) * 1.6);
+        plot(ex + 2 * ES, EY, EW - 4 * ES, 2, "#ffd27a");
+        ctx.globalAlpha = 1;
+      }
+    } else if (painted) {
       // the painted present (lib/presentArt.js): held, it squashes and
       // stretches against its ribbon; let go of, it bursts open, the lid
       // flung off and the sides falling flat
@@ -135,7 +183,7 @@ export function mount(cv, bus, { tier = 0, season = null, look = 0 } = {}) {
     }
 
     // and the coin, which is all dirt
-    if (S.phase !== "hold" && S.coin) {
+    if (S.phase !== "hold" && S.coin && !env) {
       const rise = drawn ? (view.calm ? 6 : 26) : gift ? (giftFrame(look, 0) ? 14 : 20) : 30;    // once the lid is up
       const k = ease(Math.min(1, Math.max(0, (S.anim - rise) / 50)));
       if (S.anim > rise) {
@@ -147,10 +195,10 @@ export function mount(cv, bus, { tier = 0, season = null, look = 0 } = {}) {
 
     ctx.font = FONT; ctx.textAlign = "center";
     ctx.fillStyle = INK.warm;
-    ctx.fillText(gift ? "A PRESENT FOR THE LONG NIGHT" : CHESTS.names[tier] + " CHEST", CW / 2, 22);
+    ctx.fillText(ev ? ev.present.heading : CHESTS.names[tier] + " CHEST", CW / 2, 22);
     if (S.phase === "hold") {
       ctx.fillStyle = INK.warmHi;
-      ctx.fillText(S.line || (gift ? "HOLD TO PULL THE RIBBON" : "HOLD TO BREAK THE SEAL"), CW / 2, 224);
+      ctx.fillText(S.line || (ev ? ev.present.hold : "HOLD TO BREAK THE SEAL"), CW / 2, 224);
       plot(48, 234, 99, 5, "#1d1812");
       plot(48, 234, Math.round(99 * S.p), 5, "#bb9030");
     } else if (S.phase === "risen") {
