@@ -334,7 +334,7 @@ async function open(db, pid, body, { now, rand }) {
   if (!idOk(body.chestId)) throw new Refusal("Which chest?");
   const [ch, ps] = await Promise.all([
     db.prepare(`DELETE FROM chests WHERE id = ?1 AND player_id = ?2 RETURNING tier, season, grade`).bind(body.chestId, pid).first(),
-    db.prepare(`SELECT tomes, owned_titles, owned_fx, chests_given FROM player_state WHERE player_id = ?1`).bind(pid).first(),
+    db.prepare(`SELECT tomes, owned_titles, owned_fx, owned_frames, chests_given FROM player_state WHERE player_id = ?1`).bind(pid).first(),
   ]);
   if (!ch) throw new Refusal("That chest is gone", 404);
   // now and then a tome, tucked in with the coin
@@ -343,7 +343,7 @@ async function open(db, pid, body, { now, rand }) {
   // chest the better the scroll that paid for it, and it may hold the
   // event's title or its profile effect (shared/events.js)
   const ev = ch.season && SEASONS[ch.season] ? eventById(SEASONS[ch.season].event) : null;
-  const holds = ev ? eventChestHolds(ev, ch.tier, ch.grade, { tomes: tomesOf(ps.tomes), titles: parseList(ps.owned_titles), effects: parseList(ps.owned_fx) }, rand) : null;
+  const holds = ev ? eventChestHolds(ev, ch.tier, ch.grade, { tomes: tomesOf(ps.tomes), titles: parseList(ps.owned_titles), effects: parseList(ps.owned_fx), frames: parseList(ps.owned_frames) }, rand) : null;
   let rolled = rollCoin(holds ? holds.coinTier : ch.tier, rand);
   if (ev) rolled.season = ch.season;
   // or, rarely, one of the event's named coins: always mythic, no frost
@@ -370,6 +370,9 @@ async function open(db, pid, body, { now, rand }) {
         ...(holds?.title ? [db.prepare(
           `UPDATE player_state SET owned_titles = json_insert(COALESCE(owned_titles, '[]'), '$[#]', ?2)
             WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(owned_titles, '[]')) WHERE value = ?2)`).bind(pid, holds.title)] : []),
+        ...(holds?.banner ? [db.prepare(
+          `UPDATE player_state SET owned_frames = json_insert(COALESCE(owned_frames, '[]'), '$[#]', ?2)
+            WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(COALESCE(owned_frames, '[]')) WHERE value = ?2)`).bind(pid, holds.banner)] : []),
         ...(holds?.effect ? [db.prepare(
           `UPDATE player_state SET owned_fx = json_insert(owned_fx, '$[#]', ?2)
             WHERE player_id = ?1 AND NOT EXISTS (SELECT 1 FROM json_each(owned_fx) WHERE value = ?2)`).bind(pid, holds.effect)] : []),
@@ -398,7 +401,8 @@ async function open(db, pid, body, { now, rand }) {
            xp: XP.open, ...(tome ? { tome } : {}),
            ...(holds?.title ? { title: describeReward({ type: "title", id: holds.title }) } : {}),
            ...(firstStar ? { secretTitle: describeReward({ type: "title", id: "first_star" }) } : {}),
-           ...(holds?.effect ? { effect: holds.effect } : {}) };
+           ...(holds?.effect ? { effect: holds.effect } : {}),
+           ...(holds?.banner ? { banner: holds.banner } : {}) };
 }
 
 /* ─── fuse: three coins of one metal and rarity → one, a rarity finer ─ */

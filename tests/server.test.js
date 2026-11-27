@@ -1373,3 +1373,12 @@ test("ranks: when a season ends, each board's first is crowned once, from their 
   const board = (await act(db, kiwi, { action: "ranks", board: "OC" }, { now: at })).result;
   assert.deepEqual(board.crowns.map(c => [c.season, c.username]), [["2026Q4", "kiwi"]]);
 });
+
+test("the Long Night's presents may hold one of its banners, never one already owned", async () => {
+  const { eventChestHolds, eventById } = await import("../shared/events.js");
+  const ev = eventById("longnight26");
+  const owned = { tomes: [], titles: [], effects: [], frames: ["xmas_star", "xmas_square", "xmas_chimneys"] };
+  assert.equal(eventChestHolds(ev, 3, 5, owned, () => 0).banner, "xmas_rooftops", "the one left");
+  assert.equal(eventChestHolds(ev, 3, 5, { ...owned, frames: [...owned.frames, "xmas_rooftops"] }, () => 0).banner, null, "all four owned");
+  assert.equal(eventChestHolds(ev, 3, 0, owned, () => 0.5).banner, null, "a plain scroll's present, mostly not");
+});

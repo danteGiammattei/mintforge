@@ -35,6 +35,7 @@ function Ceremony({ chest, onDone, onClose }) {
       if (r.title) celebrate({ kind: "title", label: PREMIUM_TITLES.find(t => t.id === r.title.id)?.label || r.title.name, from: "chest" });
       if (r.secretTitle) celebrate({ kind: "title", label: PREMIUM_TITLES.find(t => t.id === r.secretTitle.id)?.label || r.secretTitle.name, from: "first_star" });
       if (r.effect) celebrate({ kind: "fx", id: r.effect });
+      if (r.banner) celebrate({ kind: "frame", id: r.banner, from: "chest" });
     }, say: ui.say, feel,
   }, { tier: chest.tier, season: chest.season || null, look: chest.id }), [chest.id]);   // eslint-disable-line react-hooks/exhaustive-deps
   return (

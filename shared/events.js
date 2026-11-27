@@ -33,6 +33,8 @@ export const EVENTS = [
     title: { id: "long_night", chance: [0.03, 0.05, 0.08, 0.12, 0.18, 0.25] },
     effect: { id: "frostfall", chance: [0, 0.005, 0.015, 0.03, 0.06, 0.12] },
     relics: "magi",
+    // its banners (src/lib/data.js): a present may hold one not yet owned
+    banners: { ids: ["xmas_star", "xmas_square", "xmas_chimneys", "xmas_rooftops"], chance: [0.02, 0.03, 0.05, 0.08, 0.12, 0.18] },
   },
 ];
 
@@ -88,12 +90,14 @@ export const eventChest = (ev, rand) => !!ev && rand() < ev.chestShare;
  * own chest tier, lifted by grade, is `coinTier`. */
 export function eventChestHolds(ev, tier, grade, owned, rand) {
   const g = Math.max(0, Math.min(5, grade | 0));
-  const out = { coinTier: Math.min(CHESTS.cost.length - 1, tier + (ev.coinLift[g] || 0)), tome: null, title: null, effect: null, relic: null };
+  const out = { coinTier: Math.min(CHESTS.cost.length - 1, tier + (ev.coinLift[g] || 0)), tome: null, title: null, effect: null, relic: null, banner: null };
   // now and then, in place of the frost coin, one of the event's named coins
   const set = ev.relics && RELICS[ev.relics];
   if (set && rand() < set.chance) out.relic = `${ev.relics}:${Math.floor(rand() * set.coins.length)}`;
   if (ev.tome && !(owned.tomes || []).includes(ev.tome.id) && rand() < ev.tome.chance[g]) out.tome = ev.tome.id;
   if (!owned.titles.includes(ev.title.id) && rand() < ev.title.chance[g]) out.title = ev.title.id;
   if (!owned.effects.includes(ev.effect.id) && rand() < ev.effect.chance[g]) out.effect = ev.effect.id;
+  const left = (ev.banners?.ids || []).filter(id => !(owned.frames || []).includes(id));
+  if (left.length && rand() < ev.banners.chance[g]) out.banner = left[Math.floor(rand() * left.length)];
   return out;
 }

@@ -122,6 +122,11 @@ export const BANNERS = {
   mint_below:  "image:/banners/mint_below.webp",
   wanderer: "image:/banners/wanderer.webp",
   astrarium:"image:/banners/astrarium.webp",
+  // the Long Night's banners, found in its presents (shared/events.js)
+  xmas_star:     "image:/banners/xmas_star.webp",
+  xmas_square:   "image:/banners/xmas_square.webp",
+  xmas_chimneys: "image:/banners/xmas_chimneys.webp",
+  xmas_rooftops: "image:/banners/xmas_rooftops.webp",
 };
 export const FRAMES = {
   stone:    { lbl:"Stone",        minLvl:1,  accent:"#8a7560" },
@@ -143,6 +148,10 @@ export const FRAMES = {
   mint_below:  { lbl:"The Mint Below",    minLvl:1, accent:"#e07838", premium:true, stall:true, desc:"Where the coins are struck, deep down" },
   wanderer: { lbl:"The Wanderer", minLvl:25, accent:"#a89060", premium:true, desc:"Crowned spires beyond the wandering staff" },
   astrarium:{ lbl:"The Astrarium",minLvl:30, accent:"#b8a060", premium:true, desc:"Where the heavens are charted on stone" },
+  xmas_star:     { lbl:"The Guiding Star",  minLvl:1, accent:"#f0c870", premium:true, desc:"Three travellers, one star, the Long Night of 2026" },
+  xmas_square:   { lbl:"The Town Square",   minLvl:1, accent:"#e8a850", premium:true, desc:"A tree lit in the square, the Long Night of 2026" },
+  xmas_chimneys: { lbl:"Chimney Smoke",     minLvl:1, accent:"#9fd8f0", premium:true, desc:"Snow on every roof, the Long Night of 2026" },
+  xmas_rooftops: { lbl:"Over the Rooftops", minLvl:1, accent:"#bfe6f5", premium:true, desc:"One window still lit, the Long Night of 2026" },
 };
 
 // Returns the style object to spread for a banner background — handles both
