@@ -35,6 +35,31 @@ export const EVENTS = [
     relics: "magi",
     // its banners (src/lib/data.js): a present may hold one not yet owned
     banners: { ids: ["xmas_star", "xmas_square", "xmas_chimneys", "xmas_rooftops"], chance: [0.02, 0.03, 0.05, 0.08, 0.12, 0.18] },
+    // how it looks and speaks (client only)
+    look: "winter", icon: "snow", tint: "#bfe6f5",
+    present: { name: "PRESENT", arrives: "HE PUSHES A PRESENT THROUGH THE GAP, TIED WITH RIBBON", heading: "A PRESENT FOR THE LONG NIGHT", hold: "HOLD TO PULL THE RIBBON" },
+    blurb: "A THIRD OF HIS CHESTS ARE PRESENTS WHILE THE NIGHT LASTS. EVERY PRESENT HOLDS A FROST '26 COIN. COPY HARD PAGES WELL AND THE PRESENTS ARE BETTER.",
+    teaser: "SOMETHING IS COMING THROUGH THE GAP. PRESENTS AMONG HIS CHESTS, COINS OF THE SEASON IN EVERY METAL, THREE GIFTS FIT FOR KINGS, AND A FEW THINGS NOBODY WILL HAVE ONCE THE NIGHT IS OVER.",
+  },
+  {
+    // Lunar New Year 2027 (the Year of the Goat begins 6 February), from
+    // New Year's Eve to the Lantern Festival. Built on the Long Night's
+    // pattern: the same odds, its own coins, art and words.
+    id: "lunar27",
+    name: "THE LANTERN DAYS",
+    from: "2027-02-05", to: "2027-02-20",
+    season: "lunar27",
+    chestShare: 1 / 3,
+    coinLift: [0, 0, 1, 1, 2, 3],
+    tome: { id: "lantern_book", chance: [0.08, 0.1, 0.14, 0.2, 0.28, 0.35] },
+    title: { id: "lunar27", chance: [0.03, 0.05, 0.08, 0.12, 0.18, 0.25] },
+    effect: { id: "lanternrise", chance: [0, 0.005, 0.015, 0.03, 0.06, 0.12] },
+    relics: "stargods",
+    banners: { ids: ["lny_market", "lny_lanterns", "lny_fireworks", "lny_dragon"], chance: [0.02, 0.03, 0.05, 0.08, 0.12, 0.18] },
+    look: "lunar", icon: "lantern", tint: "#ff8a5a",
+    present: { name: "RED ENVELOPE", arrives: "HE SLIDES A RED ENVELOPE THROUGH THE GAP", heading: "A RED ENVELOPE FOR THE NEW YEAR", hold: "HOLD TO LIFT THE FLAP" },
+    blurb: "A THIRD OF HIS CHESTS ARE RED ENVELOPES UNTIL THE LANTERN FESTIVAL. EVERY ENVELOPE HOLDS A LUNAR '27 COIN. COPY HARD PAGES WELL AND THE ENVELOPES ARE RICHER.",
+    teaser: "THE NEW YEAR IS COMING THROUGH THE GAP. RED ENVELOPES AMONG HIS CHESTS, COINS OF THE SEASON IN EVERY METAL, THE THREE STAR GODS, AND A FEW THINGS NOBODY WILL HAVE ONCE THE LANTERNS ARE DOWN.",
   },
 ];
 
@@ -54,7 +79,18 @@ export const RELICS = {
       { name: "FRANKINCENSE", emblem: "censer", era: "Carried by the second king, for a god" },
       { name: "MYRRH",        emblem: "jar",    era: "Carried by the third king, for the grave" },
     ],
+  },  // the Three Star Gods, shown together at the New Year: each in a red
+  // paper lantern (vessel), not a snow globe
+  stargods: {
+    event: "lunar27", name: "THE THREE STAR GODS", chance: 0.01, vessel: "lantern",
+    firstBonus: 5000, setBonus: 20000, metal: 3,
+    coins: [
+      { name: "FORTUNE",    emblem: "bat",   era: "Fu, the star of blessings: a bat, for its name sounds like fortune" },
+      { name: "PROSPERITY", emblem: "ingot", era: "Lu, the star of rank: a gold ingot, for wealth that keeps coming" },
+      { name: "LONGEVITY",  emblem: "peach", era: "Shou, the star of long life: the peach of the immortals" },
+    ],
   },
+
 };
 export const relicOf = r => {
   const [set, i] = String(r || "").split(":"), s = RELICS[set], c = s?.coins[+i];
@@ -64,15 +100,26 @@ export const relicOf = r => {
 /* What each season does to a coin: its sale value and cabinet score
  * multiply; `label` is how the coin names it. */
 export const SEASONS = {
-  frost26: { label: "FROST '26", event: "longnight26", valueMul: 1.5, cabinetMul: 1.5 },
+  frost26: { label: "FROST '26", event: "longnight26", valueMul: 1.5, cabinetMul: 1.5, look: "frost" },
+  lunar27: { label: "LUNAR '27", event: "lunar27", valueMul: 1.5, cabinetMul: 1.5, look: "lunar" },
 };
 
 /* Profile effects, worn over the banner (components/ProfileFx.jsx). */
 export const PROFILE_FX = {
   frostfall: { label: "Frostfall", desc: "Snow falls across your banner; frost creeps along your name." },
+  lanternrise: { label: "Lanternrise", desc: "Paper lanterns rise across your banner, an ember glow beneath them." },
 };
 
 const dayOf = iso => Math.floor(Date.parse(iso + "T00:00:00Z") / 86400e3);
+
+/* the event running on this local day number, or else the next to come:
+ * { ev, live, days } (days left, or days until it begins), or null */
+export function eventAhead(day) {
+  const on = EVENTS.find(e => day >= dayOf(e.from) && day <= dayOf(e.to));
+  if (on) return { ev: on, live: true, days: dayOf(on.to) - day + 1 };
+  const next = EVENTS.filter(e => dayOf(e.from) > day).sort((a, b) => dayOf(a.from) - dayOf(b.from))[0];
+  return next ? { ev: next, live: false, days: dayOf(next.from) - day } : null;
+}
 
 /* the event running on this local day number, or null */
 export function eventOn(day) {

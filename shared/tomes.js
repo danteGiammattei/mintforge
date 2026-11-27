@@ -108,6 +108,21 @@ export const TOMES = [
       { id: "present",   name: "THE PRESENT",   tier: 4, strokes: [line([0.16, 0.42], [0.84, 0.42], [0.84, 0.94], [0.16, 0.94], [0.16, 0.42]), line([0.5, 0.42], [0.5, 0.94]), ring(0.38, 0.3, 0.11, 16), ring(0.62, 0.3, 0.11, 16)] },
     ],
   },
+  /* The Lantern Days' book (lunar27): signs of the New Year. */
+  {
+    id: "lantern_book", name: "THE BOOK OF LANTERNS", tier: 2, event: "lunar27",
+    look: { leather: "#7a1a14", trim: "#e8c060", emblem: "lantern" },
+    pages: [
+      { id: "lantern",  name: "THE LANTERN",     tier: 3, strokes: [arc(0.5, 0.5, 0.3, 0, TAU, 28, 0.26), line([0.38, 0.24], [0.62, 0.24]), line([0.38, 0.76], [0.62, 0.76]), line([0.5, 0.04], [0.5, 0.24]), line([0.5, 0.76], [0.5, 0.96])] },
+      { id: "cash",     name: "THE CASH COIN",   tier: 3, strokes: [ring(0.5, 0.5, 0.4, 32), line([0.4, 0.4], [0.6, 0.4], [0.6, 0.6], [0.4, 0.6], [0.4, 0.4])] },
+      { id: "cracker",  name: "THE FIRECRACKER", tier: 3, strokes: [line([0.38, 0.32], [0.62, 0.32], [0.62, 0.94], [0.38, 0.94], [0.38, 0.32]), line([0.5, 0.32], [0.56, 0.2], [0.46, 0.12], [0.54, 0.03])] },
+      { id: "orange",   name: "THE MANDARIN",    tier: 3, strokes: [ring(0.5, 0.58, 0.34, 28), line([0.5, 0.24], [0.5, 0.12]), [[0.5, 0.16], [0.66, 0.06], [0.78, 0.12], [0.62, 0.2], [0.5, 0.16]]] },
+      { id: "moon",     name: "THE NEW MOON",    tier: 3, strokes: [arc(0.5, 0.5, 0.4, -2.2, 2.2, 22), arc(0.66, 0.5, 0.32, -2.05, 2.05, 18)] },
+      { id: "plum",     name: "THE PLUM BLOSSOM", tier: 3, strokes: [ring(0.5, 0.5, 0.08, 10), ...[0, 1, 2, 3, 4].map(k => ring(0.5 + Math.cos(k * TAU / 5 - Math.PI / 2) * 0.26, 0.5 + Math.sin(k * TAU / 5 - Math.PI / 2) * 0.26, 0.14, 14))] },
+      { id: "knot",     name: "THE KNOT",        tier: 4, strokes: [line([0.5, 0.1], [0.86, 0.46], [0.5, 0.82], [0.14, 0.46], [0.5, 0.1]), line([0.5, 0.26], [0.7, 0.46], [0.5, 0.66], [0.3, 0.46], [0.5, 0.26]), line([0.5, 0.82], [0.5, 0.98]), line([0.5, 0.02], [0.5, 0.1])] },
+      { id: "fish",     name: "THE FISH",        tier: 4, strokes: [[[0.14, 0.5], ...arc(0.42, 0.5, 0.3, Math.PI, TAU, 14, 0.2), [0.86, 0.3], [0.86, 0.7], ...arc(0.42, 0.5, 0.3, 0, Math.PI, 14, 0.2)], ring(0.28, 0.46, 0.04, 8)] },
+    ],
+  },
 ];
 
 export const TOME_BY_ID = Object.fromEntries(TOMES.map(t => [t.id, t]));
