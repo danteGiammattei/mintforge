@@ -50,7 +50,7 @@ export function StudioCard() {
 // on half of all launches; the rest rotate the year round. Art: docs/ART_STYLE.md.
 const W = 1080, H = 1927;
 const ARTS = [
-  { src: "/splash.webp", w: 853, h: 1844, lights: [[50.1, 37.9]] },                       // the candle on the desk
+  // the candle on the desk is out of the rotation until it is redone in this style
   { src: "/splash-door.webp",        w: W, h: H, lights: [[82, 60], [57, 77]] },          // the door, through the arch
   { src: "/splash-mint.webp",        w: W, h: H, lights: [[50, 86], [60, 34]] },          // the Mint Below
   { src: "/splash-observatory.webp", w: W, h: H, lights: [[56, 64.5]] },                  // the observatory
