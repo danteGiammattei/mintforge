@@ -1382,3 +1382,29 @@ test("the Long Night's presents may hold one of its banners, never one already o
   assert.equal(eventChestHolds(ev, 3, 5, { ...owned, frames: [...owned.frames, "xmas_rooftops"] }, () => 0).banner, null, "all four owned");
   assert.equal(eventChestHolds(ev, 3, 0, owned, () => 0.5).banner, null, "a plain scroll's present, mostly not");
 });
+
+test("the Lantern Days: its own season, set, book, title, effect and banners, all of them defined", async () => {
+  const { eventChestHolds, eventById, eventAhead, PROFILE_FX } = await import("../shared/events.js");
+  const { TOME_BY_ID } = await import("../shared/tomes.js");
+  const ev = eventById("lunar27");
+  assert.equal(SEASONS[ev.season].look, "lunar");
+  assert.equal(SEASONS[ev.season].valueMul, 1.5);
+  assert.equal(RELICS[ev.relics].event, "lunar27");
+  assert.equal(RELICS[ev.relics].coins.length, 3);
+  assert.ok(TOME_BY_ID[ev.tome.id], "its book exists");
+  assert.ok(PROFILE_FX[ev.effect.id], "its effect exists");
+  const data = readFileSync(new URL("../src/lib/data.js", import.meta.url), "utf8");
+  for (const id of ev.banners.ids) assert.match(data, new RegExp(`\\b${id}:`), `${id} is a banner`);
+  assert.match(data, /id:"lunar27"/, "its title exists");
+  // its envelopes may hold its own banners, never the Long Night's
+  const owned = { tomes: [], titles: [], effects: [], frames: [] };
+  assert.ok(ev.banners.ids.includes(eventChestHolds(ev, 3, 5, owned, () => 0).banner));
+  // it does not overlap the Long Night, and before it begins it is the one ahead
+  const day = iso => Math.floor(Date.parse(iso + "T00:00:00Z") / 86400e3);
+  assert.equal(eventOn(day("2027-01-20")), null);
+  assert.equal(eventOn(day("2027-02-05")).id, "lunar27");
+  assert.equal(eventOn(day("2027-02-21")), null);
+  const ahead = eventAhead(day("2027-01-20"));
+  assert.equal(ahead.ev.id, "lunar27"); assert.equal(ahead.live, false); assert.equal(ahead.days, 16);
+  assert.equal(eventAhead(day("2027-02-20")).days, 1, "its last day");
+});
