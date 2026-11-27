@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { eventOn } from "../../shared/events.js";
+import { localDay } from "../../shared/economy.js";
 
 /* ─── the way in ──────────────────────────────────────────────────────────
  * Every launch: black, and the studio's name flickering up out of it and
@@ -44,12 +46,27 @@ export function StudioCard() {
  * put its image in public/ and a line here: its size, and where any warm
  * light in it sits (in % of the image) to flicker; leave `lights` empty
  * for a screen that should hold still. */
+// `season`: shown only while that event runs (shared/events.js), and then
+// on half of all launches; the rest rotate the year round. Art: docs/ART_STYLE.md.
+const W = 1080, H = 1927;
 const ARTS = [
-  { src: "/splash.webp", w: 853, h: 1844, lights: [[50.1, 37.9]] },        // the candle on the desk
+  { src: "/splash.webp", w: 853, h: 1844, lights: [[50.1, 37.9]] },                       // the candle on the desk
+  { src: "/splash-door.webp",        w: W, h: H, lights: [[82, 60], [57, 77]] },          // the door, through the arch
+  { src: "/splash-mint.webp",        w: W, h: H, lights: [[50, 86], [60, 34]] },          // the Mint Below
+  { src: "/splash-observatory.webp", w: W, h: H, lights: [[56, 64.5]] },                  // the observatory
+  { src: "/splash-vault.webp",       w: W, h: H, lights: [[37, 84.5], [41, 53]] },        // the vault
+  { src: "/splash-longnight.webp",   w: W, h: H, lights: [[66, 66], [62, 57]], season: "frost26" },   // the Long Night
 ];
+function pickArt() {
+  const ev = eventOn(localDay(Date.now(), -new Date().getTimezoneOffset()));
+  const own = ev && ARTS.filter(a => a.season === ev.season);
+  if (own?.length && Math.random() < 0.5) return own[Math.floor(Math.random() * own.length)];
+  const all = ARTS.filter(a => !a.season);
+  return all[Math.floor(Math.random() * all.length)];
+}
 function Art() {
   const [missing, setMissing] = useState(false);
-  const [ART] = useState(() => ARTS[Math.floor(Math.random() * ARTS.length)]);
+  const [ART] = useState(pickArt);
   if (missing) return (
     <div aria-hidden style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center",
                               background: "radial-gradient(circle at 50% 42%, #2a1d0c 0, #0b0805 45%, #000 80%)" }}>
